@@ -1,108 +1,121 @@
-# Deploying Shelly to Unraid
+# Deploying Shelly
 
-This guide deploys Shelly as a Docker container on Unraid, accessible on your local network.
-
----
-
-## What you need
-
-- Unraid server running
-- SSH access to Unraid (Settings → Management Access → SSH)
-- The `finance-dashboard-v2` folder on your Mac (already have it)
+Shelly runs as a Docker container. Your data stays on your machine — nothing is sent to the cloud.
 
 ---
 
-## Step 1 — Copy the app to your Unraid server
+## Option A — Docker (any machine)
 
-From your **Mac terminal** (not Unraid), run:
+### Step 1 — Pull the image
 
 ```bash
-scp -r /path/to/finance-dashboard-v2 root@10.1.1.4:/mnt/user/appdata/shelly
+docker pull ghcr.io/jahumac/shelly:latest
 ```
 
-Replace:
-- `/path/to/finance-dashboard-v2` with the actual path to your project folder on your Mac
-- `10.1.1.4` with your Unraid server's IP (e.g. `192.168.1.100`)
-
-> **Tip:** To find your Unraid IP — open the Unraid web UI, it's shown in the top-left corner.
-
----
-
-## Step 2 — SSH into Unraid
-
-```bash
-ssh root@10.1.1.4
-```
-
----
-
-## Step 3 — Build the Docker image
-
-```bash
-cd /mnt/user/appdata/shelly
-docker build -t shelly-app .
-```
-
-This will take a minute or two the first time as it downloads Python and installs packages.
-
----
-
-## Step 4 — Run the container
+### Step 2 — Run the container
 
 ```bash
 docker run -d \
   --name shelly \
   --restart unless-stopped \
-  -p 8001:8000 \
-  -v /mnt/user/appdata/shelly/data:/app/data \
-  shelly-app
+  -p 8000:8000 \
+  -v /path/to/shelly-data:/app/data \
+  ghcr.io/jahumac/shelly:latest
 ```
+
+Replace `/path/to/shelly-data` with wherever you want Shelly to store its database. For example:
+- **Mac/Linux:** `~/shelly-data`
+- **Unraid:** `/mnt/user/appdata/shelly/data`
 
 What each flag does:
 - `-d` — runs in the background
-- `--restart unless-stopped` — auto-starts on Unraid reboot
-- `-p 8001:8000` — makes it accessible on port 8001 (maps to port 8000 inside the container)
+- `--restart unless-stopped` — auto-starts on reboot
+- `-p 8000:8000` — makes it accessible on port 8000 (change the left number if that port is taken, e.g. `-p 8001:8000`)
 - `-v .../data:/app/data` — persists your database and secret key outside the container
 
----
+### Step 3 — Open it
 
-## Step 5 — Open it in your browser
+Go to **http://localhost:8000** (or replace `localhost` with your server's IP).
 
-Go to: **http://10.1.1.4:8001**
-
-You'll see the setup screen the first time — create your admin account and you're in.
+You'll see the setup screen the first time — create your account and you're in.
 
 ---
 
-## How to update the app in future
+## Option B — Docker Compose
 
-When you've made changes on your Mac and want to push them to the server:
+Create a `docker-compose.yml`:
+
+```yaml
+services:
+  shelly:
+    image: ghcr.io/jahumac/shelly:latest
+    container_name: shelly
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+```
+
+Then run:
 
 ```bash
-# 1. Copy updated files to Unraid
-scp -r /path/to/finance-dashboard-v2 root@10.1.1.4:/mnt/user/appdata/shelly
+docker compose up -d
+```
 
-# 2. SSH in
-ssh root@10.1.1.4
+---
 
-# 3. Rebuild and restart
-cd /mnt/user/appdata/shelly
-docker build -t shelly-app .
+## Option C — Unraid
+
+### From Community Apps (recommended)
+
+Search for **Shelly** in the Unraid Community Apps store and click Install. Set the data path to `/mnt/user/appdata/shelly/data` and pick your port.
+
+### Manual install via SSH
+
+```bash
+ssh root@YOUR_UNRAID_IP
+docker pull ghcr.io/jahumac/shelly:latest
+docker run -d \
+  --name shelly \
+  --restart unless-stopped \
+  -p 8000:8000 \
+  -v /mnt/user/appdata/shelly/data:/app/data \
+  ghcr.io/jahumac/shelly:latest
+```
+
+Then open **http://YOUR_UNRAID_IP:8000** in your browser.
+
+---
+
+## Updating
+
+Pull the latest image and recreate the container:
+
+```bash
+docker pull ghcr.io/jahumac/shelly:latest
 docker stop shelly
 docker rm shelly
 docker run -d \
   --name shelly \
   --restart unless-stopped \
-  -p 8001:8000 \
-  -v /mnt/user/appdata/shelly/data:/app/data \
-  shelly-app
+  -p 8000:8000 \
+  -v /path/to/shelly-data:/app/data \
+  ghcr.io/jahumac/shelly:latest
 ```
 
-Your data is safe — it lives in `/mnt/user/appdata/shelly/data/` on the Unraid disk and is not touched by rebuilds.
+Or with Docker Compose:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Your data is safe — it lives in the volume you mounted and is not touched by updates.
 
 ---
 
-## Checking logs if something goes wrong
+## Checking logs
 
 ```bash
 docker logs shelly
@@ -112,12 +125,18 @@ docker logs -f shelly
 
 ---
 
-## Using a different port
+## Building from source
 
-If port 8001 is also taken, change `-p 8001:8000` to any free port, e.g. `-p 8080:8000`, and access it at `http://10.1.1.4:8080`. The left number is the host port (what you type in the browser); the right number (8000) is internal to the container and never changes.
+If you prefer to build the image yourself rather than using the pre-built one:
 
----
-
-## Visible to Unraid Docker UI?
-
-Yes — after `docker run`, open the Unraid web UI → Docker tab and Shelly will appear there. You can start/stop/restart it from the UI and see its port mapping.
+```bash
+git clone https://github.com/Jahumac/shelly.git
+cd shelly
+docker build -t shelly .
+docker run -d \
+  --name shelly \
+  --restart unless-stopped \
+  -p 8000:8000 \
+  -v ./data:/app/data \
+  shelly
+```
