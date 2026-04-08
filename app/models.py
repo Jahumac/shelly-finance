@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS assumptions (
     target_em_pct REAL DEFAULT 0.10,
     emergency_fund_target REAL DEFAULT 3000,
     dashboard_name TEXT DEFAULT 'Shelly',
+    auto_update_prices INTEGER DEFAULT 1,
     updated_at TEXT
 );
 
@@ -179,6 +180,15 @@ CREATE TABLE IF NOT EXISTS contribution_overrides (
 CREATE TABLE IF NOT EXISTS schema_migrations (
     name TEXT PRIMARY KEY,
     applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS portfolio_daily_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    snapshot_date TEXT NOT NULL,
+    total_value REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(user_id, snapshot_date)
 );
 """
 
@@ -601,6 +611,12 @@ def init_db():
         except Exception:
             pass
 
+        # ── Auto-update prices toggle on assumptions ─────────────────────────
+        try:
+            conn.execute("ALTER TABLE assumptions ADD COLUMN auto_update_prices INTEGER DEFAULT 1")
+        except Exception:
+            pass
+
         conn.commit()
 
 
@@ -850,6 +866,7 @@ def update_assumptions(payload, user_id):
                 update_day = ?,
                 retirement_date_mode = ?,
                 tax_band = ?,
+                auto_update_prices = ?,
                 updated_at = ?
             WHERE user_id = ?
             """,
@@ -868,6 +885,7 @@ def update_assumptions(payload, user_id):
                 payload.get("update_day", 0),
                 payload.get("retirement_date_mode", "birthday"),
                 payload.get("tax_band", "basic"),
+                payload.get("auto_update_prices", 1),
                 payload["updated_at"],
                 user_id,
             ),
@@ -1771,3 +1789,44 @@ def delete_contribution_override(override_id):
     with get_connection() as conn:
         conn.execute("DELETE FROM contribution_overrides WHERE id = ?", (override_id,))
         conn.commit()
+
+
+# ── Portfolio daily snapshots ──────────────────────────────────────────────────
+
+def save_daily_snapshot(user_id, total_value, snapshot_date=None):
+    """Save or update a portfolio snapshot for a given user and date.
+
+    Uses INSERT OR REPLACE to handle the UNIQUE(user_id, snapshot_date) constraint.
+    If snapshot_date is None, uses today's date.
+    """
+    from datetime import datetime
+    if snapshot_date is None:
+        snapshot_date = datetime.now().strftime("%Y-%m-%d")
+
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO portfolio_daily_snapshots (user_id, snapshot_date, total_value, created_at)
+            VALUES (?, ?, ?, datetime('now'))
+            """,
+            (user_id, snapshot_date, total_value),
+        )
+        conn.commit()
+
+
+def fetch_daily_snapshots(user_id, limit=365):
+    """Fetch daily portfolio snapshots for a user, limited to the last N days.
+
+    Returns a list of (snapshot_date, total_value) tuples ordered by date ASC.
+    """
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT snapshot_date, total_value FROM portfolio_daily_snapshots
+            WHERE user_id = ?
+            ORDER BY snapshot_date ASC
+            LIMIT ?
+            """,
+            (user_id, limit),
+        ).fetchall()
+    return [(r["snapshot_date"], float(r["total_value"])) for r in rows]

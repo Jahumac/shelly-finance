@@ -45,6 +45,7 @@ def settings():
             "update_day": update_day,
             "retirement_date_mode": request.form.get("retirement_date_mode", "birthday"),
             "tax_band": request.form.get("tax_band", "basic"),
+            "auto_update_prices": 1 if request.form.get("auto_update_prices") else 0,
             "updated_at": datetime.now().isoformat(),
         }
         update_assumptions(payload, uid)

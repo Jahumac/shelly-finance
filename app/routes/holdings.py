@@ -1,9 +1,10 @@
 """Holdings blueprint — API-only routes (page removed; see accounts for add-holding flow)."""
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 from flask_login import current_user, login_required
 
 from app.models import fetch_holding_catalogue, update_holding
 from app.services.prices import fetch_price, lookup_instrument
+from app.services.scheduler import trigger_manual_update
 
 holdings_bp = Blueprint("holdings", __name__)
 
@@ -79,3 +80,16 @@ def api_save_price():
     })
 
     return jsonify({"ok": True, "value": round(units * price, 2)})
+
+
+@holdings_bp.route("/api/trigger-price-update", methods=["POST"])
+@login_required
+def api_trigger_price_update():
+    """Manually trigger a price update for the current user.
+
+    This fetches fresh prices for all holdings, updates the catalogue,
+    and saves a daily snapshot.
+    """
+    result = trigger_manual_update(current_app, current_user.id)
+    status_code = 200 if result.get("ok") else 400
+    return jsonify(result), status_code

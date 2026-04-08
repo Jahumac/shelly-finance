@@ -2,8 +2,9 @@ from flask import Flask, redirect, url_for, send_from_directory
 from flask_login import LoginManager, current_user
 
 from .models import count_users, fetch_assumptions, get_user_by_id, init_db
+from .services.scheduler import init_scheduler
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 from .routes.auth import auth_bp
 from .routes.overview import overview_bp
 from .routes.goals import goals_bp
@@ -52,6 +53,7 @@ def create_app():
 
     with app.app_context():
         init_db()
+        init_scheduler(app)
 
     # ── Redirect to setup if no users exist ──────────────────────────────────
     @app.before_request

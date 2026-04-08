@@ -70,6 +70,12 @@
       </label>
 
       <label class="form-full-col" style="border-top:1px solid var(--border); padding-top:1rem; margin-top:0.5rem;">
+        <input type="checkbox" name="auto_update_prices" value="1" {{ 'checked' if not assumptions or assumptions.auto_update_prices != 0 else '' }}>
+        <span style="font-weight:600; font-size:0.95rem;">Auto-update portfolio prices</span>
+        <small class="form-hint" style="margin-top:-0.25rem;">Shelly will automatically fetch fresh prices at 7:00 AM and 5:00 PM UK time every day</small>
+      </label>
+
+      <label class="form-full-col" style="border-top:1px solid var(--border); padding-top:1rem; margin-top:0.5rem;">
         <span style="font-weight:600; font-size:0.95rem;">Monthly Update Timing</span>
         <small class="form-hint" style="margin-top:-0.25rem;">Shelly uses these dates to nudge you at the right time</small>
       </label>

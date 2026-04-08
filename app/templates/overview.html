@@ -89,7 +89,35 @@
     {% endif %}
   </div>
 
-  {% if history_labels | length >= 2 %}
+  {# Show daily portfolio chart if 2+ data points exist, otherwise show monthly history #}
+  {% if daily_labels | length >= 2 %}
+  <div class="mt-125">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+      <p class="chart-label">Portfolio Value</p>
+      <div class="period-selector" style="display: flex; gap: 0.5rem;">
+        <button class="period-btn" data-period="7D" style="padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: transparent; cursor: pointer; font-size: 0.85rem;">7D</button>
+        <button class="period-btn" data-period="1M" style="padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: transparent; cursor: pointer; font-size: 0.85rem;">1M</button>
+        <button class="period-btn" data-period="3M" style="padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: transparent; cursor: pointer; font-size: 0.85rem;">3M</button>
+        <button class="period-btn" data-period="6M" style="padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: transparent; cursor: pointer; font-size: 0.85rem;">6M</button>
+        <button class="period-btn" data-period="1Y" style="padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: transparent; cursor: pointer; font-size: 0.85rem;">1Y</button>
+        <button class="period-btn active" data-period="ALL" style="padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: var(--primary); color: white; cursor: pointer; font-size: 0.85rem;">ALL</button>
+      </div>
+    </div>
+    <div class="chart-wrap chart-wrap-sm">
+      <canvas id="dailyPortfolioChart" role="img" aria-label="Daily portfolio value chart"></canvas>
+    </div>
+    <div id="chartStats" style="display: flex; justify-content: space-between; margin-top: 0.75rem; font-size: 0.9rem;">
+      <div>
+        <p class="text-muted" style="margin: 0;">Latest Value</p>
+        <p id="latestValue" style="margin: 0; font-weight: 600;"></p>
+      </div>
+      <div style="text-align: right;">
+        <p class="text-muted" style="margin: 0;">Change</p>
+        <p id="changeValue" style="margin: 0; font-weight: 600;"></p>
+      </div>
+    </div>
+  </div>
+  {% elif history_labels | length >= 2 %}
   <div class="mt-125">
     <p class="chart-label">Net worth history</p>
     <div class="chart-wrap chart-wrap-sm">
@@ -104,6 +132,21 @@
   <p class="helper-text mt-1">
     Complete your first Monthly Update and Shelly will start tracking your net worth. Remember: slow and steady wins the race.
   </p>
+  {% endif %}
+
+  {# Last updated indicator #}
+  {% if last_snapshot_date %}
+  <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <p class="text-muted" style="margin: 0; font-size: 0.9rem;">Prices last updated</p>
+      <p style="margin: 0; font-weight: 600;">{{ last_snapshot_date }}</p>
+    </div>
+    {% if assumptions and assumptions.auto_update_prices %}
+    <p class="text-muted" style="margin: 0; font-size: 0.85rem;">Auto-update: On</p>
+    {% else %}
+    <p class="text-muted" style="margin: 0; font-size: 0.85rem;">Auto-update: Off</p>
+    {% endif %}
+  </div>
   {% endif %}
 </section>
 
@@ -228,6 +271,150 @@
       }
     }
   });
+})();
+</script>
+{% endif %}
+
+{# Daily portfolio chart script #}
+{% if daily_labels | length >= 2 %}
+<script>
+(function () {
+  var allLabels = {{ daily_labels | tojson }};
+  var allValues = {{ daily_values | tojson }};
+  var chart = null;
+
+  var S = getComputedStyle(document.documentElement);
+  var CSS = {
+    primary: S.getPropertyValue('--primary').trim(),
+    muted:  S.getPropertyValue('--muted').trim(),
+    grid:   S.getPropertyValue('--chart-grid').trim(),
+  };
+
+  // Period definitions (in days)
+  var periods = {
+    '7D': 7,
+    '1M': 30,
+    '3M': 90,
+    '6M': 180,
+    '1Y': 365,
+    'ALL': 999999
+  };
+
+  function filterData(period) {
+    var cutoffDays = periods[period];
+    var today = new Date();
+    var cutoffDate = new Date(today.getTime() - cutoffDays * 24 * 60 * 60 * 1000);
+
+    var filtered = {
+      labels: [],
+      values: []
+    };
+
+    for (var i = 0; i < allLabels.length; i++) {
+      var dateStr = allLabels[i];
+      var date = new Date(dateStr);
+      if (date >= cutoffDate) {
+        filtered.labels.push(dateStr);
+        filtered.values.push(allValues[i]);
+      }
+    }
+
+    return filtered;
+  }
+
+  function formatDate(dateStr) {
+    var date = new Date(dateStr);
+    return date.toLocaleDateString('en-GB', { day: 'short', month: 'short' });
+  }
+
+  function updateChart(period) {
+    var data = filterData(period);
+    if (data.labels.length === 0) return;
+
+    var fmtLabels = data.labels.map(formatDate);
+    var ctx = document.getElementById('dailyPortfolioChart').getContext('2d');
+
+    if (chart) {
+      chart.destroy();
+    }
+
+    chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: fmtLabels,
+        datasets: [{
+          data: data.values,
+          borderColor: CSS.primary,
+          backgroundColor: CSS.primary + '22',
+          borderWidth: 2,
+          pointRadius: data.values.length <= 30 ? 3 : 0,
+          pointBackgroundColor: CSS.primary,
+          fill: true,
+          tension: 0.25
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                return ' £' + ctx.parsed.y.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: CSS.grid },
+            ticks: { color: CSS.muted, font: { size: 11 } }
+          },
+          y: {
+            grid: { color: CSS.grid },
+            ticks: {
+              color: CSS.muted,
+              font: { size: 11 },
+              callback: function(v) { return '£' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v); }
+            }
+          }
+        }
+      }
+    });
+
+    // Update stats
+    if (data.values.length > 0) {
+      var latest = data.values[data.values.length - 1];
+      var first = data.values[0];
+      var change = latest - first;
+      var changePct = (change / first * 100);
+
+      document.getElementById('latestValue').textContent = '£' + latest.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      var changeStr = (change >= 0 ? '+' : '') + change.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' (' + (changePct >= 0 ? '+' : '') + changePct.toFixed(2) + '%)';
+      var changeEl = document.getElementById('changeValue');
+      changeEl.textContent = changeStr;
+      changeEl.style.color = change >= 0 ? 'var(--success)' : 'var(--danger)';
+    }
+  }
+
+  // Period button handlers
+  document.querySelectorAll('.period-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      document.querySelectorAll('.period-btn').forEach(function(b) {
+        b.style.background = 'transparent';
+        b.style.color = 'inherit';
+      });
+      this.style.background = CSS.primary;
+      this.style.color = 'white';
+      updateChart(this.dataset.period);
+    });
+  });
+
+  // Initial render
+  updateChart('ALL');
 })();
 </script>
 {% endif %}

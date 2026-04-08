@@ -14,7 +14,7 @@ from app.calculations import (
     uk_tax_year_label,
     days_until_tax_year_end,
 )
-from app.models import fetch_all_accounts, fetch_allowance_tracking, fetch_assumptions, fetch_holding_totals_by_account, fetch_net_worth_history, fetch_primary_goal
+from app.models import fetch_all_accounts, fetch_allowance_tracking, fetch_assumptions, fetch_holding_totals_by_account, fetch_net_worth_history, fetch_primary_goal, fetch_daily_snapshots
 
 overview_bp = Blueprint("overview", __name__)
 
@@ -77,6 +77,12 @@ def overview():
     history_labels = [h[0] for h in history]
     history_values = [round(h[1], 2) for h in history]
 
+    # Fetch daily snapshots (up to 365 days)
+    daily_snapshots = fetch_daily_snapshots(uid, limit=365)
+    daily_labels = [d[0] for d in daily_snapshots]
+    daily_values = [round(d[1], 2) for d in daily_snapshots]
+    last_snapshot_date = daily_labels[-1] if daily_labels else None
+
     return render_template(
         "overview.html",
         metrics=metrics,
@@ -84,5 +90,8 @@ def overview():
         assumptions=assumptions,
         history_labels=history_labels,
         history_values=history_values,
+        daily_labels=daily_labels,
+        daily_values=daily_values,
+        last_snapshot_date=last_snapshot_date,
         active_page="overview",
     )
