@@ -28,28 +28,35 @@ def init_scheduler(app):
     Uses a file lock to prevent multiple scheduler instances in multi-worker
     environments like Gunicorn.
     """
+    import sys
     global scheduler
 
+    print(f"[Shelly] init_scheduler called (pid={os.getpid()})", flush=True)
+
     if not APSCHEDULER_AVAILABLE:
-        logger.warning("APScheduler not installed. Background price updates disabled.")
+        print("[Shelly] APScheduler not installed!", flush=True)
         return None
 
     if scheduler is not None:
+        print("[Shelly] Scheduler already exists, returning", flush=True)
         return scheduler
 
     # In development with Werkzeug reloader, only start in the reloader process
     if os.environ.get('WERKZEUG_RUN_MAIN') == 'false':
+        print("[Shelly] Skipping: Werkzeug reloader child process", flush=True)
         return None
 
     # Use a file lock to ensure only one worker starts the scheduler
     import fcntl
-    lock_path = os.path.join(str(app.config.get('DATA_DIR', '/app/data')), '.scheduler.lock')
+    data_dir = str(app.config.get('DATA_DIR', '/app/data'))
+    lock_path = os.path.join(data_dir, '.scheduler.lock')
+    print(f"[Shelly] Attempting lock at: {lock_path}", flush=True)
     try:
         lock_file = open(lock_path, 'w')
         fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except (IOError, OSError):
-        # Another worker already has the lock — skip scheduler
-        logger.debug("Scheduler lock held by another process, skipping.")
+        print(f"[Shelly] Lock acquired!", flush=True)
+    except (IOError, OSError) as e:
+        print(f"[Shelly] Lock failed: {e}", flush=True)
         return None
 
     scheduler = BackgroundScheduler(timezone='Europe/London')
@@ -75,10 +82,10 @@ def init_scheduler(app):
 
     try:
         scheduler.start()
-        print("[Shelly] Background scheduler started — price updates at 7:00 AM and 5:00 PM UK time")
+        print("[Shelly] Background scheduler started — price updates at 7:00 AM and 5:00 PM UK time", flush=True)
         logger.info("Background scheduler started (7:00 AM and 5:00 PM UK time)")
     except Exception as e:
-        print(f"[Shelly] Failed to start scheduler: {e}")
+        print(f"[Shelly] Failed to start scheduler: {e}", flush=True)
         logger.error(f"Failed to start scheduler: {e}")
         scheduler = None
 
