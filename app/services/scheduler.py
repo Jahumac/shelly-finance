@@ -25,7 +25,7 @@ def init_scheduler(app):
     """Initialize and start the background scheduler.
 
     This should be called once during app initialization, after the database is set up.
-    Uses a file-based approach to prevent multiple scheduler instances in multi-worker
+    Uses a file lock to prevent multiple scheduler instances in multi-worker
     environments like Gunicorn.
     """
     global scheduler
@@ -34,15 +34,22 @@ def init_scheduler(app):
         logger.warning("APScheduler not installed. Background price updates disabled.")
         return None
 
-    # Prevent double-start in development with Werkzeug reloader
-    # or in production with multiple Gunicorn workers
     if scheduler is not None:
         return scheduler
 
-    # Only start scheduler in main process (not Werkzeug reloader or Gunicorn worker)
+    # In development with Werkzeug reloader, only start in the reloader process
     if os.environ.get('WERKZEUG_RUN_MAIN') == 'false':
         return None
-    if os.environ.get('WERKZEUG_SERVER_FD') is not None:
+
+    # Use a file lock to ensure only one worker starts the scheduler
+    import fcntl
+    lock_path = os.path.join(str(app.config.get('DATA_DIR', '/app/data')), '.scheduler.lock')
+    try:
+        lock_file = open(lock_path, 'w')
+        fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (IOError, OSError):
+        # Another worker already has the lock — skip scheduler
+        logger.debug("Scheduler lock held by another process, skipping.")
         return None
 
     scheduler = BackgroundScheduler(timezone='Europe/London')
@@ -68,8 +75,10 @@ def init_scheduler(app):
 
     try:
         scheduler.start()
+        print("[Shelly] Background scheduler started — price updates at 7:00 AM and 5:00 PM UK time")
         logger.info("Background scheduler started (7:00 AM and 5:00 PM UK time)")
     except Exception as e:
+        print(f"[Shelly] Failed to start scheduler: {e}")
         logger.error(f"Failed to start scheduler: {e}")
         scheduler = None
 
