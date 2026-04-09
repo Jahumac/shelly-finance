@@ -1,6 +1,7 @@
 from flask import Blueprint, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
+from app import __version__
 from app.extensions import limiter
 from app.models import (
     count_users,
@@ -49,7 +50,7 @@ def setup():
             login_user(user)
             return redirect(url_for("overview.overview"))
 
-    return render_template("auth/setup.html", error=error)
+    return render_template("auth/setup.html", error=error, version=__version__)
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
@@ -71,7 +72,7 @@ def login():
             next_url = request.args.get("next")
             return redirect(next_url or url_for("overview.overview"))
 
-    return render_template("auth/login.html", error=error)
+    return render_template("auth/login.html", error=error, version=__version__)
 
 
 @auth_bp.route("/logout")

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sign In · Shelly</title>
+  <title>Sign In · Shelly Finance</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -15,19 +15,25 @@
 
     <!-- Left: branding panel -->
     <div class="auth-brand">
+      <div class="auth-brand-bg-dots"></div>
+
       <div class="auth-brand-logo">
-        <span class="auth-brand-hero turtle-bob">🐢</span>
-        <span class="auth-brand-name">Shelly</span>
+        <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="Shelly" class="auth-brand-icon turtle-bob">
+        <div class="auth-brand-name-block">
+          <span class="auth-brand-name">Shelly Finance</span>
+          <span class="auth-version-badge">v{{ version }}</span>
+        </div>
       </div>
 
       <h1 class="auth-brand-headline">Slow and steady<br><span>wins the race.</span></h1>
-      <p class="auth-brand-sub">Shelly is your personal finance turtle — tracking investments, planning retirement, and keeping your budget in check. One month at a time.</p>
+      <p class="auth-brand-sub">Your self-hosted personal finance dashboard. Track investments, plan for retirement, and keep your budget on track — your data never leaves your machine.</p>
 
       <ul class="auth-brand-features">
         <li>Net worth &amp; investment tracking</li>
+        <li>Live prices with configurable schedules</li>
         <li>Retirement projections by account</li>
         <li>Monthly budget with carry-forward</li>
-        <li>ISA &amp; LISA allowance tracker</li>
+        <li>ISA, LISA &amp; pension allowance tracking</li>
         <li>Works offline as a PWA</li>
       </ul>
     </div>
@@ -36,7 +42,7 @@
     <div class="auth-form-panel">
       <div class="auth-form-inner">
         <p class="eyebrow">Welcome back</p>
-        <h2>Sign in to Shelly</h2>
+        <h2>Sign in</h2>
         <p class="auth-hint">Shelly missed you. Let's see how the portfolio's doing.</p>
 
         {% if error %}
@@ -54,6 +60,8 @@
           </div>
           <button type="submit" class="auth-submit">Sign in</button>
         </form>
+
+        <p class="auth-footer-note">Self-hosted &middot; Open source &middot; <a href="https://github.com/Jahumac/shelly-finance" target="_blank" rel="noopener">GitHub</a></p>
       </div>
     </div>
 

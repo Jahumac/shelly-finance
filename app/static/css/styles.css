@@ -2351,6 +2351,14 @@ button.badge-like-button {
   margin-bottom: 1.75rem;
 }
 
+.auth-brand-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+  filter: drop-shadow(0 4px 24px rgba(56, 189, 248, 0.2));
+}
+
+/* Legacy emoji fallback */
 .auth-brand-hero {
   font-size: 5rem;
   line-height: 1;
@@ -2359,11 +2367,40 @@ button.badge-like-button {
   filter: drop-shadow(0 4px 24px rgba(56, 189, 248, 0.15));
 }
 
+.auth-brand-name-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
 .auth-brand-name {
-  font-size: 2rem;
+  font-size: 1.65rem;
   font-weight: 800;
   letter-spacing: -0.03em;
   color: var(--text);
+  line-height: 1.1;
+}
+
+.auth-version-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  letter-spacing: 0.04em;
+  width: fit-content;
+}
+
+/* Subtle dot grid overlay on brand panel */
+.auth-brand-bg-dots {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(56, 189, 248, 0.07) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
 }
 
 /* ── Turtle animations ──────────────────────────────────────────────── */
@@ -2372,18 +2409,18 @@ button.badge-like-button {
 /* Login: gentle float — Shelly's waiting patiently for you */
 .turtle-bob { animation: turtle-bob 4s ease-in-out infinite; }
 @keyframes turtle-bob {
-  0%, 100% { transform: scaleX(-1) translateY(0); }
-  50%      { transform: scaleX(-1) translateY(-8px); }
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
 }
 
 /* Setup: excited wiggle — Shelly's meeting someone new! */
 .turtle-wave { animation: turtle-wave 2s ease-in-out infinite; }
 @keyframes turtle-wave {
-  0%, 100% { transform: scaleX(-1) rotate(0deg) translateY(0); }
-  20%      { transform: scaleX(-1) rotate(-8deg) translateY(-3px); }
-  40%      { transform: scaleX(-1) rotate(8deg) translateY(-3px); }
-  60%      { transform: scaleX(-1) rotate(-5deg) translateY(-2px); }
-  80%      { transform: scaleX(-1) rotate(5deg) translateY(-2px); }
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  20%      { transform: rotate(-8deg) translateY(-3px); }
+  40%      { transform: rotate(8deg) translateY(-3px); }
+  60%      { transform: rotate(-5deg) translateY(-2px); }
+  80%      { transform: rotate(5deg) translateY(-2px); }
 }
 
 /* Fallback / default: subtle breathe */
@@ -2617,6 +2654,47 @@ button.badge-like-button {
 
 .auth-submit:active {
   transform: translateY(0);
+}
+
+.auth-footer-note {
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--muted);
+  opacity: 0.6;
+}
+.auth-footer-note a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.auth-footer-note a:hover {
+  text-decoration: underline;
+}
+
+/* ── Auth mobile layout ──────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .auth-shell {
+    padding: 0;
+    align-items: flex-start;
+  }
+  .auth-container {
+    grid-template-columns: 1fr;
+    border-radius: 0;
+    border: none;
+    max-width: 100%;
+  }
+  .auth-brand {
+    padding: 2rem 1.5rem 1.5rem;
+  }
+  .auth-brand-headline {
+    font-size: 1.5rem;
+  }
+  .auth-brand-features {
+    display: none;
+  }
+  .auth-form-panel {
+    padding: 1.5rem;
+  }
 }
 
 /* ── Toggle switch ───────────────────────────────────────────────────── */

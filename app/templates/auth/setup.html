@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>First-Time Setup · Shelly</title>
+  <title>First-Time Setup · Shelly Finance</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -15,9 +15,14 @@
 
     <!-- Left: branding panel -->
     <div class="auth-brand">
+      <div class="auth-brand-bg-dots"></div>
+
       <div class="auth-brand-logo">
-        <span class="auth-brand-hero turtle-wave">🐢</span>
-        <span class="auth-brand-name">Shelly</span>
+        <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="Shelly" class="auth-brand-icon turtle-wave">
+        <div class="auth-brand-name-block">
+          <span class="auth-brand-name">Shelly Finance</span>
+          <span class="auth-version-badge">v{{ version }}</span>
+        </div>
       </div>
 
       <h1 class="auth-brand-headline">Meet Shelly,<br><span>your finance turtle.</span></h1>
@@ -25,9 +30,10 @@
 
       <ul class="auth-brand-features">
         <li>Net worth &amp; investment tracking</li>
+        <li>Live prices with configurable schedules</li>
         <li>Retirement projections by account</li>
         <li>Monthly budget with carry-forward</li>
-        <li>ISA &amp; LISA allowance tracker</li>
+        <li>ISA, LISA &amp; pension allowance tracking</li>
         <li>Works offline as a PWA</li>
       </ul>
     </div>
@@ -59,6 +65,8 @@
           </div>
           <button type="submit" class="auth-submit">Create account &amp; sign in &rarr;</button>
         </form>
+
+        <p class="auth-footer-note">Self-hosted &middot; Open source &middot; <a href="https://github.com/Jahumac/shelly-finance" target="_blank" rel="noopener">GitHub</a></p>
       </div>
     </div>
 
