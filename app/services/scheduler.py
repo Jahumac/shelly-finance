@@ -50,6 +50,8 @@ def init_scheduler(app):
         _lock_file = open(lock_path, 'w')
         fcntl.flock(_lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except (IOError, OSError):
+        print("[Shelly] Another worker already holds the scheduler lock — skipping scheduler init in this worker.", flush=True)
+        logger.info("Another worker already holds the scheduler lock — skipping.")
         return None
 
     scheduler = BackgroundScheduler(timezone='Europe/London')
@@ -93,6 +95,8 @@ def _scheduled_check(app):
         now_minutes = now.hour * 60 + now.minute  # minutes since midnight
         today_str = now.strftime('%Y-%m-%d')
 
+        print(f"[Shelly] Scheduled check running at {now.strftime('%Y-%m-%d %H:%M:%S')} UK time", flush=True)
+
         try:
             users = fetch_all_users()
         except Exception as e:
@@ -120,25 +124,25 @@ def _scheduled_check(app):
 
                     # Check if we're within the 15-minute window after the configured time
                     if 0 <= (now_minutes - slot_minutes) < 15:
-                        # Check we haven't already run this slot today
+                        # Atomic check-and-claim: single connection to avoid race condition
                         with get_connection() as conn:
                             already = conn.execute(
                                 "SELECT 1 FROM scheduler_runs WHERE user_id = ? AND run_date = ? AND slot = ?",
                                 (user_id, today_str, slot_name),
                             ).fetchone()
-                        if already:
-                            continue
-
-                        logger.info(f"Triggering {slot_name} update for user {user_id} (scheduled {time_str})")
-                        _run_price_update_for_user(app, user_id, slot_name)
-
-                        # Record that we've run this slot
-                        with get_connection() as conn:
+                            if already:
+                                continue
+                            # Claim the slot *before* running the update so no other
+                            # worker can start the same job if this one is slow.
                             conn.execute(
                                 "INSERT OR IGNORE INTO scheduler_runs (user_id, run_date, slot) VALUES (?, ?, ?)",
                                 (user_id, today_str, slot_name),
                             )
                             conn.commit()
+
+                        print(f"[Shelly] Triggering {slot_name} price update for user {user_id} (scheduled {time_str})", flush=True)
+                        logger.info(f"Triggering {slot_name} update for user {user_id} (scheduled {time_str})")
+                        _run_price_update_for_user(app, user_id, slot_name)
 
             except Exception as e:
                 logger.error(f"Scheduled check error for user {user_id}: {e}")
