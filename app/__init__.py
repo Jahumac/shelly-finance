@@ -4,7 +4,9 @@ from flask_login import LoginManager, current_user
 from .models import count_users, fetch_assumptions, get_user_by_id, init_db
 from .services.scheduler import init_scheduler
 
-__version__ = "1.1.0"
+from .extensions import limiter
+
+__version__ = "1.2.0"
 from .routes.auth import auth_bp
 from .routes.overview import overview_bp
 from .routes.goals import goals_bp
@@ -21,6 +23,16 @@ from .routes.performance import performance_bp
 def create_app():
     app = Flask(__name__)
     app.config.from_object("app.config.Config")
+
+    # ── Rate limiter ─────────────────────────────────────────────────────────
+    if limiter is not None:
+        limiter.init_app(app)
+
+    # ── Secure session cookies (auto-detect HTTPS) ───────────────────────
+    app.config.setdefault("SESSION_COOKIE_HTTPONLY", True)
+    app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")
+    app.config.setdefault("REMEMBER_COOKIE_HTTPONLY", True)
+    app.config.setdefault("REMEMBER_COOKIE_SAMESITE", "Lax")
 
     # ── Flask-Login ──────────────────────────────────────────────────────────
     login_manager = LoginManager(app)
@@ -77,5 +89,21 @@ def create_app():
         except Exception:
             name = "Shelly"
         return {"dashboard_name": name}
+
+    # ── Security headers ────────────────────────────────────────────────────
+    @app.after_request
+    def set_security_headers(response):
+        from flask import request as req
+        # Only add strict transport if we're behind HTTPS
+        if req.is_secure or req.headers.get("X-Forwarded-Proto") == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+            # Secure cookies only over HTTPS
+            app.config["SESSION_COOKIE_SECURE"] = True
+            app.config["REMEMBER_COOKIE_SECURE"] = True
+
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
 
     return app

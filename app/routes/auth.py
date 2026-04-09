@@ -1,6 +1,7 @@
 from flask import Blueprint, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
+from app.extensions import limiter
 from app.models import (
     count_users,
     create_user,
@@ -13,8 +14,15 @@ from app.models import (
 
 auth_bp = Blueprint("auth", __name__)
 
+# Rate limit helper — no-op if Flask-Limiter isn't installed
+def _limit(limit_string, **kwargs):
+    if limiter:
+        return limiter.limit(limit_string, **kwargs)
+    return lambda f: f
+
 
 @auth_bp.route("/setup", methods=["GET", "POST"])
+@_limit("5 per minute", methods=["POST"])
 def setup():
     if count_users() > 0:
         return redirect(url_for("overview.overview"))
@@ -45,6 +53,7 @@ def setup():
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
+@_limit("5 per minute", methods=["POST"])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("overview.overview"))
