@@ -72,7 +72,7 @@
 {% else %}
 <section class="card">
   <div class="empty-state">
-    <div class="empty-state-icon">🐢</div>
+    <div class="empty-state-icon"><img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="" class="shelly-inline-icon shelly-icon-lg"></div>
     <h3>No goals yet</h3>
     <p>A turtle without a destination is just wandering. Set a goal, tag the right accounts, and Shelly will track your progress to the finish line.</p>
     <a href="/goals/?mode=create" class="badge badge-primary-action">+ Create your first goal</a>

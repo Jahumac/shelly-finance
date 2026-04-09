@@ -13,7 +13,7 @@
 {% if steps_done < 4 %}
 <section class="card onboarding-welcome mb-1">
   <div class="onboarding-hero">
-    <span class="onboarding-turtle turtle-hello">🐢</span>
+    <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="" class="onboarding-turtle turtle-hello shelly-inline-icon shelly-icon-md">
     <div>
       <p class="eyebrow">Getting Started</p>
       <h2 class="onboarding-title">Welcome to Shelly</h2>
@@ -58,7 +58,7 @@
 {% if review_nudge %}
 <section class="card review-nudge mb-1">
   <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
-    <span style="font-size:1.5rem;">🐢</span>
+    <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="" class="shelly-inline-icon shelly-icon-sm">
     <div style="flex:1; min-width:200px;">
       <strong>Your investments should be settled by now</strong>
       <p class="helper-text" style="margin:0.15rem 0 0;">
@@ -232,7 +232,7 @@
       </a>
     {% else %}
       <div class="empty-state">
-        <div class="empty-state-icon">🐢</div>
+        <div class="empty-state-icon"><img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="" class="shelly-inline-icon shelly-icon-lg"></div>
         <h3>Nothing in the shell yet</h3>
         <p>Every journey starts with a single step — even for a turtle. Add your first account and Shelly will start crunching the numbers.</p>
         <a href="/accounts/?mode=create" class="badge badge-primary-action">+ Add your first account</a>

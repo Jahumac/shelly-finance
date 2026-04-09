@@ -180,7 +180,7 @@
   {% else %}
   <div class="card">
     <div class="empty-state">
-      <div class="empty-state-icon">🐢</div>
+      <div class="empty-state-icon"><img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="" class="shelly-inline-icon shelly-icon-lg"></div>
       <h3>No accounts yet</h3>
       <p>Shelly can't track what Shelly can't see. Add your first account — ISA, pension, savings, the works — and let the slow, steady magic begin.</p>
       <a href="/accounts/?mode=create" class="badge badge-primary-action">+ Add your first account</a>

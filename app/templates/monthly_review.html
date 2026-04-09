@@ -229,7 +229,7 @@
     </div>
   {% else %}
     <div class="empty-state">
-      <div class="empty-state-icon">🐢</div>
+      <div class="empty-state-icon"><img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="" class="shelly-inline-icon shelly-icon-lg"></div>
       <h3>No holdings-based accounts</h3>
       <p>Shelly's got nothing to update here. Add a holdings-based account and it'll show up ready for your monthly check-in.</p>
       <a href="/accounts/?mode=create" class="badge badge-primary-action">+ Add account</a>

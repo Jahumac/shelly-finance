@@ -58,8 +58,9 @@ body {
 }
 
 .site-logo-icon {
-  font-size: 2.2rem;
-  line-height: 1;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
   flex-shrink: 0;
   display: inline-block;
   transform: scaleX(-1);
@@ -2006,6 +2007,17 @@ button.badge-like-button {
 
 /* Active pill underline inherits month colour (already set via --month-color) */
 
+/* ── Inline Shelly icon (replaces 🐢 emoji everywhere) ─────────────── */
+.shelly-inline-icon {
+  object-fit: contain;
+  vertical-align: middle;
+  display: inline-block;
+}
+.shelly-icon-xs { width: 20px; height: 20px; }     /* inline text */
+.shelly-icon-sm { width: 28px; height: 28px; }     /* nudge banners */
+.shelly-icon-md { width: 44px; height: 44px; }     /* onboarding */
+.shelly-icon-lg { width: 64px; height: 64px; }     /* empty states, modals */
+
 /* ── Hero turtle icons ──────────────────────────────────────────────── */
 .hero-turtle-wrap {
   flex-shrink: 0;
@@ -2526,16 +2538,16 @@ button.badge-like-button {
 /* Fallback / default: subtle breathe */
 .turtle-breathe { animation: turtle-breathe 6s ease-in-out infinite; }
 @keyframes turtle-breathe {
-  0%, 100% { transform: scaleX(-1) scale(1); }
-  50%      { transform: scaleX(-1) scale(1.06); }
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
 }
 
 /* Overview: happy nod — Shelly's pleased with the numbers */
 .turtle-overview { animation: turtle-overview 3s ease-in-out infinite; }
 @keyframes turtle-overview {
-  0%, 100% { transform: scaleX(-1) translateY(0) rotate(0deg); }
-  30%      { transform: scaleX(-1) translateY(-4px) rotate(-3deg); }
-  50%      { transform: scaleX(-1) translateY(0) rotate(2deg); }
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  30%      { transform: translateY(-4px) rotate(-3deg); }
+  50%      { transform: translateY(0) rotate(2deg); }
   70%      { transform: scaleX(-1) translateY(-3px) rotate(-2deg); }
 }
 
@@ -2991,8 +3003,6 @@ button.badge-like-button {
 .acct-grid > .card { grid-column: 1 / -1; }
 
 .empty-state-icon {
-  font-size: 2.5rem;
-  line-height: 1;
   margin-bottom: 0.25rem;
   animation: turtle-peek 5s ease-in-out infinite;
 }
@@ -3210,7 +3220,6 @@ button.badge-like-button {
 }
 
 .shelly-modal-icon {
-  font-size: 2.5rem;
   margin-bottom: 0.5rem;
   animation: turtle-hello-wave 2.5s ease-in-out infinite;
 }
