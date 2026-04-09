@@ -106,9 +106,10 @@ def _scheduled_check(app):
         for user_row in users:
             user_id = user_row["id"]
             try:
-                assumptions = fetch_assumptions(user_id)
-                if not assumptions:
+                row = fetch_assumptions(user_id)
+                if not row:
                     continue
+                assumptions = dict(row)
                 if not bool(assumptions.get("auto_update_prices", 1)):
                     continue
 
