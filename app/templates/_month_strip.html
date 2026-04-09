@@ -1,0 +1,16 @@
+{# ── Month strip (tax year: Apr → Mar) ─────────────────────────────────── #}
+{# Expects `month_strip` to be available in template context (injected globally). #}
+{% if month_strip %}
+{% set _current_month = month_strip | selectattr('is_today', 'true') | first %}
+{% set _accent = _current_month.month_num if _current_month else 4 %}
+<section class="budget-year-strip month-strip-global month-accent-{{ _accent }}">
+  <div class="budget-year-strip-inner">
+    {% for m in month_strip %}
+    <span class="budget-month-pill{% if m.is_today %} budget-month-active{% endif %}"
+          title="{{ m.label }}">
+      <span class="budget-month-pill-label">{{ m.label }}</span>
+    </span>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}

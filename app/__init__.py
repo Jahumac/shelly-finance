@@ -1,6 +1,7 @@
 from flask import Flask, redirect, url_for, send_from_directory
 from flask_login import LoginManager, current_user
 
+from .calculations import build_month_strip
 from .models import count_users, fetch_assumptions, get_user_by_id, init_db
 from .services.scheduler import init_scheduler
 
@@ -91,6 +92,14 @@ def create_app():
         except Exception:
             name = "Shelly"
         return {"dashboard_name": name}
+
+    @app.context_processor
+    def inject_month_strip():
+        from datetime import date
+        strip = build_month_strip(date.today())
+        today_pill = next((m for m in strip if m["is_today"]), None)
+        current_month_num = today_pill["month_num"] if today_pill else date.today().month
+        return {"month_strip": strip, "current_month_num": current_month_num}
 
     # ── Security headers ────────────────────────────────────────────────────
     @app.after_request

@@ -8,8 +8,11 @@
   <a href="/performance/" class="subnav-active">Performance</a>
 </nav>
 
+{# ── Month strip ─────────────────────────────────────────────────────────── #}
+{% include '_month_strip.html' %}
+
 {# ── Hero ────────────────────────────────────────────────────────────────── #}
-<section class="card highlight mb-1">
+<section class="card highlight mb-1 month-accent-{{ current_month_num }}">
   <div class="hero-top">
     <div>
       <p class="eyebrow">Performance</p>
@@ -22,6 +25,9 @@
         <h2 class="hero-value">No data yet</h2>
         <p class="hero-subtitle">Shelly needs at least two monthly reviews before the maths kicks in</p>
       {% endif %}
+    </div>
+    <div class="hero-turtle-wrap">
+      <img src="{{ url_for('static', filename='icons/shelly/Goals.png') }}" alt="" class="hero-turtle">
     </div>
   </div>
   {% if perf %}

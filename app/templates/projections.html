@@ -8,18 +8,26 @@
   <a href="/performance/">Performance</a>
 </nav>
 
+{# ── Month strip ─────────────────────────────────────────────────────────── #}
+{% include '_month_strip.html' %}
+
 {# ── Header ───────────────────────────────────────────────────────────────── #}
-<section class="card highlight mb-1">
-  <div class="section-header">
+<section class="card highlight mb-1 month-accent-{{ current_month_num }}">
+  <div class="hero-top">
     <div>
       <p class="eyebrow">Projections</p>
-      <h2>Retirement Projections</h2>
+      <h2 class="hero-value">Retirement Projections</h2>
+      <p class="hero-subtitle">Compound interest: the one thing that moves slower than a turtle but somehow makes you rich.</p>
     </div>
-    <div class="badge-row">
-      <a class="badge" href="/projections/export.xlsx">↓ Download Excel</a>
+    <div class="hero-turtle-wrap">
+      <img src="{{ url_for('static', filename='icons/shelly/Goals.png') }}" alt="" class="hero-turtle">
+    </div>
+    <div>
+      <div class="badge-row">
+        <a class="badge" href="/projections/export.xlsx">↓ Download Excel</a>
+      </div>
     </div>
   </div>
-  <p class="helper-text">Compound interest: the one thing that moves slower than a turtle but somehow makes you rich. Based on your current balances and growth settings.</p>
 </section>
 
 {# ── Summary cards ────────────────────────────────────────────────────────── #}

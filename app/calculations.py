@@ -769,3 +769,38 @@ def calculate_isa_usage(accounts, ad_hoc_contributions, today=None, salary_day=0
         "total_months": total_months,
         "breakdown": breakdown,
     }
+
+
+def build_month_strip(today=None):
+    """Build the 12-month tax-year strip (Apr → Mar) for the current date.
+
+    Returns a list of dicts: key, label, month_num, is_current, is_today.
+    This is a display-only strip (no budget data), so has_data is always False.
+    """
+    today = today or date.today()
+    current_month_key = today.strftime("%Y-%m")
+    current_month_num = today.month
+
+    # Determine the tax year start (April)
+    if today.month > 4 or (today.month == 4 and today.day >= 6):
+        ty_start_year = today.year
+    else:
+        ty_start_year = today.year - 1
+
+    strip = []
+    for i in range(12):
+        m = 4 + i  # Apr=4 … Mar=15→3
+        y = ty_start_year if m <= 12 else ty_start_year + 1
+        if m > 12:
+            m -= 12
+        mk = f"{y}-{m:02d}"
+        label_short = datetime.strptime(mk, "%Y-%m").strftime("%b")
+        strip.append({
+            "key": mk,
+            "label": label_short,
+            "month_num": m,
+            "is_current": (m == current_month_num),
+            "is_today": (mk == current_month_key),
+            "has_data": False,
+        })
+    return strip

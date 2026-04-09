@@ -71,13 +71,19 @@
 </section>
 {% endif %}
 
+{# ── Month strip ─────────────────────────────────────────────────────────── #}
+{% include '_month_strip.html' %}
+
 {# ── Hero ─────────────────────────────────────────────────────────────────── #}
-<section class="card highlight mb-1">
+<section class="card highlight mb-1 month-accent-{{ current_month_num }}">
   <div class="hero-top" style="display:flex; justify-content:space-between; align-items:flex-start;">
     <div>
       <p class="eyebrow">Total Net Worth</p>
       <h2 class="hero-value hero-value-xl">£{{ '{:,.2f}'.format(metrics.invested_total) }}</h2>
       <p class="hero-subtitle">{{ metrics.current_date }} · {{ metrics.current_time }}</p>
+    </div>
+    <div class="hero-turtle-wrap">
+      <img src="{{ url_for('static', filename='icons/shelly/Overview.png') }}" alt="" class="hero-turtle">
     </div>
     <div style="text-align:right;">
       <p class="eyebrow">Tax Year {{ metrics.tax_year }}</p>

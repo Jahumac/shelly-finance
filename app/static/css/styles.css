@@ -2003,6 +2003,33 @@ button.badge-like-button {
 
 /* Active pill underline inherits month colour (already set via --month-color) */
 
+/* ── Hero turtle icons ──────────────────────────────────────────────── */
+.hero-turtle-wrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.hero-turtle {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  opacity: 0.9;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.15));
+  transition: transform 0.3s ease;
+}
+.hero-turtle:hover {
+  transform: scale(1.08) rotate(-3deg);
+}
+
+/* ── Global month strip (non-budget pages) ─────────────────────────── */
+.month-strip-global {
+  pointer-events: none;            /* display-only, no links */
+}
+.month-strip-global .budget-month-pill {
+  cursor: default;
+}
+
 /* ── Account cards ─────────────────────────────────────────────────── */
 
 .acct-grid {
@@ -2358,6 +2385,11 @@ button.badge-like-button {
   .budget-month-dot {
     width: 3px;
     height: 3px;
+  }
+
+  .hero-turtle {
+    width: 56px;
+    height: 56px;
   }
 }
 
