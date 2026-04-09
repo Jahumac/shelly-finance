@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <Container version="2">
-  <Name>Shelly</Name>
+  <Name>Shelly-Finance</Name>
   <Repository>ghcr.io/jahumac/shelly-finance:latest</Repository>
   <Registry>https://github.com/jahumac/shelly-finance/pkgs/container/shelly-finance</Registry>
   <Branch>
@@ -13,24 +13,24 @@
   <Support>https://github.com/jahumac/shelly-finance/issues</Support>
   <Project>https://github.com/jahumac/shelly-finance</Project>
   <Overview>
-    Shelly is a self-hosted personal finance dashboard built for UK investors.
+    Shelly Finance is a self-hosted personal finance dashboard built for UK investors.
     Track your accounts (ISA, SIPP, LISA, GIA, pensions), holdings with live
     prices, monthly budgets, savings goals and retirement projections — all
     from your own machine. Your data never leaves your network.
 
-    Features: broker CSV import (Trading 212, Vanguard, HL, AJ Bell, and more),
+    Features: live price updates with configurable schedules, custom tags,
     granular fee tracking, year-by-year and month-by-month projections,
-    Excel export, PWA mobile support.
+    Excel export, PWA mobile support, rate-limited login for reverse proxy use.
   </Overview>
   <Category>Productivity: Tools:</Category>
-  <WebUI>http://[IP]:[PORT:8000]/</WebUI>
+  <WebUI>http://[IP]:[PORT:8001]/</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/jahumac/shelly-finance/main/unraid-template.xml</TemplateURL>
   <Icon>https://raw.githubusercontent.com/jahumac/shelly-finance/main/app/static/icons/icon-512.png</Icon>
-  <ExtraParams/>
+  <ExtraParams>--restart=unless-stopped</ExtraParams>
   <PostArgs/>
   <DonateText/>
   <DonateLink/>
   <Requires/>
-  <Config Name="Web UI Port" Target="8000" Default="8000" Mode="tcp" Description="Port for the Shelly web interface." Type="Port" Display="always" Required="true" Mask="false">8000</Config>
-  <Config Name="Data Directory" Target="/app/data" Default="/mnt/user/appdata/shelly/data" Mode="rw" Description="Where Shelly stores its SQLite database and secret key. Back this up!" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/shelly/data</Config>
+  <Config Name="Web UI Port" Target="8000" Default="8001" Mode="tcp" Description="Port for the Shelly Finance web interface." Type="Port" Display="always" Required="true" Mask="false">8001</Config>
+  <Config Name="Data Directory" Target="/app/data" Default="/mnt/user/appdata/shelly-finance" Mode="rw" Description="Where Shelly stores its SQLite database and secret key. Back this up!" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/shelly-finance</Config>
 </Container>
