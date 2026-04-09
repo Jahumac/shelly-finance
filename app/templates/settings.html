@@ -134,9 +134,6 @@
     <div class="hero-turtle-wrap">
       <img src="{{ url_for('static', filename='icons/shelly/Settings.png') }}" alt="" class="hero-turtle">
     </div>
-    <div style="padding-top:0.5rem;">
-      <a class="badge badge-primary-action" href="/settings/?mode=edit">Edit settings</a>
-    </div>
   </div>
   <div class="hero-strip">
     <div class="hero-strip-stat">
@@ -165,6 +162,10 @@
     </div>
   </div>
 </section>
+
+<div class="row-end">
+  <a class="badge badge-primary-action" href="/settings/?mode=edit">Edit settings</a>
+</div>
 
 {% endif %}
 
