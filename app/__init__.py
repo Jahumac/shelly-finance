@@ -94,12 +94,8 @@ def create_app():
     @app.after_request
     def set_security_headers(response):
         from flask import request as req
-        # Only add strict transport if we're behind HTTPS
         if req.is_secure or req.headers.get("X-Forwarded-Proto") == "https":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-            # Secure cookies only over HTTPS
-            app.config["SESSION_COOKIE_SECURE"] = True
-            app.config["REMEMBER_COOKIE_SECURE"] = True
 
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
