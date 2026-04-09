@@ -11,3 +11,4 @@ instance/
 .mypy_cache/
 .vscode/
 .idea/
+shelly_icons/
