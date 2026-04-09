@@ -110,6 +110,7 @@
   </p>
   {% if isa_accounts %}
   <form method="post" action="/allowance/add" class="allowance-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="allowance-form-row">
       <label class="allowance-form-field allowance-form-field-grow">
         <span>Account</span>
@@ -170,6 +171,7 @@
         <td>{{ c.note or '–' }}</td>
         <td style="text-align:right">
           <form method="post" action="/allowance/delete/{{ c.id }}" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="badge badge-sm badge-danger" style="cursor:pointer;" title="Remove">✕</button>
           </form>
         </td>

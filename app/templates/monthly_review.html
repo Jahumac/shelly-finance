@@ -30,6 +30,7 @@
         <span class="badge badge-complete">✓ Completed</span>
       {% else %}
         <form method="post" class="form-reset" id="mark-complete-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="form_name" value="mark_complete">
           <input type="hidden" name="month" value="{{ month_key }}">
           <button type="button" class="badge badge-primary-action" id="mark-complete-btn">Mark as Complete</button>
@@ -178,6 +179,7 @@
               {% for holding in account_holdings %}
                 <form method="post" class="holding-update-row"
                       data-ticker="{{ holding.ticker or '' }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <input type="hidden" name="form_name" value="update_holding">
                   <input type="hidden" name="month" value="{{ month_key }}">
                   <input type="hidden" name="holding_id" value="{{ holding.id }}">

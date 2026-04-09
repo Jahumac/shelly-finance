@@ -1,8 +1,9 @@
 from flask import Flask, redirect, url_for, send_from_directory
 from flask_login import LoginManager, current_user
+from flask_wtf.csrf import CSRFProtect
 
 from .calculations import build_month_strip
-from .models import count_users, fetch_assumptions, get_user_by_id, init_db
+from .models import count_users, fetch_assumptions, get_user_by_id, init_db, close_db
 from .services.scheduler import init_scheduler
 
 from .extensions import limiter
@@ -36,6 +37,9 @@ def create_app():
     app.config.setdefault("REMEMBER_COOKIE_HTTPONLY", True)
     app.config.setdefault("REMEMBER_COOKIE_SAMESITE", "Lax")
 
+    # ── CSRF Protection ──────────────────────────────────────────────────────
+    csrf = CSRFProtect(app)
+
     # ── Flask-Login ──────────────────────────────────────────────────────────
     login_manager = LoginManager(app)
     login_manager.login_view = "auth.login"
@@ -58,6 +62,8 @@ def create_app():
     app.register_blueprint(export_bp)
     app.register_blueprint(performance_bp, url_prefix="/performance")
     app.register_blueprint(allowance_bp, url_prefix="/allowance")
+
+    app.teardown_appcontext(close_db)
 
     # ── Service worker (must be served from / for full scope) ──────────────
     @app.route('/sw.js')

@@ -50,6 +50,7 @@
         {% endif %}
 
         <form method="POST" action="{{ url_for('auth.setup') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="form-group">
             <label for="username">Username</label>
             <input type="text" id="username" name="username" autocomplete="username" autofocus required minlength="3">

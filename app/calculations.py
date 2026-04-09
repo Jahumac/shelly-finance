@@ -138,7 +138,10 @@ def future_value(current_value, monthly_contribution, annual_growth_rate, years)
 
 
 def to_float(value):
-    return float(value or 0)
+    try:
+        return float(value or 0)
+    except (ValueError, TypeError):
+        return 0.0
 
 
 def effective_account_value(account, holdings_totals=None):

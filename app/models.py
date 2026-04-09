@@ -1,6 +1,6 @@
 import sqlite3
 from pathlib import Path
-from flask import current_app
+from flask import current_app, g
 from flask_login import UserMixin
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -331,11 +331,18 @@ def delete_user(user_id):
 
 
 def get_connection():
-    db_path = Path(current_app.config["DB_PATH"])
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
+    if "db" not in g:
+        db_path = Path(current_app.config["DB_PATH"])
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        g.db = sqlite3.connect(db_path)
+        g.db.row_factory = sqlite3.Row
+    return g.db
+
+
+def close_db(e=None):
+    db = g.pop("db", None)
+    if db is not None:
+        db.close()
 
 
 def init_db():
@@ -343,17 +350,20 @@ def init_db():
         conn.executescript(SCHEMA)
 
         # ── Legacy column additions (accounts) ───────────────────────────────
-        for col_sql in [
-            "ALTER TABLE accounts ADD COLUMN goal_value REAL",
-            "ALTER TABLE accounts ADD COLUMN valuation_mode TEXT DEFAULT 'manual'",
-            "ALTER TABLE accounts ADD COLUMN growth_mode TEXT DEFAULT 'default'",
-            "ALTER TABLE accounts ADD COLUMN growth_rate_override REAL",
-            "ALTER TABLE accounts ADD COLUMN tags TEXT DEFAULT ''",
+        for col_name, col_def in [
+            ("goal_value", "REAL"),
+            ("valuation_mode", "TEXT DEFAULT 'manual'"),
+            ("growth_mode", "TEXT DEFAULT 'default'"),
+            ("growth_rate_override", "REAL"),
+            ("tags", "TEXT DEFAULT ''"),
         ]:
             try:
-                conn.execute(col_sql)
-            except Exception:
-                pass
+                # Check if column exists first
+                info = conn.execute(f"PRAGMA table_info(accounts)").fetchall()
+                if not any(row['name'] == col_name for row in info):
+                    conn.execute(f"ALTER TABLE accounts ADD COLUMN {col_name} {col_def}")
+            except Exception as e:
+                print(f"Migration error (accounts.{col_name}): {e}")
 
         # ── Legacy column additions (other tables) ───────────────────────────
         for col_sql in [

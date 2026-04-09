@@ -21,6 +21,7 @@
 
 <section class="card">
   <form method="post" class="settings-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-grid">
       <label class="form-full-col">
         <span>Dashboard name</span>
@@ -208,6 +209,7 @@
 
   <div id="reset-form" style="display:none;margin-top:1rem;">
     <form method="post" action="/settings/reset" id="reset-form-el">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <p class="text-sm" style="margin-bottom:0.75rem;">
         Type <strong>RESET</strong> below to confirm. No going back after this.
       </p>
