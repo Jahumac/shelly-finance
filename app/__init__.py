@@ -8,7 +8,11 @@ from .services.scheduler import init_scheduler
 
 from .extensions import limiter
 
+<<<<<<< HEAD
 __version__ = "1.3.0"
+=======
+__version__ = "1.2.0"
+>>>>>>> 960fff2 (feat: initial commit for Shelly finance dashboard)
 from .routes.auth import auth_bp
 from .routes.overview import overview_bp
 from .routes.goals import goals_bp

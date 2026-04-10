@@ -6,9 +6,12 @@ from flask_login import current_user, login_required
 from app.calculations import (
     allowance_progress,
     calculate_isa_usage,
+<<<<<<< HEAD
     calculate_pension_usage,
     is_pension_account,
     pension_allowance_limits,
+=======
+>>>>>>> 960fff2 (feat: initial commit for Shelly finance dashboard)
     uk_tax_year_label,
     uk_tax_year_start,
     uk_tax_year_end,
@@ -16,6 +19,7 @@ from app.calculations import (
 )
 from app.models import (
     add_isa_contribution,
+<<<<<<< HEAD
     add_pension_contribution,
     delete_isa_contribution,
     delete_pension_contribution,
@@ -23,6 +27,12 @@ from app.models import (
     fetch_assumptions,
     fetch_isa_contributions,
     fetch_pension_contributions,
+=======
+    delete_isa_contribution,
+    fetch_all_accounts,
+    fetch_assumptions,
+    fetch_isa_contributions,
+>>>>>>> 960fff2 (feat: initial commit for Shelly finance dashboard)
 )
 
 allowance_bp = Blueprint("allowance", __name__)
@@ -51,26 +61,37 @@ def allowance_overview():
     # ISA accounts for the dropdown
     isa_accounts = [a for a in accounts if (a["wrapper_type"] or "") in ISA_WRAPPER_TYPES]
 
+<<<<<<< HEAD
     pension_contribs = fetch_pension_contributions(uid, ty_start, ty_end)
     pension_usage = calculate_pension_usage(accounts, pension_contribs, assumptions, now_date, salary_day)
     pension_limits = pension_allowance_limits(dict(assumptions) if assumptions else {})
     pension_accounts = [a for a in accounts if is_pension_account(dict(a))]
 
+=======
+>>>>>>> 960fff2 (feat: initial commit for Shelly finance dashboard)
     return render_template(
         "allowance.html",
         tax_year=uk_tax_year_label(now_date),
         usage=usage,
+<<<<<<< HEAD
         pension_usage=pension_usage,
         pension_limits=pension_limits,
+=======
+>>>>>>> 960fff2 (feat: initial commit for Shelly finance dashboard)
         isa_allowance=isa_allowance,
         lisa_allowance=lisa_allowance,
         isa_progress=allowance_progress(usage["isa_used"], isa_allowance),
         lisa_progress=allowance_progress(usage["lisa_used"], lisa_allowance),
+<<<<<<< HEAD
         pension_progress=allowance_progress(pension_usage["pension_used"], pension_limits["effective_allowance"]),
         contributions=ad_hoc,
         pension_contributions=pension_contribs,
         isa_accounts=isa_accounts,
         pension_accounts=pension_accounts,
+=======
+        contributions=ad_hoc,
+        isa_accounts=isa_accounts,
+>>>>>>> 960fff2 (feat: initial commit for Shelly finance dashboard)
         today=now_date.isoformat(),
         active_page="overview",
     )
@@ -100,6 +121,7 @@ def remove_contribution(contribution_id):
     delete_isa_contribution(contribution_id, current_user.id)
     flash("Contribution removed.", "success")
     return redirect(url_for("allowance.allowance_overview"))
+<<<<<<< HEAD
 
 
 @allowance_bp.route("/pension/add", methods=["POST"])
@@ -130,3 +152,5 @@ def remove_pension_topup(contribution_id):
     delete_pension_contribution(contribution_id, current_user.id)
     flash("Contribution removed.", "success")
     return redirect(url_for("allowance.allowance_overview"))
+=======
+>>>>>>> 960fff2 (feat: initial commit for Shelly finance dashboard)
