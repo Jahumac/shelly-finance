@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import Blueprint, render_template
 from flask_login import current_user, login_required
@@ -128,6 +128,20 @@ def overview():
     daily_values = [round(d[1], 2) for d in daily_snapshots]
     last_snapshot_date = daily_labels[-1] if daily_labels else None
     last_price_update = fetch_latest_price_update(uid)
+    last_price_update_display = None
+    if last_price_update:
+        try:
+            if isinstance(last_price_update, str) and last_price_update.endswith(" UTC"):
+                dt = datetime.strptime(last_price_update, "%Y-%m-%d %H:%M UTC").replace(tzinfo=timezone.utc)
+            else:
+                dt = datetime.fromisoformat(str(last_price_update))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+            import pytz
+            uk = pytz.timezone("Europe/London")
+            last_price_update_display = dt.astimezone(uk).strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            last_price_update_display = str(last_price_update)[:16]
 
     return render_template(
         "overview.html",
@@ -140,6 +154,7 @@ def overview():
         daily_values=daily_values,
         last_snapshot_date=last_snapshot_date,
         last_price_update=last_price_update,
+        last_price_update_display=last_price_update_display,
         review_nudge=review_nudge,
         review_ready=review_ready,
         active_page="overview",

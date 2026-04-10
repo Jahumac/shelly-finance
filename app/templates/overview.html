@@ -168,7 +168,7 @@
     <div>
       <p class="text-muted" style="margin: 0; font-size: 0.9rem;">Prices last updated</p>
       <p style="margin: 0; font-weight: 600;">
-        {% if last_price_update %}{{ last_price_update[:16] }}{% elif last_snapshot_date %}{{ last_snapshot_date }}{% else %}Never{% endif %}
+        {% if last_price_update_display %}{{ last_price_update_display }}{% elif last_price_update %}{{ last_price_update[:16] }}{% elif last_snapshot_date %}{{ last_snapshot_date }}{% else %}Never{% endif %}
       </p>
     </div>
     <div style="display:flex; align-items:center; gap:0.75rem;">
@@ -488,7 +488,7 @@
 
   function formatDate(dateStr) {
     var date = parseYMD(dateStr) || new Date(dateStr);
-    return date.toLocaleDateString('en-GB', { day: 'short', month: 'short' });
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
   }
 
   function updateChart(period) {
