@@ -404,27 +404,84 @@
     return { labels: labels, values: values };
   }
 
-  function filterData(period) {
+  function ymd(date) {
+    var y = date.getFullYear();
+    var m = String(date.getMonth() + 1).padStart(2, '0');
+    var d = String(date.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + d;
+  }
+
+  function addDays(date, n) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate() + n);
+  }
+
+  function buildSeries(period) {
     var src = ensureMinPoints(allLabels, allValues);
-    var cutoffDays = periods[period];
-    var endDate = parseYMD(src.labels[src.labels.length - 1]) || new Date();
+    var cutoffDays = periods[period] || 365;
+    var today = new Date();
+    var endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     var cutoffDate = new Date(endDate.getTime() - cutoffDays * 24 * 60 * 60 * 1000);
 
-    var filtered = {
-      labels: [],
-      values: []
-    };
-
+    var points = [];
     for (var i = 0; i < src.labels.length; i++) {
-      var dateStr = src.labels[i];
-      var date = parseYMD(dateStr) || new Date(dateStr);
-      if (date >= cutoffDate) {
-        filtered.labels.push(dateStr);
-        filtered.values.push(src.values[i]);
-      }
+      var ds = src.labels[i];
+      var dt = parseYMD(ds);
+      if (!dt) continue;
+      points.push({ d: dt, s: ds, v: Number(src.values[i]) });
+    }
+    points.sort(function(a, b) { return a.d - b.d; });
+
+    if (!points.length) {
+      return ensureMinPoints([], []);
     }
 
-    return filtered;
+    var map = {};
+    for (var j = 0; j < points.length; j++) {
+      map[ymd(points[j].d)] = isFinite(points[j].v) ? points[j].v : fallbackValue;
+    }
+
+    var startDate = cutoffDate;
+    if (points[0].d > startDate) startDate = points[0].d;
+
+    var labels = [];
+    var values = [];
+
+    var lastKnown = null;
+    for (var k = 0; k < points.length; k++) {
+      if (points[k].d < startDate) {
+        lastKnown = isFinite(points[k].v) ? points[k].v : fallbackValue;
+      } else {
+        break;
+      }
+    }
+    if (lastKnown === null) {
+      lastKnown = isFinite(points[0].v) ? points[0].v : fallbackValue;
+    }
+
+    var doFill = cutoffDays <= 400;
+    if (doFill) {
+      for (var cur = startDate; cur <= endDate; cur = addDays(cur, 1)) {
+        var key = ymd(cur);
+        if (map.hasOwnProperty(key)) lastKnown = map[key];
+        labels.push(key);
+        values.push(lastKnown);
+      }
+      return { labels: labels, values: values };
+    }
+
+    for (var p = 0; p < points.length; p++) {
+      if (points[p].d >= startDate && points[p].d <= endDate) {
+        labels.push(ymd(points[p].d));
+        values.push(isFinite(points[p].v) ? points[p].v : fallbackValue);
+      }
+    }
+    var lastPointDate = parseYMD(labels[labels.length - 1]);
+    if (lastPointDate && lastPointDate < endDate) {
+      labels.push(ymd(endDate));
+      values.push(values[values.length - 1]);
+    }
+
+    return ensureMinPoints(labels, values);
   }
 
   function formatDate(dateStr) {
@@ -433,7 +490,7 @@
   }
 
   function updateChart(period) {
-    var data = filterData(period);
+    var data = buildSeries(period);
     var fmtLabels = data.labels.map(formatDate);
     var ctx = document.getElementById('dailyPortfolioChart').getContext('2d');
 
