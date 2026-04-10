@@ -128,6 +128,7 @@
     <div class="chart-wrap chart-wrap-sm">
       <canvas id="dailyPortfolioChart" role="img" aria-label="Daily portfolio value chart"></canvas>
     </div>
+    <p id="portfolio-chart-error" class="helper-text mt-05" style="display:none;"></p>
     <div id="chartStats" style="display: flex; justify-content: space-between; margin-top: 0.75rem; font-size: 0.9rem;">
       <div>
         <p class="text-muted" style="margin: 0;">Latest Value</p>
@@ -339,6 +340,7 @@
 {# Daily portfolio chart script #}
 <script>
 (function () {
+  try {
   var allLabels = {{ daily_labels | tojson }};
   var allValues = {{ daily_values | tojson }};
   var chart = null;
@@ -676,6 +678,20 @@
 
   // Initial render
   updateChart('ALL');
+  } catch (err) {
+    var msg = (err && err.message) ? err.message : String(err);
+    var el = document.getElementById('portfolio-chart-error');
+    if (el) {
+      el.style.display = 'block';
+      el.textContent = 'Portfolio chart failed to render: ' + msg;
+    }
+    try {
+      var latestEl = document.getElementById('latestValue');
+      var changeEl = document.getElementById('changeValue');
+      if (latestEl && !latestEl.textContent) latestEl.textContent = '—';
+      if (changeEl && !changeEl.textContent) changeEl.textContent = '—';
+    } catch (e) {}
+  }
 })();
 </script>
 

@@ -8,7 +8,7 @@
  *  - Images/fonts: Cache-first, long-lived
  */
 
-const CACHE_NAME = 'shelly-v2.1.3.1';
+const CACHE_NAME = 'shelly-v2.1.3.2';
 
 /* App shell files to pre-cache on install */
 const APP_SHELL = [
