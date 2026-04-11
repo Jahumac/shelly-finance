@@ -147,7 +147,7 @@ def to_float(value):
 def effective_account_value(account, holdings_totals=None):
     holdings_totals = holdings_totals or {}
     if account["valuation_mode"] == "holdings":
-        return to_float(holdings_totals.get(account["id"], 0))
+        return to_float(holdings_totals.get(account["id"], 0)) + to_float(account.get("current_value", 0))
     return to_float(account["current_value"])
 
 

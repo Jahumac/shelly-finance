@@ -70,7 +70,7 @@
     <a class="badge badge-sm" href="/budget/export.xlsx?month={{ month_key }}">↓ Export</a>
     <label class="badge badge-sm budget-import-label" title="Import budget from an Excel file">
       ↑ Import
-      <form method="post" action="/budget/import" enctype="multipart/form-data" id="import-form" style="display:none">
+      <form method="post" action="/budget/import" enctype="multipart/form-data" class="form-reset" id="import-form" style="display:none">
         <input type="hidden" name="month" value="{{ month_key }}">
         <input type="file" name="file" accept=".xlsx,.xls" onchange="this.form.submit()">
       </form>

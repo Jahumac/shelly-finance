@@ -3885,6 +3885,17 @@ a.link-accent:hover {
   gap: 0.75rem;
 }
 
+@media (max-width: 768px) {
+  .hero-actions-col {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    order: 3;
+    margin-top: -0.5rem;
+  }
+}
+
 /* Hero actions row */
 .hero-actions-row {
   display: flex;

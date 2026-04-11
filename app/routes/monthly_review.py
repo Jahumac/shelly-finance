@@ -81,26 +81,27 @@ def monthly_review():
             account = fetch_account(int(request.form.get("account_id")))
             if account:
                 new_balance = _optional_float(request.form.get("current_value"), account["current_value"])
-                update_account(
-                    {
-                        "id": account["id"],
-                        "name": account["name"],
-                        "provider": account["provider"],
-                        "wrapper_type": account["wrapper_type"],
-                        "category": account["category"],
-                        "tags": account["tags"],
-                        "current_value": new_balance,
-                        "monthly_contribution": account["monthly_contribution"],
-                        "goal_value": account["goal_value"],
-                        "valuation_mode": account["valuation_mode"],
-                        "growth_mode": account["growth_mode"],
-                        "growth_rate_override": account["growth_rate_override"],
-                        "owner": account["owner"],
-                        "notes": account["notes"],
-                        "last_updated": datetime.now().isoformat(),
-                    }
-                )
-                upsert_monthly_snapshot(account["id"], month_key, new_balance)
+                updated_account_dict = {
+                    "id": account["id"],
+                    "name": account["name"],
+                    "provider": account["provider"],
+                    "wrapper_type": account["wrapper_type"],
+                    "category": account["category"],
+                    "tags": account["tags"],
+                    "current_value": new_balance,
+                    "monthly_contribution": account["monthly_contribution"],
+                    "goal_value": account["goal_value"],
+                    "valuation_mode": account["valuation_mode"],
+                    "growth_mode": account["growth_mode"],
+                    "growth_rate_override": account["growth_rate_override"],
+                    "owner": account["owner"],
+                    "notes": account["notes"],
+                    "last_updated": datetime.now().isoformat(),
+                }
+                update_account(updated_account_dict)
+                holdings_totals = fetch_holding_totals_by_account(uid)
+                effective_val = effective_account_value(updated_account_dict, holdings_totals)
+                upsert_monthly_snapshot(account["id"], month_key, effective_val)
         elif form_name == "mark_complete":
             review = fetch_or_create_monthly_review(month_key, uid)
             all_accounts = fetch_all_accounts(uid)
