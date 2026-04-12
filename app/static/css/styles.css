@@ -2267,6 +2267,19 @@ button.badge-like-button {
   flex: 1;
   min-width: 0;
 }
+
+@media (max-width: 768px) {
+  .hero-title-row {
+    position: relative;
+    padding-inline-end: 72px;
+  }
+  .hero-title-row .hero-turtle-wrap {
+    position: absolute;
+    inset-inline-end: 0;
+    top: 0;
+    margin-left: 0;
+  }
+}
 .hero-turtle {
   width: 80px;
   height: 80px;
