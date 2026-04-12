@@ -65,7 +65,8 @@
 
 {# ── Budget toolbar ──────────────────────────────────────────────────────── #}
 <div class="budget-toolbar">
-  <div class="badge-row">
+  <p class="budget-linked-hint">Items marked <em>linked</em> sync from your account's monthly contribution.</p>
+  <div class="badge-row budget-toolbar-actions">
     <a class="badge" href="/budget/items/">Edit Budget</a>
     <a class="badge badge-sm" href="/budget/export.xlsx?month={{ month_key }}">↓ Export</a>
     <label class="badge badge-sm budget-import-label" title="Import budget from an Excel file">
@@ -76,7 +77,6 @@
       </form>
     </label>
   </div>
-  <p class="budget-linked-hint">Items marked <em>linked</em> sync from your account's monthly contribution.</p>
 </div>
 
 {# ── Section colour map ──────────────────────────────────────────────────── #}
@@ -92,13 +92,13 @@
 {# ── Budget sections ──────────────────────────────────────────────────────── #}
 {% for section in sections %}
 {% set sec_color = section_colors.get(section.key, '--accent-7') %}
-<section class="panel mb-1 budget-section-panel" style="--sec-color: var({{ sec_color }})">
+<section class="panel mb-1 budget-section-panel budget-sec-{{ section.key | replace('_', '-') }}" data-sec-color="{{ sec_color }}">
   <div class="section-header">
     <div>
-      <p class="eyebrow" style="color: var({{ sec_color }})">{{ section.key | replace('_', ' ') | upper }}</p>
+      <p class="eyebrow">{{ section.key | replace('_', ' ') | upper }}</p>
       <h3>{{ section.label }}</h3>
     </div>
-    <strong class="budget-section-total" id="total-{{ section.key }}" style="color: var({{ sec_color }})">
+    <strong class="budget-section-total" id="total-{{ section.key }}">
       £{{ '{:,.2f}'.format(section.total) }}
     </strong>
   </div>

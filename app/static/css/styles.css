@@ -2143,8 +2143,24 @@ button.badge-like-button {
 
 /* ── Section colour accent strip ─────────────────────────────────── */
 .budget-section-panel {
+  --sec-color: var(--accent-7);
   border-top: 3px solid var(--sec-color, var(--accent));
 }
+
+.budget-section-panel .eyebrow {
+  color: var(--sec-color);
+}
+
+.budget-section-panel .budget-section-total {
+  color: var(--sec-color);
+}
+
+.budget-sec-income         { --sec-color: var(--accent-2); }
+.budget-sec-fixed          { --sec-color: var(--accent); }
+.budget-sec-debt           { --sec-color: var(--accent-6); }
+.budget-sec-investment     { --sec-color: var(--accent-5); }
+.budget-sec-saving         { --sec-color: var(--accent-5); }
+.budget-sec-discretionary  { --sec-color: var(--accent-3); }
 
 /* ── Edit Budget page — row actions + default amount ─────────────── */
 .budget-row-default {
@@ -2178,6 +2194,13 @@ button.badge-like-button {
 }
 .budget-toolbar .budget-linked-hint {
   margin: 0;
+  flex: 1;
+  min-width: 12rem;
+}
+.budget-toolbar .budget-toolbar-actions {
+  margin-top: 0;
+  margin-inline-start: auto;
+  justify-content: flex-end;
 }
 .budget-import-label {
   cursor: pointer;
