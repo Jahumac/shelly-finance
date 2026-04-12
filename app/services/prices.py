@@ -65,6 +65,7 @@ def _try_ticker(symbol: str):
         prev_close = None
         name = None
         quote_type = None
+        dividend_yield = None
         try:
             fi = t.fast_info
             price = getattr(fi, "last_price", None) or getattr(fi, "regularMarketPrice", None)
@@ -83,6 +84,7 @@ def _try_ticker(symbol: str):
                     prev_close = prev_close or info.get("regularMarketPreviousClose") or info.get("previousClose")
                     name = info.get("longName") or info.get("shortName")
                     quote_type = info.get("quoteType")
+                    dividend_yield = info.get("dividendYield") or info.get("trailingAnnualDividendYield")
             except Exception:
                 pass
 
@@ -94,6 +96,7 @@ def _try_ticker(symbol: str):
                     name = info.get("longName") or info.get("shortName")
                     quote_type = quote_type or info.get("quoteType")
                     currency = currency or info.get("currency")
+                    dividend_yield = dividend_yield or info.get("dividendYield") or info.get("trailingAnnualDividendYield")
             except Exception:
                 pass
 
@@ -122,12 +125,24 @@ def _try_ticker(symbol: str):
         if prev_close and prev_close > 0:
             change_pct = ((price - prev_close) / prev_close * 100)
 
+        if dividend_yield is not None:
+            try:
+                dividend_yield = float(dividend_yield)
+            except Exception:
+                dividend_yield = None
+        if dividend_yield is not None:
+            if dividend_yield < 0:
+                dividend_yield = 0.0
+            if dividend_yield > 1:
+                dividend_yield = None
+
         return {
             "price": round(float(price), 4),
             "currency": currency,
             "change_pct": round(float(change_pct), 2) if change_pct is not None else None,
             "name": name,
             "quote_type": quote_type,
+            "dividend_yield": dividend_yield,
         }
     except Exception:
         return None
@@ -445,6 +460,7 @@ def lookup_instrument(query: str):
         "currency": currency,
         "change_pct": price_data.get("change_pct"),
         "asset_type": asset_type,
+        "dividend_yield_pct": price_data.get("dividend_yield"),
     }
 
 

@@ -61,9 +61,20 @@ def allowance_overview():
 
     dividend_allowance = float(assumptions["dividend_allowance"]) if assumptions and assumptions.get("dividend_allowance") is not None else 500
     dividend_records = fetch_dividend_records(uid, ty_start, ty_end)
-    dividend_used = sum(float(r["amount"] or 0) for r in dividend_records) if dividend_records else 0.0
-    dividend_progress = allowance_progress(dividend_used, dividend_allowance) if dividend_allowance else 0
-    taxable_accounts = [a for a in accounts if (a["wrapper_type"] or "") not in ISA_WRAPPER_TYPES and not is_pension_account(dict(a))]
+    dividend_used_taxable = 0.0
+    dividend_used_isa = 0.0
+    if dividend_records:
+        for r in dividend_records:
+            wt = (r["wrapper_type"] or "").strip()
+            if is_pension_account({"wrapper_type": wt}):
+                continue
+            amt = float(r["amount"] or 0)
+            if wt in ISA_WRAPPER_TYPES:
+                dividend_used_isa += amt
+            else:
+                dividend_used_taxable += amt
+    dividend_progress = allowance_progress(dividend_used_taxable, dividend_allowance) if dividend_allowance else 0
+    dividend_accounts = [a for a in accounts if not is_pension_account(dict(a))]
 
     return render_template(
         "allowance.html",
@@ -81,10 +92,11 @@ def allowance_overview():
         isa_accounts=isa_accounts,
         pension_accounts=pension_accounts,
         dividend_allowance=dividend_allowance,
-        dividend_used=dividend_used,
+        dividend_used_taxable=dividend_used_taxable,
+        dividend_used_isa=dividend_used_isa,
         dividend_progress=dividend_progress,
         dividend_records=dividend_records,
-        taxable_accounts=taxable_accounts,
+        dividend_accounts=dividend_accounts,
         today=now_date.isoformat(),
         active_page="overview",
     )

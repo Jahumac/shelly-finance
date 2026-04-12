@@ -309,6 +309,7 @@ def api_add_holding(account_id):
     catalogue_id = add_holding_catalogue_item({
         "holding_name": name, "ticker": ticker,
         "asset_type": asset_type, "bucket": "Global Equity", "notes": "",
+        "dividend_yield_pct": (instrument.get("dividend_yield_pct") if instrument else None),
     }, uid)
 
     update_catalogue_price(
@@ -458,6 +459,7 @@ def account_add_holding(account_id):
         "ticker": ticker,
         "asset_type": asset_type,
         "bucket": "Global Equity",
+        "dividend_yield_pct": (instrument.get("dividend_yield_pct") if instrument else None),
         "notes": "",
     }, uid)
 

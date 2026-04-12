@@ -15,6 +15,7 @@ from app.models import (
     fetch_holding_totals_by_account,
     fetch_monthly_review_items,
     fetch_or_create_monthly_review,
+    upsert_yield_dividends_for_month,
     update_account,
     update_holding,
     update_monthly_review,
@@ -124,6 +125,7 @@ def monthly_review():
         holdings_by_account.setdefault(row["account_id"], []).append(row)
 
     assumptions = fetch_assumptions(uid)
+    upsert_yield_dividends_for_month(uid, month_key)
 
     # Calculate the smart review-ready date for this month
     try:

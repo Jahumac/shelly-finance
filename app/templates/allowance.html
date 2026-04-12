@@ -56,9 +56,12 @@
   </div>
   <div class="card allowance-card">
     <h2>Dividend Allowance</h2>
-    <p>£{{ '{:,.0f}'.format(dividend_used) }} <span class="allowance-denom">/ £{{ '{:,.0f}'.format(dividend_allowance) }}</span></p>
+    <p>£{{ '{:,.0f}'.format(dividend_used_taxable) }} <span class="allowance-denom">/ £{{ '{:,.0f}'.format(dividend_allowance) }}</span></p>
     <div class="progress"><div class="progress-bar" data-pct="{{ (dividend_progress * 100)|round(1) }}"></div></div>
     <small>{{ '{:.1f}'.format(dividend_progress * 100) }}% used · taxable accounts only</small>
+    {% if dividend_used_isa %}
+    <small style="display:block; margin-top:0.25rem; color:var(--muted);">ISA dividends recorded: £{{ '{:,.0f}'.format(dividend_used_isa) }} (not counted toward allowance)</small>
+    {% endif %}
   </div>
 </section>
 
@@ -351,14 +354,14 @@
       <h2>Record Dividend Income</h2>
     </div>
   </div>
-  {% if taxable_accounts %}
+  {% if dividend_accounts %}
   <form method="post" action="/allowance/dividend/add" class="allowance-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="allowance-form-row">
       <label>
         <span>Account</span>
         <select name="account_id" required>
-          {% for a in taxable_accounts %}
+          {% for a in dividend_accounts %}
           <option value="{{ a.id }}">{{ a.name }}{% if a.wrapper_type %} ({{ a.wrapper_type }}){% endif %}</option>
           {% endfor %}
         </select>
@@ -377,10 +380,10 @@
       </label>
       <button type="submit">Add dividend</button>
     </div>
-    <p class="helper-text mt-05">Dividends inside ISA/LISA are tax-free and not counted here.</p>
+    <p class="helper-text mt-05">Dividends inside ISA/LISA are tax-free for HMRC purposes. Shelly still records them, but only taxable dividends count toward the allowance.</p>
   </form>
   {% else %}
-  <p class="helper-text">No taxable (non-ISA, non-pension) accounts found. Create one under <a href="/accounts/">Accounts</a>.</p>
+  <p class="helper-text">No eligible accounts found. Create one under <a href="/accounts/">Accounts</a>.</p>
   {% endif %}
 </section>
 
@@ -397,7 +400,9 @@
       <tr>
         <th>Date</th>
         <th>Account</th>
+        <th>Wrapper</th>
         <th style="text-align:right">Amount</th>
+        <th>Source</th>
         <th>Note</th>
         <th></th>
       </tr>
@@ -407,7 +412,9 @@
       <tr>
         <td>{{ d.dividend_date }}</td>
         <td>{{ d.account_name }}</td>
+        <td><span class="badge badge-sm">{{ d.wrapper_type or '—' }}</span></td>
         <td style="text-align:right">£{{ '{:,.2f}'.format(d.amount) }}</td>
+        <td><span class="badge badge-sm">{{ d.source or 'manual' }}</span></td>
         <td>{{ d.note or '–' }}</td>
         <td style="text-align:right">
           <form method="post" action="/allowance/dividend/delete/{{ d.id }}" style="display:inline">

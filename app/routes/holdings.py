@@ -14,6 +14,7 @@ from app.models import (
     save_daily_snapshot,
     sync_holding_prices_from_catalogue,
     update_catalogue_price,
+    update_holding_catalogue_yield,
     update_holding,
 )
 from app.services.prices import fetch_price, fetch_history, lookup_instrument
@@ -67,6 +68,31 @@ def holding_detail(catalogue_id):
         history_period=period,
         view_in_account_url=view_in_account_url,
     )
+
+
+@holdings_bp.route("/<int:catalogue_id>/yield", methods=["POST"])
+@login_required
+def update_yield(catalogue_id):
+    pct_raw = (request.form.get("dividend_yield_pct") or "").strip()
+    if pct_raw == "":
+        update_holding_catalogue_yield(catalogue_id, current_user.id, None)
+        flash("Dividend yield cleared.", "success")
+        return redirect(url_for("holdings.holding_detail", catalogue_id=catalogue_id))
+
+    try:
+        pct = float(pct_raw)
+    except ValueError:
+        flash("Enter a valid dividend yield percentage.", "error")
+        return redirect(url_for("holdings.holding_detail", catalogue_id=catalogue_id))
+
+    if pct < 0:
+        pct = 0
+    if pct > 100:
+        pct = 100
+
+    update_holding_catalogue_yield(catalogue_id, current_user.id, pct / 100.0)
+    flash("Dividend yield saved.", "success")
+    return redirect(url_for("holdings.holding_detail", catalogue_id=catalogue_id))
 
 
 @holdings_bp.route("/api/lookup")

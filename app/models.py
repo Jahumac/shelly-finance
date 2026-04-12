@@ -977,16 +977,142 @@ def delete_pension_contribution(contribution_id, user_id):
         conn.commit()
 
 
-def add_dividend_record(user_id, account_id, amount, dividend_date, note=None):
+def add_dividend_record(
+    user_id,
+    account_id,
+    amount,
+    dividend_date,
+    note=None,
+    holding_catalogue_id=None,
+    month_key=None,
+    source="manual",
+    yield_pct=None,
+    basis_value=None,
+):
     with get_connection() as conn:
         conn.execute(
             """
-            INSERT INTO dividend_records (user_id, account_id, amount, dividend_date, note)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO dividend_records (
+                user_id, account_id, holding_catalogue_id, amount, month_key,
+                source, yield_pct, basis_value, dividend_date, note
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (user_id, account_id, amount, dividend_date, note),
+            (
+                user_id,
+                account_id,
+                holding_catalogue_id,
+                amount,
+                month_key,
+                source,
+                yield_pct,
+                basis_value,
+                dividend_date,
+                note,
+            ),
         )
         conn.commit()
+
+
+def upsert_yield_dividends_for_month(user_id, month_key):
+    from app.calculations import is_pension_account
+
+    if not month_key:
+        return 0
+    month_date = f"{month_key}-01"
+
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                h.holding_catalogue_id,
+                h.account_id,
+                h.value AS holding_value,
+                a.wrapper_type,
+                hc.dividend_yield_pct
+            FROM holdings h
+            JOIN accounts a ON a.id = h.account_id
+            JOIN holding_catalogue hc ON hc.id = h.holding_catalogue_id
+            WHERE a.user_id = ?
+              AND a.is_active = 1
+              AND h.holding_catalogue_id IS NOT NULL
+              AND hc.is_active = 1
+              AND hc.dividend_yield_pct IS NOT NULL
+              AND hc.dividend_yield_pct > 0
+            """,
+            (user_id,),
+        ).fetchall()
+
+        touched = 0
+        for r in rows:
+            wrapper_type = r["wrapper_type"] or ""
+            if is_pension_account({"wrapper_type": wrapper_type}):
+                continue
+
+            holding_value = float(r["holding_value"] or 0)
+            y = float(r["dividend_yield_pct"] or 0)
+            if holding_value <= 0 or y <= 0:
+                continue
+
+            amount = (holding_value * y) / 12.0
+            if amount < 0.005:
+                continue
+
+            existing = conn.execute(
+                """
+                SELECT id FROM dividend_records
+                WHERE user_id = ?
+                  AND account_id = ?
+                  AND holding_catalogue_id = ?
+                  AND month_key = ?
+                  AND source = 'yield'
+                LIMIT 1
+                """,
+                (user_id, r["account_id"], r["holding_catalogue_id"], month_key),
+            ).fetchone()
+
+            if existing:
+                conn.execute(
+                    """
+                    UPDATE dividend_records
+                    SET amount = ?, yield_pct = ?, basis_value = ?, dividend_date = ?, note = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        round(amount, 2),
+                        y,
+                        holding_value,
+                        month_date,
+                        "Estimated from dividend yield",
+                        existing["id"],
+                    ),
+                )
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO dividend_records (
+                        user_id, account_id, holding_catalogue_id, amount, month_key,
+                        source, yield_pct, basis_value, dividend_date, note
+                    )
+                    VALUES (?, ?, ?, ?, ?, 'yield', ?, ?, ?, ?)
+                    """,
+                    (
+                        user_id,
+                        r["account_id"],
+                        r["holding_catalogue_id"],
+                        round(amount, 2),
+                        month_key,
+                        y,
+                        holding_value,
+                        month_date,
+                        "Estimated from dividend yield",
+                    ),
+                )
+            touched += 1
+
+        if touched:
+            conn.commit()
+        return touched
 
 
 def fetch_dividend_records(user_id, tax_year_start, tax_year_end):
