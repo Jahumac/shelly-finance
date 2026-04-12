@@ -8,18 +8,6 @@
   var controls = document.querySelectorAll('[data-history-period]');
   var holdingId = canvas.getAttribute('data-holding-id');
 
-  try {
-    var restoreKey = 'holdingHistoryScrollY';
-    var y0 = sessionStorage.getItem(restoreKey);
-    if (y0 !== null) {
-      sessionStorage.removeItem(restoreKey);
-      var yNum = Number(y0);
-      if (isFinite(yNum) && yNum >= 0) {
-        setTimeout(function () { window.scrollTo(0, yNum); }, 0);
-      }
-    }
-  } catch (e) {}
-
   function setError(msg) {
     if (!errorEl) return;
     if (!msg) {
@@ -167,9 +155,6 @@
         } else {
           fallbackNavigate();
         }
-      })
-      .finally(function () {
-        window.scrollTo(0, y);
       });
   }
 

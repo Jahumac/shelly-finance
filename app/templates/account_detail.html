@@ -1,0 +1,850 @@
+{% extends 'base.html' %}
+{% block title %}{{ selected.name }} · Shelly{% endblock %}
+{% block extra_head %}
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+{% endblock %}
+{% block content %}
+
+<div class="mb-1">
+  <nav class="breadcrumb">
+    <a href="/accounts/" class="breadcrumb-item">Accounts</a>
+    <span class="breadcrumb-sep">/</span>
+    <span class="breadcrumb-current">{{ selected.name }}</span>
+  </nav>
+</div>
+
+<div class="badge-row mb-1">
+  <a href="/accounts/" class="badge badge-primary-action">← Back to Accounts</a>
+</div>
+
+{# ── Account detail view ──────────────────────────────────────────── #}
+<section class="panel mt-1">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">{{ selected.provider }} · {{ selected.wrapper_type }}</p>
+      <h2>{{ selected.name }}</h2>
+    </div>
+    <div class="badge-row">
+      {% if detail_mode != 'edit' %}<a class="badge" href="/accounts/{{ selected.id }}?mode=edit">Edit Account</a>{% endif %}
+      <form method="post" class="form-reset" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="form_name" value="delete_account">
+        <button type="submit" class="badge badge-danger"
+          data-confirm="This will permanently remove {{ selected.name }} and all its holdings. Shelly can't undo this one."
+          data-confirm-title="Delete {{ selected.name }}?"
+          data-confirm-ok="Yes, delete it"
+          data-confirm-cancel="Keep it">
+          Delete
+        </button>
+      </form>
+    </div>
+  </div>
+
+  {% if detail_mode == 'edit' %}
+    <form method="post" class="settings-form mt-1">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="form_name" value="account">
+      <section class="panel panel-sm">
+        <h3 class="section-title">Edit Account</h3>
+        <div class="form-grid">
+          <label><span>Name</span><input type="text" name="name" value="{{ selected.name }}"></label>
+          <label>
+            <span>Provider</span>
+            <input type="text" name="provider" value="{{ selected.provider }}" list="provider-list" autocomplete="off">
+          </label>
+          <label>
+            <span>Wrapper Type</span>
+            <select name="wrapper_type">
+              {% for option in wrapper_type_options %}
+                <option value="{{ option }}" {% if selected.wrapper_type == option %}selected{% endif %}>{{ option }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>Category</span>
+            <select name="category">
+              {% for option in category_options %}
+                <option value="{{ option }}" {% if selected.category == option %}selected{% endif %}>{{ option }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="form-full-col">
+            <span>Tags</span>
+            <input type="hidden" name="tags" value="{{ selected.tags or '' }}" data-tags-hidden-input>
+            <div class="tag-picker" data-tag-picker>
+              {% for tag in tag_options %}
+              <label class="tag-chip">
+                <input type="checkbox" value="{{ tag }}" data-tag-checkbox {% if tag in selected_tags %}checked{% endif %}>
+                <span>{{ tag }}</span>
+                {% if tag in custom_tags %}
+                <button type="button" class="tag-delete" data-delete-tag="{{ tag }}" title="Remove custom tag">&times;</button>
+                {% endif %}
+              </label>
+              {% endfor %}
+            </div>
+            <div class="tag-add-row" style="margin-top:0.4rem; display:flex; gap:0.4rem; align-items:center;">
+              <input type="text" data-new-tag-input placeholder="Add custom tag…" style="flex:1; padding:0.3rem 0.5rem; font-size:0.85rem;">
+              <button type="button" class="badge badge-outline" data-add-tag-btn style="white-space:nowrap;">+ Add</button>
+            </div>
+          </label>
+          <label>
+            <span>Balance Method</span>
+            <select name="valuation_mode" data-valuation-mode>
+              <option value="manual" {% if selected.valuation_mode == 'manual' %}selected{% endif %}>Manual</option>
+              <option value="holdings" {% if selected.valuation_mode == 'holdings' %}selected{% endif %}>Built from holdings</option>
+            </select>
+          </label>
+          <label>
+            <span>Growth Mode</span>
+            <select name="growth_mode" data-growth-mode>
+              <option value="default" {% if selected.growth_mode == 'default' %}selected{% endif %}>Default investment growth</option>
+              <option value="custom" {% if selected.growth_mode == 'custom' %}selected{% endif %}>Custom rate / interest</option>
+            </select>
+          </label>
+          <div data-manual-fields class="form-contents" {% if selected.valuation_mode == 'holdings' %}hidden{% endif %}>
+            <label><span>Current Balance</span><input type="number" step="0.01" name="current_value" value="{{ selected.current_value if selected.current_value is not none else '' }}"></label>
+          </div>
+          <label data-custom-rate-field {% if selected.growth_mode != 'custom' %}class="hidden"{% endif %}>
+            <span>Custom Growth / Interest Rate (%)</span>
+            <input type="number" step="0.1" name="growth_rate_override" value="{{ '{:.1f}'.format(selected.growth_rate_override * 100) if selected.growth_rate_override else '' }}" placeholder="e.g. 4.5">
+            <small class="form-hint">Enter as a percentage — e.g. 4.5 for 4.5%, 3.6 for 3.6%</small>
+          </label>
+          <label>
+            <span>Your Monthly Contribution</span>
+            <input type="number" step="0.01" name="monthly_contribution" value="{{ selected.monthly_contribution or 0 }}">
+            {% set _wt_edit = (selected.wrapper_type or '') | lower %}
+            {% if 'sipp' in _wt_edit %}
+            <small class="form-hint">What you pay from your bank each month. Shelly adds 25% basic-rate tax relief on top — your provider claims it from HMRC automatically.</small>
+            {% elif 'workplace' in _wt_edit or 'pension' in _wt_edit %}
+            <small class="form-hint">Your share of the pension contribution — either from your net pay or salary sacrifice, depending on your scheme.</small>
+            {% elif 'lifetime' in _wt_edit %}
+            <small class="form-hint">What you pay in. The government adds a 25% bonus (up to £4,000/year contributions).</small>
+            {% else %}
+            <small class="form-hint">How much you put in each month. If you link a budget item to this account, Shelly uses this in your budget automatically.</small>
+            {% endif %}
+          </label>
+          {# ── Pension-specific fields ── #}
+          {% if 'workplace' in _wt_edit or 'pension' in _wt_edit %}
+          <label>
+            <span>Employer Contribution</span>
+            <input type="number" step="0.01" name="employer_contribution" value="{{ selected.employer_contribution or 0 }}">
+            <small class="form-hint">What your employer puts in each month on top of yours</small>
+          </label>
+          <label>
+            <span>Contribution Method</span>
+            {% set cm = selected.contribution_method if selected.contribution_method else 'standard' %}
+            <select name="contribution_method">
+              <option value="salary_sacrifice" {{ 'selected' if cm == 'salary_sacrifice' }}>Salary sacrifice</option>
+              <option value="relief_at_source" {{ 'selected' if cm == 'relief_at_source' or cm == 'standard' }}>Relief at source (e.g. NEST)</option>
+            </select>
+            <small class="form-hint">Salary sacrifice = pre-tax, no relief to claim. Relief at source = your provider claims 20% back from HMRC for you.</small>
+          </label>
+          <label>
+            <span>Pension contribution posting day</span>
+            <input type="number" name="pension_contribution_day" min="0" max="28" value="{{ selected.pension_contribution_day or 0 }}">
+            <small class="form-hint">Optional. Use if workplace pension invests later than salary day (e.g. paid on the 28th, invested on the 7th). Set 0 to use salary day from Settings.</small>
+          </label>
+          {% endif %}
+          <label><span>Account Goal</span><input type="number" step="0.01" name="goal_value" value="{{ selected.goal_value or '' }}"></label>
+          <label class="form-full-col"><span>Notes</span><input type="text" name="notes" value="{{ selected.notes or '' }}"></label>
+        </div>
+        {# ── Advanced: Fees (below the main form grid) ─────────── #}
+        <details class="fee-details" style="margin-top:1rem;" {% if selected.platform_fee_pct or selected.platform_fee_flat or selected.fund_fee_pct %}open{% endif %}>
+          <summary class="badge badge-outline" style="cursor:pointer;">Advanced: Fees</summary>
+          <div class="fee-fields" style="margin-top:0.75rem; display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:0.75rem;">
+            <label>
+              <span>Platform fee (%)</span>
+              <input type="number" step="0.001" name="platform_fee_pct" value="{{ selected.platform_fee_pct or '' }}" placeholder="e.g. 0.15" min="0" max="5">
+              <small class="form-hint">Broker's annual charge. E.g. Vanguard 0.15%, HL 0.45%.</small>
+            </label>
+            <label>
+              <span>Fee cap (£/year)</span>
+              <input type="number" step="1" name="platform_fee_cap" value="{{ selected.platform_fee_cap or '' }}" placeholder="e.g. 375" min="0">
+              <small class="form-hint">Cap on % fee. E.g. Vanguard £375/yr.</small>
+            </label>
+            <label>
+              <span>Flat fee (£/year)</span>
+              <input type="number" step="1" name="platform_fee_flat" value="{{ selected.platform_fee_flat or '' }}" placeholder="e.g. 144" min="0">
+              <small class="form-hint">Fixed annual amount. E.g. ii ~£144/yr.</small>
+            </label>
+            <label>
+              <span>Fund fee / OCF (%)</span>
+              <input type="number" step="0.001" name="fund_fee_pct" value="{{ selected.fund_fee_pct or '' }}" placeholder="e.g. 0.22" min="0" max="5">
+              <small class="form-hint">Fund ongoing charge. E.g. VWRP 0.22%.</small>
+            </label>
+          </div>
+          <input type="hidden" name="annual_fee_pct" value="0">
+          <small class="form-hint" style="color:var(--muted); display:block; margin-top:0.5rem;">All optional — Shelly combines these into one effective fee and subtracts it from your growth rate.</small>
+        </details>
+        <div class="badge-row mt-1">
+          <button type="submit">Save account</button>
+          <a class="badge" href="/accounts/{{ selected.id }}">Cancel</a>
+        </div>
+      </section>
+    </form>
+
+  {% else %}
+    {# ── View mode ──────────────────────────────────────────────────────── #}
+    <div class="acct-detail-stats">
+      <div class="acct-detail-stat">
+        <span>Balance</span>
+        <strong>£{{ '{:,.2f}'.format(effective_values[selected.id]) }}</strong>
+      </div>
+      <div class="acct-detail-stat">
+        {% set scb = contrib_breakdowns.get(selected.id, {}) %}
+        {% if scb.get('total_into_pot', 0) != (selected.monthly_contribution or 0) and scb.get('total_into_pot', 0) > 0 %}
+        <span>You pay</span>
+        <strong>£{{ '{:,.2f}'.format(selected.monthly_contribution or 0) }}</strong>
+      </div>
+      <div class="acct-detail-stat">
+        <span>Into pot</span>
+        <strong style="color:var(--accent-2)">£{{ '{:,.2f}'.format(scb.total_into_pot) }}</strong>
+        {% else %}
+        <span>Monthly</span>
+        <strong>£{{ '{:,.2f}'.format(selected.monthly_contribution or 0) }}</strong>
+        {% endif %}
+      </div>
+      <div class="acct-detail-stat">
+        <span>Growth rate</span>
+        <strong>
+          {% if selected.growth_mode == 'custom' and selected.growth_rate_override is not none %}
+            {{ '{:.2f}'.format(selected.growth_rate_override * 100) }}% (custom)
+          {% else %}
+            Default
+          {% endif %}
+        </strong>
+      </div>
+      {% if selected.platform_fee_pct or selected.platform_fee_flat or selected.fund_fee_pct %}
+      <div class="acct-detail-stat">
+        <span>Platform fee</span>
+        <strong style="color:var(--danger, #f87171);">
+          {%- if selected.platform_fee_pct %}{{ '{:.3f}'.format(selected.platform_fee_pct) }}%{% if selected.platform_fee_cap %} (capped £{{ '{:,.0f}'.format(selected.platform_fee_cap) }}/yr){% endif %}{% endif %}
+          {%- if selected.platform_fee_flat %}{% if selected.platform_fee_pct %} + {% endif %}£{{ '{:,.0f}'.format(selected.platform_fee_flat) }}/yr{% endif %}
+          {%- if not selected.platform_fee_pct and not selected.platform_fee_flat %}0%{% endif %}
+        </strong>
+      </div>
+      <div class="acct-detail-stat">
+        <span>Fund fee (OCF)</span>
+        <strong style="color:var(--danger, #f87171);">{{ '{:.3f}'.format(selected.fund_fee_pct or 0) }}%</strong>
+      </div>
+      {% elif selected.annual_fee_pct %}
+      <div class="acct-detail-stat">
+        <span>Annual fee</span>
+        <strong style="color:var(--danger, #f87171);">{{ '{:.3f}'.format(selected.annual_fee_pct) }}%</strong>
+      </div>
+      {% endif %}
+      <div class="acct-detail-stat">
+        <span>Valuation</span>
+        <strong>{{ 'From holdings' if selected.valuation_mode == 'holdings' else 'Manual' }}</strong>
+      </div>
+      {% if selected.goal_value %}
+      <div class="acct-detail-stat">
+        <span>Account goal</span>
+        <strong>£{{ '{:,.0f}'.format(selected.goal_value) }}</strong>
+      </div>
+      {% endif %}
+      {% if selected.owner %}
+      <div class="acct-detail-stat">
+        <span>Owner</span>
+        <strong>{{ selected.owner }}</strong>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if selected.tags %}
+    <div class="badge-row mt-075">
+      {% for tag in selected.tags.split(',') %}
+        {% if tag.strip() %}<span class="badge badge-tag">{{ tag.strip() }}</span>{% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if selected.notes %}
+    <p class="mt-075 text-sm-2 text-muted">{{ selected.notes }}</p>
+    {% endif %}
+
+    {% if selected.valuation_mode == 'holdings' %}
+    <section class="panel mt-1">
+      <h3 class="section-title">Allocation Snapshot</h3>
+      {% if allocation_rows %}
+        {% set palette = ['#38bdf8', '#22c55e', '#f59e0b', '#f97316', '#a78bfa', '#ef4444', '#14b8a6', '#eab308'] %}
+        <div class="allocation-layout">
+          <div class="allocation-chart-card">
+            <canvas id="allocChart" width="210" height="210" role="img" aria-label="Allocation breakdown doughnut chart"></canvas>
+          </div>
+          <div class="allocation-list">
+            {% for row in allocation_rows %}
+            {% set color = palette[loop.index0 % (palette|length)] %}
+            <div class="allocation-item" data-index="{{ loop.index0 }}">
+              <div class="allocation-item-top">
+                <div class="flex flex-center gap-05">
+                  <span class="alloc-dot" data-color="{{ color }}"></span>
+                  <strong>{{ row.bucket }}</strong>
+                </div>
+                <span>{{ '{:.1f}'.format(row.percentage) }}%</span>
+              </div>
+              <small>£{{ '{:,.2f}'.format(row.value) }}</small>
+              <div class="progress">
+                <div class="progress-bar" data-pct="{{ row.percentage }}" data-color="{{ color }}"></div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <script>
+        (function() {
+          var palette = JSON.parse('{{ palette | list | tojson | safe }}');
+          var labels   = JSON.parse('{{ allocation_rows | map(attribute="bucket") | list | tojson | safe }}');
+          var values   = JSON.parse('{{ allocation_rows | map(attribute="value") | list | tojson | safe }}');
+          var pcts     = JSON.parse('{{ allocation_rows | map(attribute="percentage") | list | tojson | safe }}');
+          var total    = '£{{ "{:,.2f}".format(allocation_total) }}';
+          var colors   = labels.map(function(_, i) { return palette[i % palette.length]; });
+          var S = getComputedStyle(document.documentElement);
+          var CSS = {
+            textWhite: S.getPropertyValue('--text-white').trim(),
+            muted:     S.getPropertyValue('--muted').trim(),
+            chartBg:   S.getPropertyValue('--chart-bg-deep').trim(),
+          };
+
+          document.querySelectorAll('.allocation-item .alloc-dot[data-color]').forEach(function (el) {
+            el.style.background = el.dataset.color;
+          });
+          document.querySelectorAll('.allocation-item .progress-bar[data-pct]').forEach(function (el) {
+            var pct = parseFloat(el.dataset.pct || '0');
+            if (!isFinite(pct) || pct < 0) pct = 0;
+            if (pct > 100) pct = 100;
+            el.style.width = pct + '%';
+            if (el.dataset.color) el.style.background = el.dataset.color;
+          });
+
+          function fmtGBP(v) {
+            return '£' + v.toLocaleString('en-GB', {minimumFractionDigits:2, maximumFractionDigits:2});
+          }
+
+          /* Highlight the matching list row + dot; idx = -1 to clear */
+          function highlightListItem(idx) {
+            var items = document.querySelectorAll('.allocation-item[data-index]');
+            items.forEach(function(item) {
+              var i = parseInt(item.dataset.index);
+              var dot = item.querySelector('.alloc-dot');
+              if (idx >= 0 && i === idx) {
+                var c = colors[i % colors.length];
+                item.style.borderColor = c;
+                item.style.boxShadow   = '0 0 0 1px ' + c + '55, 0 4px 22px ' + c + '30';
+                item.style.transform   = 'translateX(4px)';
+                if (dot) dot.style.boxShadow = '0 0 7px 2px ' + c + '99';
+              } else {
+                item.style.borderColor = '';
+                item.style.boxShadow   = '';
+                item.style.transform   = '';
+                if (dot) dot.style.boxShadow = '';
+              }
+            });
+          }
+
+          var centerPlugin = {
+            id: 'centerText',
+            afterDraw: function(chart) {
+              var ctx = chart.ctx;
+              var ca  = chart.chartArea;
+              var cx  = (ca.left + ca.right)  / 2;
+              var cy  = (ca.top  + ca.bottom) / 2;
+              var active = chart.getActiveElements();
+              ctx.save();
+              ctx.textAlign    = 'center';
+              ctx.textBaseline = 'middle';
+              if (active.length > 0) {
+                var idx = active[0].index;
+                var pct = pcts[idx].toFixed(1) + '%';
+                var val = fmtGBP(values[idx]);
+                /* Large % */
+                ctx.font      = 'bold 26px Inter, system-ui, sans-serif';
+                ctx.fillStyle = CSS.textWhite;
+                ctx.fillText(pct, cx, cy - 9);
+                /* Value below */
+                ctx.font      = '600 12px Inter, system-ui, sans-serif';
+                ctx.fillStyle = CSS.muted;
+                ctx.fillText(val, cx, cy + 13);
+              } else {
+                ctx.font      = 'bold 15px Inter, system-ui, sans-serif';
+                ctx.fillStyle = CSS.textWhite;
+                ctx.fillText(total, cx, cy - 8);
+                ctx.font      = '10px Inter, system-ui, sans-serif';
+                ctx.fillStyle = CSS.muted;
+                ctx.fillText('TOTAL TRACKED', cx, cy + 10);
+              }
+              ctx.restore();
+            }
+          };
+
+          var canvas = document.getElementById('allocChart');
+          if (!canvas) return;
+          var allocChart = new Chart(canvas.getContext('2d'), {
+            type: 'doughnut',
+            plugins: [centerPlugin],
+            data: {
+              labels: labels,
+              datasets: [{
+                data: values,
+                backgroundColor: colors,
+                hoverBackgroundColor: colors,
+                borderWidth: 3,
+                borderColor: CSS.chartBg,
+                hoverBorderColor: CSS.textWhite,
+                hoverBorderWidth: 2,
+                hoverOffset: 8,
+              }]
+            },
+            options: {
+              cutout: '68%',
+              responsive: false,
+              /* padding prevents hoverOffset clipping at canvas edge */
+              layout: { padding: 14 },
+              animation: { animateRotate: true, duration: 700, easing: 'easeInOutQuart' },
+              plugins: {
+                legend:  { display: false },
+                tooltip: { enabled: false },
+              },
+              onHover: function(event, activeElements) {
+                canvas.style.cursor = activeElements.length ? 'pointer' : 'default';
+                highlightListItem(activeElements.length ? activeElements[0].index : -1);
+              }
+            }
+          });
+
+          /* Bidirectional: hovering a list row highlights the chart segment too */
+          var items = document.querySelectorAll('.allocation-item[data-index]');
+          items.forEach(function(item) {
+            item.addEventListener('mouseenter', function() {
+              var idx = parseInt(item.dataset.index);
+              highlightListItem(idx);
+              /* Activate the matching donut segment */
+              allocChart.setActiveElements([{ datasetIndex: 0, index: idx }]);
+              allocChart.update('none');
+            });
+            item.addEventListener('mouseleave', function() {
+              highlightListItem(-1);
+              allocChart.setActiveElements([]);
+              allocChart.update('none');
+            });
+          });
+        })();
+        </script>
+      {% else %}
+        <p class="helper-text">No allocation data yet. Add some holdings and Shelly will break down the numbers for you.</p>
+      {% endif %}
+    </section>
+
+    <section class="panel mt-1">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Performance</p>
+          <h3>Monthly history</h3>
+        </div>
+        <a class="badge badge-meta" href="/performance/export.xlsx?account_id={{ selected.id }}">Download report</a>
+      </div>
+
+      {% if account_monthly_labels and account_monthly_labels | length >= 2 %}
+      <div class="chart-wrap chart-wrap-sm">
+        <canvas id="acctMonthlyChart" role="img" aria-label="Monthly account value chart" data-labels='{{ account_monthly_labels | tojson | safe }}' data-values='{{ account_monthly_values | tojson | safe }}'></canvas>
+      </div>
+      <p id="acct-chart-error" class="helper-text mt-05" style="display:none;"></p>
+
+      <script>
+      (function () {
+        try {
+          var canvas = document.getElementById('acctMonthlyChart');
+          if (!canvas) return;
+          var labels = JSON.parse(canvas.dataset.labels || '[]');
+          var values = JSON.parse(canvas.dataset.values || '[]');
+          var ctx = canvas.getContext('2d');
+
+          function drawFallback(canvasCtx, values) {
+            var rect = canvas.getBoundingClientRect();
+            var w = Math.max(1, Math.floor(rect.width));
+            var h = Math.max(1, Math.floor(rect.height));
+            var dpr = window.devicePixelRatio || 1;
+            if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
+              canvas.width = Math.floor(w * dpr);
+              canvas.height = Math.floor(h * dpr);
+            }
+            canvasCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            canvasCtx.clearRect(0, 0, w, h);
+
+            var padL = 44;
+            var padR = 12;
+            var padT = 10;
+            var padB = 22;
+            var innerW = Math.max(1, w - padL - padR);
+            var innerH = Math.max(1, h - padT - padB);
+
+            var minV = Infinity;
+            var maxV = -Infinity;
+            for (var i = 0; i < values.length; i++) {
+              var v = Number(values[i]);
+              if (!isFinite(v)) continue;
+              if (v < minV) minV = v;
+              if (v > maxV) maxV = v;
+            }
+            if (!isFinite(minV) || !isFinite(maxV)) return;
+            if (minV === maxV) {
+              minV = minV * 0.999;
+              maxV = maxV * 1.001;
+            }
+
+            function xFor(idx) {
+              if (values.length <= 1) return padL + innerW / 2;
+              return padL + (idx / (values.length - 1)) * innerW;
+            }
+            function yFor(val) {
+              var t = (val - minV) / (maxV - minV);
+              return padT + (1 - t) * innerH;
+            }
+
+            canvasCtx.strokeStyle = CSS.grid || 'rgba(148, 163, 184, 0.12)';
+            canvasCtx.lineWidth = 1;
+            canvasCtx.beginPath();
+            for (var g = 0; g <= 4; g++) {
+              var y = padT + (g / 4) * innerH;
+              canvasCtx.moveTo(padL, y);
+              canvasCtx.lineTo(padL + innerW, y);
+            }
+            canvasCtx.stroke();
+
+            canvasCtx.beginPath();
+            for (var p = 0; p < values.length; p++) {
+              var pv = Number(values[p]);
+              if (!isFinite(pv)) continue;
+              var x = xFor(p);
+              var y = yFor(pv);
+              if (p === 0) canvasCtx.moveTo(x, y);
+              else canvasCtx.lineTo(x, y);
+            }
+            canvasCtx.lineWidth = 2;
+            canvasCtx.strokeStyle = CSS.primary || '#38bdf8';
+            canvasCtx.stroke();
+          }
+
+          if (typeof window.Chart === 'function') {
+            new Chart(ctx, {
+              type: 'line',
+              data: {
+                labels: labels,
+                datasets: [{
+                  data: values,
+                  borderColor: CSS.primary,
+                  backgroundColor: CSS.primary + '22',
+                  borderWidth: 2,
+                  pointRadius: values.length <= 24 ? 3 : 0,
+                  pointBackgroundColor: CSS.primary,
+                  fill: true,
+                  tension: 0.25
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                  x: { grid: { color: CSS.grid }, ticks: { color: CSS.muted, font: { size: 11 } } },
+                  y: { grid: { color: CSS.grid }, ticks: { color: CSS.muted, font: { size: 11 } } }
+                }
+              }
+            });
+          } else {
+            drawFallback(ctx, values);
+          }
+        } catch (err) {
+          var msg = (err && err.message) ? err.message : String(err);
+          var el = document.getElementById('acct-chart-error');
+          if (el) {
+            el.style.display = 'block';
+            el.textContent = 'Account chart failed to render: ' + msg;
+          }
+        }
+      })();
+      </script>
+      {% else %}
+      <p class="helper-text">Not enough monthly snapshots yet. Run a Monthly Update twice (two months) to see history.</p>
+      {% endif %}
+    </section>
+
+    <section class="panel mt-1" id="holdings-section">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow">Positions</p>
+          <h3>Holdings</h3>
+        </div>
+        {% if positions %}
+        <form method="post" action="/holdings/trigger-price-update" class="form-reset">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="badge badge-meta" title="Fetch latest prices from Yahoo Finance">↻ Refresh prices</button>
+        </form>
+        {% endif %}
+      </div>
+
+      {# ── Uninvested Cash ── #}
+      {% if selected.valuation_mode == 'holdings' %}
+      <div class="panel mt-1 mb-1" style="background: var(--surface-2); padding: 1rem; border-radius: var(--radius-md);">
+        <form method="post" action="/accounts/{{ selected.id }}/cash" class="form-reset" style="display:flex; flex-wrap:wrap; gap:1rem; align-items:flex-end;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div style="flex:1; min-width: 10rem;">
+            <label class="text-sm text-muted uppercase">Uninvested Cash (£)</label>
+            <input type="number" step="any" name="uninvested_cash" class="input-standard mt-025" style="width:100%;" value="{{ '{:.2f}'.format(selected.uninvested_cash or 0) }}">
+          </div>
+          <div style="flex:1; min-width: 10rem;">
+            <label class="text-sm text-muted uppercase">Cash Interest Rate (%)</label>
+            <input type="number" step="any" name="cash_interest_rate" class="input-standard mt-025" style="width:100%;" value="{{ '{:.2f}'.format((selected.cash_interest_rate or 0) * 100) }}">
+          </div>
+          <div>
+            <button type="submit" class="badge badge-meta">Save Cash Balance</button>
+          </div>
+        </form>
+      </div>
+      {% endif %}
+
+      {% if positions %}
+        {# ── Desktop: full table ── #}
+        <div class="responsive-table-wrap mt-075 holdings-desktop">
+          <table class="data-table holdings-table">
+            <thead>
+              <tr>
+                <th>Holding</th>
+                <th>Bucket</th>
+                <th class="num">Units</th>
+                <th class="num">Price</th>
+                <th class="num">Value</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for position in positions %}
+              <tr>
+                <td>
+                  {% if position.holding_catalogue_id %}
+                    <a href="/holdings/{{ position.holding_catalogue_id }}" class="link-accent text-sm-2"><strong>{{ position.holding_name }}</strong></a>
+                  {% else %}
+                    <strong class="text-sm-2">{{ position.holding_name }}</strong>
+                  {% endif %}
+                  {% if position.ticker %}<br><small class="text-muted">{{ position.ticker }}</small>{% endif %}
+                </td>
+                <td>{{ position.bucket or '' }}</td>
+                <td class="num">
+                  <input type="number" step="any" name="units" form="edit-holding-{{ position.id }}" value="{{ '{:.4f}'.format(position.units or 0) }}" style="width: 5rem; padding: 0.2rem; text-align: right;" class="input-standard">
+                </td>
+                <td class="num">
+                  <div class="money-input">
+                    <span>£</span>
+                    <input type="number" step="any" name="price" form="edit-holding-{{ position.id }}" value="{{ '{:.4f}'.format(position.price or 0) }}" style="width: 5rem; padding: 0.2rem; text-align: right;" class="input-standard">
+                  </div>
+                  {% if position.price_updated_at %}<small class="text-muted" style="display:block;margin-top:0.2rem;">{{ position.price_updated_at[:16] }}</small>{% endif %}
+                </td>
+                <td class="num">£{{ '{:,.2f}'.format(position.value or 0) }}</td>
+                <td class="text-right text-nowrap">
+                  <div class="badge-row badge-row-end">
+                    <form method="post" action="/accounts/{{ selected.id }}/holdings/{{ position.id }}/edit" id="edit-holding-{{ position.id }}" class="form-reset">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="badge badge-meta">Save</button>
+                    </form>
+                    <form method="post" action="/accounts/{{ selected.id }}/holdings/{{ position.id }}/delete" class="form-reset">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit"
+                              data-confirm="Remove {{ position.holding_name }} from this account?"
+                              data-confirm-title="Remove holding?"
+                              data-confirm-ok="Yes, remove it"
+                              data-confirm-cancel="Keep it"
+                              class="badge badge-danger">Remove</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {# ── Mobile: stacked cards ── #}
+        <div class="holdings-mobile mt-075">
+          {% for position in positions %}
+          <div class="holding-card">
+            <div class="holding-card-header">
+              <div>
+                {% if position.holding_catalogue_id %}
+                  <a href="/holdings/{{ position.holding_catalogue_id }}" class="link-accent"><strong>{{ position.holding_name }}</strong></a>
+                {% else %}
+                  <strong>{{ position.holding_name }}</strong>
+                {% endif %}
+                {% if position.ticker %}<small class="text-muted">{{ position.ticker }}</small>{% endif %}
+              </div>
+              <span class="holding-card-value">£{{ '{:,.2f}'.format(position.value or 0) }}</span>
+            </div>
+            <div class="holding-card-stats">
+              <form method="post" action="/accounts/{{ selected.id }}/holdings/{{ position.id }}/edit" id="edit-holding-mob-{{ position.id }}" class="form-reset" style="display:contents;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              </form>
+              <div style="display:flex; flex-direction:column; gap:0.2rem;">
+                <span style="font-size:0.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em;">Units</span>
+                <input type="number" step="any" name="units" form="edit-holding-mob-{{ position.id }}" value="{{ '{:.4f}'.format(position.units or 0) }}" class="input-standard" style="width:100%; padding:0.2rem;">
+              </div>
+              <div style="display:flex; flex-direction:column; gap:0.2rem;">
+                <span style="font-size:0.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em;">Price (£)</span>
+                <input type="number" step="any" name="price" form="edit-holding-mob-{{ position.id }}" value="{{ '{:.4f}'.format(position.price or 0) }}" class="input-standard" style="width:100%; padding:0.2rem;">
+                {% if position.price_updated_at %}<small class="text-muted" style="margin-top:0.1rem; line-height:1;">{{ position.price_updated_at[:16] }}</small>{% endif %}
+              </div>
+              {% if position.bucket %}<div><span>Bucket</span><strong>{{ position.bucket }}</strong></div>{% endif %}
+            </div>
+            <div class="holding-card-actions">
+              <button type="submit" form="edit-holding-mob-{{ position.id }}" class="badge badge-meta">Save</button>
+              <form method="post" action="/accounts/{{ selected.id }}/holdings/{{ position.id }}/delete" class="form-reset">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit"
+                        data-confirm="Remove {{ position.holding_name }} from this account?"
+                        data-confirm-title="Remove holding?"
+                        data-confirm-ok="Yes, remove it"
+                        data-confirm-cancel="Keep it"
+                        class="badge badge-danger">Remove</button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {# ── Inline add-holding bar ──────────────────────────────────────── #}
+      <div class="add-holding-bar" id="add-holding-bar">
+        <div class="section-header">
+          <h4>Add holding</h4>
+        </div>
+
+        {# Mode A: search by ticker #}
+        <div id="ah-mode-ticker">
+          <form method="post" action="/accounts/{{ selected.id }}/holdings/add" id="add-holding-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="add-holding-fields">
+              <div class="add-holding-field">
+                <label for="ah-ticker">Ticker</label>
+                <input type="text" id="ah-ticker" name="ticker" class="input-standard"
+                       placeholder="e.g. VWRP" autocapitalize="characters" autocomplete="off">
+              </div>
+              <div class="add-holding-field">
+                <label for="ah-units">Units</label>
+                <input type="number" id="ah-units" name="units" class="input-standard" step="any" placeholder="e.g. 42.5">
+              </div>
+              <div class="add-holding-field add-holding-preview-wrap">
+                <label>Est. value</label>
+                <span id="ah-preview" class="add-holding-preview">—</span>
+              </div>
+              <button type="submit" class="badge badge-primary-action add-holding-submit">Add</button>
+            </div>
+            <p id="ah-status" class="text-sm" style="margin:0.4rem 0 0.2rem;min-height:1.25rem;"></p>
+          </form>
+          <button type="button" id="ah-switch-manual" class="btn-link text-sm text-muted">
+            No ticker / pension fund? Add manually →
+          </button>
+        </div>
+
+        {# Mode B: manual / custom holding #}
+        <div id="ah-mode-manual" class="hidden">
+          <form method="post" action="/accounts/{{ selected.id }}/holdings/add-manual" id="add-manual-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="add-holding-fields" style="flex-wrap:wrap;gap:0.6rem;">
+              <div class="add-holding-field" style="flex:1;min-width:12rem;">
+                <label for="am-name">Fund / holding name</label>
+                <input type="text" id="am-name" name="name" class="input-full"
+                       placeholder="e.g. Nest Higher Risk Fund">
+              </div>
+              <div class="add-holding-field">
+                <label for="am-ticker">Ticker (optional)</label>
+                <input type="text" id="am-ticker" name="ticker" class="input-medium"
+                       placeholder="Leave blank if none" autocapitalize="characters">
+              </div>
+              <div class="add-holding-field">
+                <label for="am-type">Type</label>
+                <select id="am-type" name="asset_type">
+                  <option value="Pension Fund">Pension Fund</option>
+                  <option value="Fund">Fund</option>
+                  <option value="ETF">ETF</option>
+                  <option value="Share">Share</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Bond">Bond</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div class="add-holding-field">
+                <label for="am-units">Units</label>
+                <input type="number" id="am-units" name="units" class="input-narrow" step="any" placeholder="e.g. 100">
+              </div>
+              <div class="add-holding-field">
+                <label for="am-price">Price (£/unit)</label>
+                <input type="number" id="am-price" name="price" class="input-narrow" step="any" placeholder="e.g. 1.25">
+              </div>
+              <div class="add-holding-field add-holding-preview-wrap">
+                <label>Est. value</label>
+                <span id="am-preview" class="add-holding-preview">—</span>
+              </div>
+              <button type="submit" class="badge badge-primary-action add-holding-submit">Add</button>
+            </div>
+          </form>
+          <button type="button" id="ah-switch-ticker" class="btn-link text-sm text-muted" style="margin-top:0.5rem;">
+            ← Search by ticker instead
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel mt-1">
+      <div class="section-header">
+        <h3>Contribution Plan</h3>
+        <p class="helper-text">Standard: £{{ '{:,.2f}'.format(selected.monthly_contribution or 0) }}/mo</p>
+      </div>
+
+      <div class="card panel-sm">
+        <h4 class="section-title">One-off Overrides</h4>
+        <p class="cw-hint">Expect a bonus? Taking a month off? Tell Shelly when your standard plan doesn't apply, and he'll adjust your projections automatically.</p>
+
+        {% if overrides %}
+        <div class="override-list mt-075">
+          {% for ov in overrides %}
+          <div class="override-item {% if ov.from_month <= current_month_key and ov.to_month >= current_month_key %}override-active{% endif %}">
+            <div class="override-item-info">
+              <strong>£{{ '{:,.2f}'.format(ov.override_amount) }}/mo</strong>
+              <small>{{ ov.from_month }} → {{ ov.to_month }}{% if ov.reason %} · {{ ov.reason }}{% endif %}</small>
+            </div>
+            <div class="flex flex-center gap-05">
+              {% if ov.from_month <= current_month_key and ov.to_month >= current_month_key %}
+                <span class="override-badge">Active</span>
+              {% endif %}
+              <form method="post" class="form-reset">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="form_name" value="delete_override">
+                <input type="hidden" name="override_id" value="{{ ov.id }}">
+                <button type="submit" class="badge badge-danger badge-meta">Remove</button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="helper-text">No overrides yet — Shelly's using your standard plan amounts.</p>
+        {% endif %}
+
+        <form method="post" class="settings-form mt-1">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="form_name" value="add_override">
+          <div class="form-grid">
+            <label><span>From month</span><input type="month" name="from_month" required></label>
+            <label><span>To month</span><input type="month" name="to_month" required></label>
+            <label><span>Override amount (£/mo)</span><input type="number" step="0.01" name="override_amount" placeholder="e.g. 50" required></label>
+            <label><span>Reason (optional)</span><input type="text" name="reason" placeholder="e.g. Car repair, parental leave"></label>
+          </div>
+          <div class="badge-row mt-1">
+            <button type="submit">Add override</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  {% endif %}
+</section>
+
+{% endblock %}

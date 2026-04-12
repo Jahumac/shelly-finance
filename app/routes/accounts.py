@@ -91,7 +91,7 @@ def _split_tags(tags_value):
     return [tag.strip() for tag in (tags_value or '').split(',') if tag.strip()]
 
 
-def _render_accounts_page(user_id, selected=None, detail_mode="view", position_error=None, position_added=False, edit_holding_id=None):
+def _render_accounts_page(user_id, selected=None, detail_mode="view", position_error=None, position_added=False, edit_holding_id=None, template="accounts.html"):
     rows = fetch_all_accounts(user_id)
     assumptions = fetch_assumptions(user_id)
     holdings_totals = fetch_holding_totals_by_account(user_id)
@@ -136,7 +136,7 @@ def _render_accounts_page(user_id, selected=None, detail_mode="view", position_e
             )
 
     return render_template(
-        "accounts.html",
+        template,
         accounts=rows,
         selected=selected,
         detail_mode=detail_mode,
@@ -177,32 +177,24 @@ def accounts():
     if request.method == "POST":
         payload = _account_payload_from_form(request.form)
         new_id = create_account(payload, uid)
-        return redirect(url_for("accounts.accounts"))
+        return redirect(url_for("accounts.account_detail", account_id=new_id))
 
-    rows = fetch_all_accounts(uid)
-    assumptions = fetch_assumptions(uid)
-    holdings_totals = fetch_holding_totals_by_account(uid)
-    effective_values = {row["id"]: effective_account_value(row, holdings_totals) for row in rows}
-    contrib_breakdowns = {row["id"]: contribution_breakdown(row, assumptions) for row in rows}
-    return render_template(
-        "accounts.html",
-        accounts=rows,
-        selected=None,
-        detail_mode="list",
-        holdings_totals=holdings_totals,
-        effective_values=effective_values,
-        total_value=sum(effective_values.values()),
-        total_monthly=sum(float(r["monthly_contribution"] or 0) for r in rows),
-        contrib_breakdowns=contrib_breakdowns,
-        active_page="accounts",
-        wrapper_type_options=WRAPPER_TYPE_OPTIONS,
-        category_options=CATEGORY_OPTIONS,
-        tag_options=fetch_user_tags(uid),
-        custom_tags=fetch_custom_tags(uid),
-        default_tags=DEFAULT_TAG_OPTIONS,
-        selected_tags=[],
-        tax_band=assumptions["tax_band"] if assumptions and "tax_band" in assumptions.keys() else "basic",
-    )
+    page_mode = request.args.get("mode", "list")
+    if page_mode == "create":
+        return _render_accounts_page(uid, template="account_create.html")
+
+    return _render_accounts_page(uid, template="accounts.html")
+
+
+@accounts_bp.route("/create", methods=["GET", "POST"])
+@login_required
+def account_create():
+    uid = current_user.id
+    if request.method == "POST":
+        payload = _account_payload_from_form(request.form)
+        new_id = create_account(payload, uid)
+        return redirect(url_for("accounts.account_detail", account_id=new_id))
+    return _render_accounts_page(uid, template="account_create.html")
 
 
 @accounts_bp.route("/api/tags", methods=["POST"])
@@ -412,7 +404,7 @@ def account_detail(account_id):
 
     detail_mode = request.args.get("mode", "view")
     edit_holding_id = request.args.get("holding_id", type=int)
-    return _render_accounts_page(uid, selected=selected, detail_mode=detail_mode, edit_holding_id=edit_holding_id)
+    return _render_accounts_page(uid, selected=selected, detail_mode=detail_mode, edit_holding_id=edit_holding_id, template="account_detail.html")
 
 
 @accounts_bp.route("/<int:account_id>/positions/new", methods=["GET", "POST"])
