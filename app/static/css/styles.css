@@ -1161,6 +1161,52 @@ button.badge-like-button {
     font-size: 2.35rem;
   }
 
+  .hero-turtle {
+    width: 56px;
+    height: 56px;
+  }
+
+  .helper-text {
+    margin-bottom: 0.65rem;
+  }
+
+  .review-list {
+    gap: 0.75rem;
+  }
+
+  .holding-update-list {
+    gap: 0.5rem;
+  }
+
+  .holding-update-row {
+    padding: 0.75rem 0.85rem;
+  }
+
+  .holding-update-inputs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+    margin-top: 0.15rem;
+    align-items: end;
+  }
+
+  .holding-update-field input {
+    width: 100%;
+  }
+
+  .holding-update-value {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .hu-submit {
+    grid-column: 1 / -1;
+    justify-self: end;
+    margin-left: 0;
+  }
+
   .card .section-header h2,
   .card .section-header h3,
   .panel .section-header h2,
@@ -2174,6 +2220,17 @@ button.badge-like-button {
   align-items: flex-start;
   justify-content: center;
   align-self: flex-start;
+}
+
+.hero-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.hero-title-text {
+  flex: 1;
+  min-width: 0;
 }
 .hero-turtle {
   width: 80px;
