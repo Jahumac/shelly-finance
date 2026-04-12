@@ -86,7 +86,7 @@
   </div>
 </section>
 
-{% if history_data %}
+{% if item.ticker %}
 <section class="panel mt-1">
   <div class="section-header">
     <div>
@@ -102,7 +102,7 @@
   </div>
   
   <div class="chart-wrap mt-1">
-    <canvas id="historyChart" role="img" aria-label="Holding price history chart" data-history='{{ history_data | tojson | safe }}'></canvas>
+    <canvas id="historyChart" role="img" aria-label="Holding price history chart" data-holding-id="{{ item.id }}" data-history='{{ (history_data or []) | tojson | safe }}'></canvas>
   </div>
   <p id="history-chart-error" class="helper-text mt-05" style="display:none;"></p>
 
@@ -114,6 +114,14 @@
       var values = rawData.map(function(d) { return d.price; });
       var canvas = document.getElementById('historyChart');
       if (!canvas) return;
+      if (!values.length) {
+        var noEl = document.getElementById('history-chart-error');
+        if (noEl) {
+          noEl.style.display = 'block';
+          noEl.textContent = 'No data available for this range.';
+        }
+        return;
+      }
       var ctx = canvas.getContext('2d');
 
       var S = getComputedStyle(document.documentElement);
@@ -230,12 +238,6 @@
   })();
   </script>
 </section>
-{% else %}
-  {% if item.ticker %}
-  <section class="panel mt-1">
-    <p class="helper-text">No historical price data available for {{ item.ticker }}.</p>
-  </section>
-  {% endif %}
 {% endif %}
 
 {% endblock %}

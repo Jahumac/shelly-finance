@@ -18,6 +18,7 @@ from app.models import (
     update_holding_catalogue_yield,
     update_holding,
 )
+from app.services.history_adapter import adapt_history_for_chart
 from app.services.prices import fetch_price, fetch_history, lookup_instrument
 from app.services.scheduler import trigger_manual_update
 
@@ -69,6 +70,32 @@ def holding_detail(catalogue_id):
         history_period=period,
         view_in_account_url=view_in_account_url,
     )
+
+
+@holdings_bp.route("/<int:catalogue_id>/history")
+@login_required
+def holding_history(catalogue_id):
+    item_row = fetch_catalogue_holding(catalogue_id)
+    if not item_row:
+        return jsonify({"error": "not_found"}), 404
+    item = dict(item_row)
+    if item.get("user_id") != current_user.id:
+        return jsonify({"error": "not_found"}), 404
+
+    period = (request.args.get("period") or "1y").strip().lower()
+    period_map = {"1d": "1d", "1m": "1mo", "6m": "6mo", "1y": "1y"}
+    history_period = period_map.get(period, "1y")
+
+    ticker = (item.get("ticker") or "").strip()
+    if not ticker:
+        return jsonify({"period": period, "labels": [], "values": [], "message": "No ticker available"}), 200
+
+    history_data = fetch_history(ticker, period=history_period)
+    labels, values = adapt_history_for_chart(period, history_data or [])
+    message = None
+    if not labels:
+        message = "No historical price data available"
+    return jsonify({"period": period, "labels": labels, "values": values, "message": message}), 200
 
 
 @holdings_bp.route("/<int:catalogue_id>/yield", methods=["POST"])
