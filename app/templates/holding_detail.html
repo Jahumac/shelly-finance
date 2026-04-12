@@ -65,10 +65,21 @@
           </label>
           <button type="submit" class="badge badge-meta">Save</button>
         </form>
+        <form method="post" action="/holdings/{{ item.id }}/dividend-refresh" class="form-reset mt-05" style="display:inline-block;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="badge badge-meta">Refresh from Yahoo</button>
+        </form>
         {% if item.dividend_yield_pct %}
           <p class="text-xs text-muted mt-025">Est. annual income per £1,000: £{{ '{:,.2f}'.format(1000 * item.dividend_yield_pct) }}</p>
         {% else %}
           <p class="text-xs text-muted mt-025">Set a yield to auto-estimate monthly dividends.</p>
+        {% endif %}
+        {% if item.dividend_frequency or item.dividend_pay_date or item.dividend_ex_date %}
+          <p class="text-xs text-muted mt-025">
+            {% if item.dividend_frequency %}Frequency: {{ item.dividend_frequency }}{% endif %}
+            {% if item.dividend_ex_date %}{% if item.dividend_frequency %} · {% endif %}Ex-date: {{ item.dividend_ex_date }}{% endif %}
+            {% if item.dividend_pay_date %} · Pay date: {{ item.dividend_pay_date }}{% endif %}
+          </p>
         {% endif %}
       </div>
     </div>

@@ -1742,6 +1742,16 @@ button.badge-like-button {
   justify-content: flex-end;
 }
 
+@media (max-width: 768px) {
+  .holding-card-actions .badge {
+    min-height: 44px;
+    padding: 0.65rem 1rem;
+  }
+  .holding-update-row .badge {
+    min-height: 44px;
+  }
+}
+
 /* ── Month navigation (replaces native input + Go) ───────────────────────── */
 .budget-month-nav {
   display: flex;

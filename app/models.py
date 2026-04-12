@@ -71,6 +71,11 @@ CREATE TABLE IF NOT EXISTS holding_catalogue (
     asset_type TEXT,
     bucket TEXT,
     dividend_yield_pct REAL,
+    dividend_frequency TEXT,
+    dividend_ex_date TEXT,
+    dividend_pay_date TEXT,
+    dividend_last_updated TEXT,
+    dividend_source TEXT,
     notes TEXT,
     is_active INTEGER DEFAULT 1,
     last_price REAL,
@@ -405,6 +410,11 @@ def init_db():
 
         for col_name, col_def in [
             ("dividend_yield_pct", "REAL"),
+            ("dividend_frequency", "TEXT"),
+            ("dividend_ex_date", "TEXT"),
+            ("dividend_pay_date", "TEXT"),
+            ("dividend_last_updated", "TEXT"),
+            ("dividend_source", "TEXT"),
         ]:
             try:
                 info = conn.execute("PRAGMA table_info(holding_catalogue)").fetchall()
@@ -1029,7 +1039,9 @@ def upsert_yield_dividends_for_month(user_id, month_key):
                 h.account_id,
                 h.value AS holding_value,
                 a.wrapper_type,
-                hc.dividend_yield_pct
+                hc.dividend_yield_pct,
+                hc.dividend_frequency,
+                hc.dividend_pay_date
             FROM holdings h
             JOIN accounts a ON a.id = h.account_id
             JOIN holding_catalogue hc ON hc.id = h.holding_catalogue_id
@@ -1054,7 +1066,26 @@ def upsert_yield_dividends_for_month(user_id, month_key):
             if holding_value <= 0 or y <= 0:
                 continue
 
-            amount = (holding_value * y) / 12.0
+            freq = (r["dividend_frequency"] or "").strip().lower()
+            pay_date = (r["dividend_pay_date"] or "").strip()
+            factor = 12.0
+            if freq == "monthly":
+                factor = 12.0
+            elif freq == "quarterly":
+                factor = 4.0
+            elif freq == "semi-annual":
+                factor = 2.0
+            elif freq == "annual":
+                factor = 1.0
+            else:
+                factor = 12.0
+
+            if pay_date:
+                pay_mk = pay_date[:7]
+                if pay_mk != month_key:
+                    continue
+
+            amount = (holding_value * y) / factor
             if amount < 0.005:
                 continue
 
@@ -1082,7 +1113,7 @@ def upsert_yield_dividends_for_month(user_id, month_key):
                         round(amount, 2),
                         y,
                         holding_value,
-                        month_date,
+                        pay_date or month_date,
                         "Estimated from dividend yield",
                         existing["id"],
                     ),
@@ -1104,7 +1135,7 @@ def upsert_yield_dividends_for_month(user_id, month_key):
                         month_key,
                         y,
                         holding_value,
-                        month_date,
+                        pay_date or month_date,
                         "Estimated from dividend yield",
                     ),
                 )
@@ -1627,12 +1658,72 @@ def update_holding_catalogue_yield(catalogue_id, user_id, dividend_yield_pct):
         conn.commit()
 
 
+def update_holding_catalogue_dividend_profile(
+    catalogue_id,
+    user_id,
+    dividend_yield_pct=None,
+    dividend_frequency=None,
+    dividend_ex_date=None,
+    dividend_pay_date=None,
+    dividend_last_updated=None,
+    dividend_source=None,
+):
+    with get_connection() as conn:
+        conn.execute(
+            """
+            UPDATE holding_catalogue
+            SET dividend_yield_pct = COALESCE(?, dividend_yield_pct),
+                dividend_frequency = COALESCE(?, dividend_frequency),
+                dividend_ex_date = COALESCE(?, dividend_ex_date),
+                dividend_pay_date = COALESCE(?, dividend_pay_date),
+                dividend_last_updated = COALESCE(?, dividend_last_updated),
+                dividend_source = COALESCE(?, dividend_source)
+            WHERE id = ? AND user_id = ?
+            """,
+            (
+                dividend_yield_pct,
+                dividend_frequency,
+                dividend_ex_date,
+                dividend_pay_date,
+                dividend_last_updated,
+                dividend_source,
+                catalogue_id,
+                user_id,
+            ),
+        )
+        conn.commit()
+
+
 def fetch_catalogue_holding(catalogue_id):
     with get_connection() as conn:
         return conn.execute(
             "SELECT * FROM holding_catalogue WHERE id = ?",
             (catalogue_id,),
         ).fetchone()
+
+
+def fetch_catalogue_dividend_targets(user_id, limit=25):
+    with get_connection() as conn:
+        return conn.execute(
+            """
+            SELECT DISTINCT
+                hc.id,
+                hc.ticker,
+                hc.dividend_last_updated
+            FROM holding_catalogue hc
+            JOIN holdings h ON h.holding_catalogue_id = hc.id
+            JOIN accounts a ON a.id = h.account_id
+            WHERE hc.user_id = ?
+              AND hc.is_active = 1
+              AND a.is_active = 1
+              AND a.user_id = ?
+              AND hc.ticker IS NOT NULL
+              AND TRIM(hc.ticker) != ''
+            ORDER BY hc.id ASC
+            LIMIT ?
+            """,
+            (user_id, user_id, int(limit)),
+        ).fetchall()
 
 
 def fetch_first_position_for_catalogue_holding(catalogue_id, user_id):

@@ -46,6 +46,103 @@ TICKER_ALIASES = {
 
 logger = logging.getLogger(__name__)
 
+
+def _yahoo_json(url: str, timeout: int = 10):
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    resp = urllib.request.urlopen(req, timeout=timeout)
+    return json.loads(resp.read())
+
+
+def fetch_dividend_profile(ticker: str):
+    """Fetch dividend metadata for a ticker from Yahoo Finance.
+
+    Returns dict:
+      - dividend_yield_pct: float in [0,1] or None
+      - frequency: one of 'monthly'|'quarterly'|'semi-annual'|'annual'|'unknown'
+      - ex_date: ISO date string or None
+      - pay_date: ISO date string or None
+      - source: 'yahoo'
+      - updated_at: ISO string (UTC)
+    """
+    if not ticker or not ticker.strip():
+        return None
+
+    t = ticker.strip().upper()
+    yf_symbol = t
+    if not t.endswith(".L") and TICKER_ALIASES.get(t):
+        yf_symbol = TICKER_ALIASES[t]
+    elif not t.endswith(".L"):
+        yf_symbol = t
+
+    out = {
+        "dividend_yield_pct": None,
+        "frequency": "unknown",
+        "ex_date": None,
+        "pay_date": None,
+        "source": "yahoo",
+        "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+    }
+
+    try:
+        encoded = urllib.parse.quote(yf_symbol)
+        url = (
+            f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{encoded}"
+            f"?modules=summaryDetail,calendarEvents"
+        )
+        data = _yahoo_json(url)
+        result = (data.get("quoteSummary") or {}).get("result") or []
+        if result:
+            r0 = result[0]
+            sd = r0.get("summaryDetail") or {}
+            ce = r0.get("calendarEvents") or {}
+
+            y = sd.get("dividendYield")
+            if isinstance(y, dict):
+                y = y.get("raw")
+            if y is not None:
+                try:
+                    y = float(y)
+                    if 0 <= y <= 1:
+                        out["dividend_yield_pct"] = y
+                except Exception:
+                    pass
+
+            exd = (ce.get("exDividendDate") or {}).get("raw") if isinstance(ce.get("exDividendDate"), dict) else None
+            dd = (ce.get("dividendDate") or {}).get("raw") if isinstance(ce.get("dividendDate"), dict) else None
+            if exd:
+                out["ex_date"] = datetime.fromtimestamp(int(exd), tz=timezone.utc).date().isoformat()
+            if dd:
+                out["pay_date"] = datetime.fromtimestamp(int(dd), tz=timezone.utc).date().isoformat()
+    except Exception:
+        pass
+
+    try:
+        encoded = urllib.parse.quote(yf_symbol)
+        url = (
+            f"https://query1.finance.yahoo.com/v8/finance/chart/{encoded}"
+            f"?range=1y&interval=1d&events=div"
+        )
+        data = _yahoo_json(url)
+        result = (data.get("chart") or {}).get("result") or []
+        divs = None
+        if result:
+            divs = ((result[0].get("events") or {}).get("dividends")) or None
+        count = len(divs.keys()) if isinstance(divs, dict) else 0
+        if count >= 10:
+            out["frequency"] = "monthly"
+        elif count >= 4:
+            out["frequency"] = "quarterly"
+        elif count >= 2:
+            out["frequency"] = "semi-annual"
+        elif count == 1:
+            out["frequency"] = "annual"
+        else:
+            out["frequency"] = out["frequency"] or "unknown"
+    except Exception:
+        pass
+
+    return out
+
 def _try_ticker(symbol: str):
     """Return dict with price/currency/change_pct for a Yahoo Finance symbol, or None.
 

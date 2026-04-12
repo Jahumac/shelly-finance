@@ -877,7 +877,11 @@
             <div class="holding-card">
               <div class="holding-card-header">
                 <div>
-                  <strong>{{ position.holding_name }}</strong>
+                  {% if position.holding_catalogue_id %}
+                    <a href="/holdings/{{ position.holding_catalogue_id }}" class="link-accent"><strong>{{ position.holding_name }}</strong></a>
+                  {% else %}
+                    <strong>{{ position.holding_name }}</strong>
+                  {% endif %}
                   {% if position.ticker %}<small class="text-muted">{{ position.ticker }}</small>{% endif %}
                 </div>
                 <span class="holding-card-value">£{{ '{:,.2f}'.format(position.value or 0) }}</span>

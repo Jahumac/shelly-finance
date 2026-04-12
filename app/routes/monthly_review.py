@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
@@ -11,16 +11,19 @@ from app.models import (
     fetch_all_holdings,
     fetch_all_holdings_grouped,
     fetch_assumptions,
+    fetch_catalogue_dividend_targets,
     fetch_holding,
     fetch_holding_totals_by_account,
     fetch_monthly_review_items,
     fetch_or_create_monthly_review,
     upsert_yield_dividends_for_month,
+    update_holding_catalogue_dividend_profile,
     update_account,
     update_holding,
     update_monthly_review,
     upsert_monthly_snapshot,
 )
+from app.services.prices import fetch_dividend_profile
 from app.services.csv_parsers import (
     match_parsed_to_holdings,
     parse_ajbell,
@@ -125,6 +128,38 @@ def monthly_review():
         holdings_by_account.setdefault(row["account_id"], []).append(row)
 
     assumptions = fetch_assumptions(uid)
+    try:
+        targets = fetch_catalogue_dividend_targets(uid, limit=12)
+        refreshed = 0
+        for t in targets:
+            last = (t["dividend_last_updated"] or "").strip()
+            stale = True
+            if last:
+                try:
+                    dt = datetime.strptime(last, "%Y-%m-%d %H:%M UTC")
+                    stale = (datetime.now(timezone.utc) - dt.replace(tzinfo=timezone.utc)).days >= 14
+                except Exception:
+                    stale = True
+            if not stale:
+                continue
+            prof = fetch_dividend_profile(t["ticker"])
+            if prof:
+                update_holding_catalogue_dividend_profile(
+                    int(t["id"]),
+                    uid,
+                    dividend_yield_pct=prof.get("dividend_yield_pct"),
+                    dividend_frequency=prof.get("frequency"),
+                    dividend_ex_date=prof.get("ex_date"),
+                    dividend_pay_date=prof.get("pay_date"),
+                    dividend_last_updated=prof.get("updated_at"),
+                    dividend_source=prof.get("source"),
+                )
+                refreshed += 1
+            if refreshed >= 6:
+                break
+    except Exception:
+        pass
+
     upsert_yield_dividends_for_month(uid, month_key)
 
     # Calculate the smart review-ready date for this month

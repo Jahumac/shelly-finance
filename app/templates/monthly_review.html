@@ -192,7 +192,11 @@
                   <input type="hidden" name="notes" value="{{ holding.notes or '' }}">
 
                   <div class="holding-update-meta">
-                    <strong>{{ holding.holding_name }}</strong>
+                    {% if holding.holding_catalogue_id %}
+                      <a href="/holdings/{{ holding.holding_catalogue_id }}" class="link-accent"><strong>{{ holding.holding_name }}</strong></a>
+                    {% else %}
+                      <strong>{{ holding.holding_name }}</strong>
+                    {% endif %}
                     <span>{{ holding.bucket or 'Other' }}{% if holding.ticker %} · {{ holding.ticker }}{% endif %}</span>
                   </div>
 

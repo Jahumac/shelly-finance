@@ -14,6 +14,7 @@ from app.models import (
     save_daily_snapshot,
     sync_holding_prices_from_catalogue,
     update_catalogue_price,
+    update_holding_catalogue_dividend_profile,
     update_holding_catalogue_yield,
     update_holding,
 )
@@ -92,6 +93,46 @@ def update_yield(catalogue_id):
 
     update_holding_catalogue_yield(catalogue_id, current_user.id, pct / 100.0)
     flash("Dividend yield saved.", "success")
+    return redirect(url_for("holdings.holding_detail", catalogue_id=catalogue_id))
+
+
+@holdings_bp.route("/<int:catalogue_id>/dividend-refresh", methods=["POST"])
+@login_required
+def refresh_dividend(catalogue_id):
+    item_row = fetch_catalogue_holding(catalogue_id)
+    if not item_row:
+        flash("Instrument not found.", "error")
+        return redirect(url_for("overview.overview"))
+    item = dict(item_row)
+    if item.get("user_id") != current_user.id:
+        flash("Instrument not found.", "error")
+        return redirect(url_for("overview.overview"))
+
+    ticker = (item.get("ticker") or "").strip()
+    if not ticker:
+        flash("No ticker available for this instrument.", "error")
+        return redirect(url_for("holdings.holding_detail", catalogue_id=catalogue_id))
+
+    try:
+        from app.services.prices import fetch_dividend_profile
+        prof = fetch_dividend_profile(ticker)
+        if prof:
+            update_holding_catalogue_dividend_profile(
+                catalogue_id,
+                current_user.id,
+                dividend_yield_pct=prof.get("dividend_yield_pct"),
+                dividend_frequency=prof.get("frequency"),
+                dividend_ex_date=prof.get("ex_date"),
+                dividend_pay_date=prof.get("pay_date"),
+                dividend_last_updated=prof.get("updated_at"),
+                dividend_source=prof.get("source"),
+            )
+            flash("Dividend schedule refreshed.", "success")
+        else:
+            flash("Could not fetch dividend data.", "error")
+    except Exception:
+        flash("Could not fetch dividend data.", "error")
+
     return redirect(url_for("holdings.holding_detail", catalogue_id=catalogue_id))
 
 
