@@ -1483,6 +1483,15 @@ button.badge-like-button {
   color: #ffffff;
 }
 
+.settings-hero .hero-strip-stat {
+  padding-right: 0.9rem;
+}
+
+.settings-hero .hero-strip-stat span {
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
 @media (max-width: 640px) {
   .hero-strip {
     display: grid;
