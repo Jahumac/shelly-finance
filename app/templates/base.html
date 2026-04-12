@@ -403,12 +403,38 @@
 
     /* ── Service Worker registration ──────────────────────────────────── */
     if ('serviceWorker' in navigator) {
+      var didReload = false;
       navigator.serviceWorker.register('/sw.js')
         .then(function(reg) {
-          /* Check for updates periodically */
-          setInterval(function() { reg.update(); }, 60 * 60 * 1000);
+          try { reg.update(); } catch (e) {}
+
+          function tryActivateWaiting() {
+            if (!reg.waiting) return;
+            if (!navigator.serviceWorker.controller) return;
+            try { reg.waiting.postMessage({ type: 'SKIP_WAITING' }); } catch (e) {}
+          }
+
+          tryActivateWaiting();
+
+          reg.addEventListener('updatefound', function () {
+            var sw = reg.installing;
+            if (!sw) return;
+            sw.addEventListener('statechange', function () {
+              if (sw.state === 'installed') {
+                tryActivateWaiting();
+              }
+            });
+          });
+
+          navigator.serviceWorker.addEventListener('controllerchange', function () {
+            if (didReload) return;
+            didReload = true;
+            window.location.reload();
+          });
+
+          setInterval(function() { try { reg.update(); } catch (e) {} }, 60 * 60 * 1000);
         })
-        .catch(function() { /* SW not supported or blocked */ });
+        .catch(function() { });
     }
   </script>
 </body>

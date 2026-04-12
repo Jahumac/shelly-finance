@@ -7,7 +7,7 @@ from .models import count_users, fetch_assumptions, get_user_by_id, init_db, clo
 from .services.scheduler import init_scheduler
 
 from .extensions import limiter
-__version__ = "1.5.1"
+__version__ = "1.5.2"
 from .routes.auth import auth_bp
 from .routes.overview import overview_bp
 from .routes.goals import goals_bp
@@ -118,6 +118,10 @@ def create_app():
         except Exception:
             name = "Shelly"
         return {"dashboard_name": name}
+
+    @app.context_processor
+    def inject_app_version():
+        return {"app_version": __version__}
 
     @app.context_processor
     def inject_month_strip():

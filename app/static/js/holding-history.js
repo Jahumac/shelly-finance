@@ -139,10 +139,14 @@
       })
       .catch(function (err) {
         if (err && err.message === 'non_json_response') {
-          window.location.href = reqUrl.replace('/history', '') + '&ajax=0';
+          window.location.href = '/holdings/' + holdingId + '?period=' + encodeURIComponent(period);
           return;
         }
-        setError('Could not load data. Check your connection and try again.');
+        if (navigator && navigator.onLine === false) {
+          setError('Offline. Reconnect and try again.');
+        } else {
+          setError('Could not load data. Check your connection and try again.');
+        }
       })
       .finally(function () {
         window.scrollTo(0, y);

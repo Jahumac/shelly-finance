@@ -92,14 +92,21 @@ def holding_history(catalogue_id):
     if not ticker:
         return jsonify({"period": period, "labels": [], "values": [], "message": "No ticker available"}), 200
 
-    history_data = fetch_history(ticker, period=history_period)
-    labels, values = adapt_history_for_chart(period, history_data or [])
-    message = None
-    if not labels:
-        message = "No historical price data available"
-    resp = jsonify({"period": period, "labels": labels, "values": values, "message": message})
+    try:
+        history_data = fetch_history(ticker, period=history_period)
+        labels, values = adapt_history_for_chart(period, history_data or [])
+        message = None
+        if not labels:
+            message = "No historical price data available"
+        payload = {"period": period, "labels": labels, "values": values, "message": message}
+        status = 200
+    except Exception:
+        payload = {"period": period, "labels": [], "values": [], "message": "History service error"}
+        status = 500
+
+    resp = jsonify(payload)
     resp.headers["Cache-Control"] = "no-store"
-    return resp, 200
+    return resp, status
 
 
 @holdings_bp.route("/<int:catalogue_id>/yield", methods=["POST"])

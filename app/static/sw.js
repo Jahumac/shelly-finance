@@ -8,7 +8,7 @@
  *  - Images/fonts: Cache-first, long-lived
  */
 
-const CACHE_NAME = 'shelly-v1.5.1';
+const CACHE_NAME = 'shelly-v1.5.2';
 
 /* App shell files to pre-cache on install */
 const APP_SHELL = [
@@ -29,6 +29,12 @@ self.addEventListener('install', (event) => {
     })
   );
   self.skipWaiting();
+});
+
+self.addEventListener('message', (event) => {
+  if (event && event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 /* ── Activate: clean up old caches ────────────────────────────────────── */
