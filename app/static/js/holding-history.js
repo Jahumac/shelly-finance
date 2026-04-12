@@ -1,0 +1,142 @@
+(function () {
+  function $(sel) { return document.querySelector(sel); }
+
+  var canvas = $('#historyChart');
+  if (!canvas) return;
+
+  var errorEl = $('#history-chart-error');
+  var controls = document.querySelectorAll('[data-history-period]');
+  var holdingId = canvas.getAttribute('data-holding-id');
+
+  function setError(msg) {
+    if (!errorEl) return;
+    if (!msg) {
+      errorEl.style.display = 'none';
+      errorEl.textContent = '';
+      return;
+    }
+    errorEl.style.display = 'block';
+    errorEl.textContent = msg;
+  }
+
+  function setActive(period) {
+    controls.forEach(function (el) {
+      var p = el.getAttribute('data-history-period');
+      if (p === period) {
+        el.classList.add('badge-primary-action');
+        el.classList.remove('badge-meta');
+      } else {
+        el.classList.remove('badge-primary-action');
+        el.classList.add('badge-meta');
+      }
+    });
+  }
+
+  function getColors(ctx) {
+    var S = getComputedStyle(document.documentElement);
+    return {
+      accent: (S.getPropertyValue('--accent').trim() || '#60a5fa'),
+      grid: (S.getPropertyValue('--chart-grid').trim() || 'rgba(148, 163, 184, 0.12)'),
+      muted: (S.getPropertyValue('--muted').trim() || '#94a3b8'),
+      ctx: ctx
+    };
+  }
+
+  function ensureChart(labels, values) {
+    var ctx = canvas.getContext('2d');
+    var COLORS = getColors(ctx);
+
+    if (typeof window.Chart !== 'function') {
+      setError('Chart library not available.');
+      return;
+    }
+
+    if (window.__holdingHistoryChart) {
+      window.__holdingHistoryChart.data.labels = labels;
+      window.__holdingHistoryChart.data.datasets[0].data = values;
+      window.__holdingHistoryChart.update();
+      return;
+    }
+
+    var gradient = ctx.createLinearGradient(0, 0, 0, canvas.height || 220);
+    gradient.addColorStop(0, COLORS.accent + '33');
+    gradient.addColorStop(1, COLORS.accent + '00');
+
+    window.__holdingHistoryChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: values,
+          borderColor: COLORS.accent,
+          backgroundColor: gradient,
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          pointBackgroundColor: COLORS.accent,
+          fill: true,
+          tension: 0.2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { intersect: false, mode: 'index' } },
+        scales: {
+          x: { grid: { color: COLORS.grid }, ticks: { color: COLORS.muted, font: { size: 11 }, maxTicksLimit: 6 } },
+          y: { grid: { color: COLORS.grid }, ticks: { color: COLORS.muted, font: { size: 11 } } }
+        }
+      }
+    });
+  }
+
+  function updateUrl(period) {
+    try {
+      var url = new URL(window.location.href);
+      url.searchParams.set('period', period);
+      history.replaceState(null, '', url.toString());
+    } catch (e) {}
+  }
+
+  function fetchAndRender(period) {
+    if (!holdingId) return;
+
+    var y = window.scrollY || window.pageYOffset || 0;
+    setError(null);
+
+    fetch('/holdings/' + holdingId + '/history?period=' + encodeURIComponent(period), {
+      headers: { 'Accept': 'application/json' },
+      credentials: 'same-origin'
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (payload) {
+        var labels = payload.labels || [];
+        var values = payload.values || [];
+        if (!labels.length || !values.length) {
+          setError(payload.message || 'No data available for this range.');
+          if (window.__holdingHistoryChart) {
+            window.__holdingHistoryChart.destroy();
+            window.__holdingHistoryChart = null;
+          }
+          return;
+        }
+        ensureChart(labels, values);
+        setActive(period);
+        updateUrl(period);
+      })
+      .catch(function () {
+        setError('Could not load data. Check your connection and try again.');
+      })
+      .finally(function () {
+        window.scrollTo(0, y);
+      });
+  }
+
+  controls.forEach(function (el) {
+    el.addEventListener('click', function (e) {
+      e.preventDefault();
+      var period = el.getAttribute('data-history-period');
+      fetchAndRender(period);
+    });
+  });
+})();

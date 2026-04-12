@@ -94,10 +94,10 @@
       <h3>Price history</h3>
     </div>
     <div class="badge-row badge-row-end">
-      <a class="badge {% if history_period == '1d' %}badge-primary-action{% else %}badge-meta{% endif %}" href="/holdings/{{ item.id }}?period=1d">1D</a>
-      <a class="badge {% if history_period == '1m' %}badge-primary-action{% else %}badge-meta{% endif %}" href="/holdings/{{ item.id }}?period=1m">1M</a>
-      <a class="badge {% if history_period == '6m' %}badge-primary-action{% else %}badge-meta{% endif %}" href="/holdings/{{ item.id }}?period=6m">6M</a>
-      <a class="badge {% if history_period == '1y' %}badge-primary-action{% else %}badge-meta{% endif %}" href="/holdings/{{ item.id }}?period=1y">1Y</a>
+      <a class="badge {% if history_period == '1d' %}badge-primary-action{% else %}badge-meta{% endif %}" data-history-period="1d" href="/holdings/{{ item.id }}?period=1d">1D</a>
+      <a class="badge {% if history_period == '1m' %}badge-primary-action{% else %}badge-meta{% endif %}" data-history-period="1m" href="/holdings/{{ item.id }}?period=1m">1M</a>
+      <a class="badge {% if history_period == '6m' %}badge-primary-action{% else %}badge-meta{% endif %}" data-history-period="6m" href="/holdings/{{ item.id }}?period=6m">6M</a>
+      <a class="badge {% if history_period == '1y' %}badge-primary-action{% else %}badge-meta{% endif %}" data-history-period="1y" href="/holdings/{{ item.id }}?period=1y">1Y</a>
     </div>
   </div>
   
@@ -237,6 +237,7 @@
     }
   })();
   </script>
+  <script src="{{ url_for('static', filename='js/holding-history.js') }}"></script>
 </section>
 {% endif %}
 
