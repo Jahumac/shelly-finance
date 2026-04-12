@@ -344,6 +344,7 @@ nav a.active {
   gap: 0.5rem;
   flex-wrap: wrap;
   margin-top: 0.75rem;
+  align-items: center;
 }
 
 .badge {
@@ -358,6 +359,8 @@ nav a.active {
   align-items: center;
   justify-content: center;
   min-height: 44px;
+  line-height: 1.1;
+  align-self: center;
 }
 
 .badge-sm {
