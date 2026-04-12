@@ -80,7 +80,7 @@ def init_scheduler(app: Flask) -> Optional[Any]:
 
 
 def _scheduled_check(app: Flask) -> None:
-    """Runs every 15 minutes (6am-10pm UK).
+    """Runs every 15 minutes (6am-10pm UK)."""
     import pytz
 
     with app.app_context():
