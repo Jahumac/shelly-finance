@@ -20,6 +20,7 @@ from .routes.budget import budget_bp
 from .routes.export import export_bp
 from .routes.performance import performance_bp
 from .routes.allowance import allowance_bp
+from .routes.api import api_bp
 
 
 def create_app():
@@ -38,6 +39,8 @@ def create_app():
 
     # ── CSRF Protection ──────────────────────────────────────────────────────
     csrf = CSRFProtect(app)
+    # API uses Bearer-token auth (not cookies), so CSRF doesn't apply.
+    csrf.exempt(api_bp)
 
     # ── Flask-Login ──────────────────────────────────────────────────────────
     login_manager = LoginManager(app)
@@ -61,6 +64,7 @@ def create_app():
     app.register_blueprint(export_bp)
     app.register_blueprint(performance_bp, url_prefix="/performance")
     app.register_blueprint(allowance_bp, url_prefix="/allowance")
+    app.register_blueprint(api_bp)
 
     app.teardown_appcontext(close_db)
 
@@ -86,6 +90,9 @@ def create_app():
         from flask import request
         # Allow the setup page, login page, and static assets through
         if request.endpoint in ("auth.setup", "auth.login", "static", "service_worker", "api_ping", None):
+            return
+        # API clients get a JSON error instead of an HTML redirect to /setup.
+        if request.path.startswith("/api/"):
             return
         if count_users() == 0:
             return redirect(url_for("auth.setup"))

@@ -732,6 +732,17 @@ def init_db():
             )
         """)
 
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS api_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                token TEXT NOT NULL UNIQUE,
+                label TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                last_used_at TEXT
+            )
+        """)
+
         # ── Performance indexes on foreign-key and frequently-queried columns ──
         for stmt in [
             "CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id)",
@@ -761,6 +772,8 @@ def init_db():
             "CREATE INDEX IF NOT EXISTS idx_scheduler_runs_user_date ON scheduler_runs(user_id, run_date)",
             "CREATE INDEX IF NOT EXISTS idx_portfolio_daily_user_date ON portfolio_daily_snapshots(user_id, snapshot_date)",
             "CREATE INDEX IF NOT EXISTS idx_custom_tags_user ON custom_tags(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_api_tokens_token ON api_tokens(token)",
+            "CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id)",
         ]:
             try:
                 conn.execute(stmt)
@@ -2288,3 +2301,65 @@ def fetch_daily_snapshots(user_id, limit=365):
             (user_id, limit),
         ).fetchall()
     return [(r["snapshot_date"], float(r["total_value"])) for r in rows]
+
+
+# ── API tokens ────────────────────────────────────────────────────────────────
+# Bearer tokens for the JSON API. Tokens are random 32-byte hex strings
+# generated with secrets.token_hex(32). Stored in plaintext: this is a
+# self-hosted personal app where DB access already implies full compromise.
+# If you want hashed tokens, swap to secrets.compare_digest against a hash.
+
+def create_api_token(user_id, label=None):
+    import secrets
+    token = secrets.token_hex(32)
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO api_tokens (user_id, token, label) VALUES (?, ?, ?)",
+            (user_id, token, label),
+        )
+        conn.commit()
+    return token
+
+
+def fetch_user_by_api_token(token):
+    if not token:
+        return None
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT u.* FROM users u
+            JOIN api_tokens t ON t.user_id = u.id
+            WHERE t.token = ?
+            """,
+            (token,),
+        ).fetchone()
+        if row is None:
+            return None
+        conn.execute(
+            "UPDATE api_tokens SET last_used_at = datetime('now') WHERE token = ?",
+            (token,),
+        )
+        conn.commit()
+    return User(row["id"], row["username"], row["password_hash"], row["is_admin"])
+
+
+def fetch_api_tokens(user_id):
+    with get_connection() as conn:
+        return conn.execute(
+            """
+            SELECT id, label, created_at, last_used_at,
+                   substr(token, 1, 8) AS token_preview
+            FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC
+            """,
+            (user_id,),
+        ).fetchall()
+
+
+def revoke_api_token(token_id, user_id):
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "DELETE FROM api_tokens WHERE id = ? AND user_id = ?",
+            (token_id, user_id),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
