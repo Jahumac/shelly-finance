@@ -658,6 +658,7 @@
             var labels = JSON.parse(canvas.dataset.labels || '[]');
             var values = JSON.parse(canvas.dataset.values || '[]');
             var ctx = canvas.getContext('2d');
+            var c = ChartHelpers.colors();
 
             function drawFallback(canvasCtx, values) {
               var rect = canvas.getBoundingClientRect();
@@ -701,7 +702,7 @@
                 return padT + (1 - t) * innerH;
               }
 
-              canvasCtx.strokeStyle = CSS.grid || 'rgba(148, 163, 184, 0.12)';
+              canvasCtx.strokeStyle = c.grid;
               canvasCtx.lineWidth = 1;
               canvasCtx.beginPath();
               for (var g = 0; g <= 4; g++) {
@@ -721,7 +722,7 @@
                 else canvasCtx.lineTo(x, y);
               }
               canvasCtx.lineWidth = 2;
-              canvasCtx.strokeStyle = CSS.primary || '#38bdf8';
+              canvasCtx.strokeStyle = c.primary;
               canvasCtx.stroke();
             }
 
@@ -730,26 +731,13 @@
                 type: 'line',
                 data: {
                   labels: labels,
-                  datasets: [{
-                    data: values,
-                    borderColor: CSS.primary,
-                    backgroundColor: CSS.primary + '22',
-                    borderWidth: 2,
-                    pointRadius: values.length <= 24 ? 3 : 0,
-                    pointBackgroundColor: CSS.primary,
-                    fill: true,
-                    tension: 0.25
-                  }]
+                  datasets: [ChartHelpers.lineDataset({
+                    values: values,
+                    color: c.primary,
+                    fillAlphaHex: '22',
+                  })]
                 },
-                options: {
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: { legend: { display: false } },
-                  scales: {
-                    x: { grid: { color: CSS.grid }, ticks: { color: CSS.muted, font: { size: 11 } } },
-                    y: { grid: { color: CSS.grid }, ticks: { color: CSS.muted, font: { size: 11 } } }
-                  }
-                }
+                options: ChartHelpers.lineOptions()
               });
             } else {
               drawFallback(ctx, values);
