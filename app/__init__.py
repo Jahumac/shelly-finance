@@ -135,6 +135,22 @@ def create_app():
         current_month_num = today_pill["month_num"] if today_pill else date.today().month
         return {"month_strip": strip, "current_month_num": current_month_num}
 
+    @app.context_processor
+    def inject_static_versioner():
+        import os
+
+        def static_v(filename):
+            """Return a static-file URL with a cache-busting ?v=<mtime> param.
+            Keeps browsers from serving stale CSS/JS after a deploy."""
+            path = os.path.join(app.static_folder, filename)
+            try:
+                mtime = int(os.path.getmtime(path))
+            except OSError:
+                mtime = 0
+            return url_for("static", filename=filename, v=mtime)
+
+        return {"static_v": static_v}
+
     # ── Security headers ────────────────────────────────────────────────────
     @app.after_request
     def set_security_headers(response):
