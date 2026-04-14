@@ -206,45 +206,26 @@
   var chartLabels = {{ chart_labels | tojson }};
   var chartValues = {{ chart_values | tojson }};
   var ctx = document.getElementById('projectionChart').getContext('2d');
-  var S = getComputedStyle(document.documentElement);
-  var CSS = {
-    accent2: S.getPropertyValue('--accent-2').trim(),
-    muted:   S.getPropertyValue('--muted').trim(),
-    grid:    S.getPropertyValue('--chart-grid').trim(),
-  };
+  var c = ChartHelpers.colors();
   new Chart(ctx, {
     type: 'line',
     data: {
       labels: chartLabels,
-      datasets: [{
-        data: chartValues,
-        borderColor: CSS.accent2,
-        backgroundColor: CSS.accent2 + '12',
-        borderWidth: 2,
-        pointRadius: chartLabels.length <= 20 ? 3 : 0,
-        pointBackgroundColor: CSS.accent2,
-        fill: true,
-        tension: 0.3
-      }]
+      datasets: [ChartHelpers.lineDataset({
+        values: chartValues,
+        color: c.accent2,
+        fillAlphaHex: '12',
+        pointCutoff: 20,
+        tension: 0.3,
+      })]
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) {
-              return ' £' + ctx.parsed.y.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-            }
-          }
-        }
-      },
-      scales: {
-        x: { grid: { color: CSS.grid }, ticks: { color: CSS.muted, font: { size: 11 }, maxTicksLimit: 10 } },
-        y: { grid: { color: CSS.grid }, ticks: { color: CSS.muted, font: { size: 11 }, callback: function(v) { return '£' + (v/1000).toFixed(0) + 'k'; } } }
+    options: ChartHelpers.lineOptions({
+      tooltip: ChartHelpers.gbpTooltip(0),
+      extraScales: {
+        x: { ticks: { color: c.muted, font: { size: 11 }, maxTicksLimit: 10 } },
+        y: { ticks: { color: c.muted, font: { size: 11 }, callback: function(v) { return '£' + (v/1000).toFixed(0) + 'k'; } } }
       }
-    }
+    })
   });
   {% endif %}
 
