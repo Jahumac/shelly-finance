@@ -35,6 +35,26 @@
   </div>
 </section>
 
+{% if primary_goal %}
+{% set on_track = metrics.total_projected >= primary_goal.target %}
+{% set gap = primary_goal.target - metrics.total_projected %}
+<section class="card goal-track-callout {% if on_track %}goal-track-ok{% else %}goal-track-short{% endif %} mb-1">
+  <div class="flex flex-center gap-075 flex-wrap">
+    <span class="goal-track-icon">{% if on_track %}✓{% else %}⚠{% endif %}</span>
+    <div style="flex:1; min-width:200px;">
+      {% if on_track %}
+        <strong>On track for "{{ primary_goal.name }}"</strong>
+        <p class="helper-text m-0">Your projected £{{ '{:,.0f}'.format(metrics.total_projected) }} beats your £{{ '{:,.0f}'.format(primary_goal.target) }} goal by £{{ '{:,.0f}'.format(metrics.total_projected - primary_goal.target) }}.</p>
+      {% else %}
+        <strong>Falling short of "{{ primary_goal.name }}"</strong>
+        <p class="helper-text m-0">You're projected at £{{ '{:,.0f}'.format(metrics.total_projected) }} — £{{ '{:,.0f}'.format(gap) }} short of your £{{ '{:,.0f}'.format(primary_goal.target) }} goal.</p>
+      {% endif %}
+    </div>
+    <a href="/goals/" class="badge badge-sm">View goals</a>
+  </div>
+</section>
+{% endif %}
+
 <div class="row-end">
   <a class="badge badge-meta" href="/projections/export.xlsx">↓ Export (.xlsx)</a>
 </div>

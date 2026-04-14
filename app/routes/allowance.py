@@ -7,6 +7,7 @@ from app.calculations import (
     allowance_progress,
     calculate_isa_usage,
     calculate_pension_usage,
+    current_age_from_assumptions,
     is_pension_account,
     pension_allowance_limits,
     uk_tax_year_label,
@@ -53,6 +54,11 @@ def allowance_overview():
 
     isa_allowance = float(assumptions["isa_allowance"]) if assumptions else 20000
     lisa_allowance = float(assumptions["lisa_allowance"]) if assumptions else 4000
+
+    # LISA age warning — contributions stop at 50; warn at 49+
+    current_age = current_age_from_assumptions(assumptions) if assumptions else 0
+    lisa_age_warning = current_age >= 49 if current_age else False
+    lisa_months_remaining = max(0, round((50 - current_age) * 12)) if lisa_age_warning else 0
 
     # ISA accounts for the dropdown
     isa_accounts = [a for a in accounts if (a["wrapper_type"] or "") in ISA_WRAPPER_TYPES]
@@ -124,6 +130,8 @@ def allowance_overview():
         cgt_remaining=cgt_remaining,
         cgt_over_exemption=cgt_over_exemption,
         cgt_annual_exemption=CGT_ANNUAL_EXEMPTION,
+        lisa_age_warning=lisa_age_warning,
+        lisa_months_remaining=lisa_months_remaining,
     )
 
 

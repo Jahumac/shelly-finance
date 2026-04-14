@@ -402,6 +402,8 @@ if (updateAllBtn) {
     dialog.showModal();
   });
   yes.addEventListener('click', function() {
+    yes.disabled = true;
+    yes.textContent = 'Saving…';
     dialog.close();
     form.submit();
   });

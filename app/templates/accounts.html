@@ -46,6 +46,9 @@
       {% if account.growth_mode == 'custom' %}
         <span class="acct-rate-chip">{{ '{:.1f}'.format(account.growth_rate_override * 100) if account.growth_rate_override else '' }}%</span>
       {% endif %}
+      {% if prices_stale and account.valuation_mode == 'holdings' %}
+        <span class="acct-stale-chip" title="Prices may be over 7 days old — refresh to update">⚠ stale</span>
+      {% endif %}
     </div>
     <div class="acct-card-mid">
       <div class="acct-balance">£{{ '{:,.0f}'.format(val) }}</div>

@@ -2,7 +2,7 @@ from flask import Blueprint, render_template
 from flask_login import current_user, login_required
 
 from app.calculations import current_age_from_assumptions, effective_account_value, projected_account_value, projected_account_value_at_year, projected_account_value_no_fees, projected_accounts, projected_total_retirement_value, to_float, years_to_retirement
-from app.models import fetch_all_accounts, fetch_assumptions, fetch_holding_totals_by_account
+from app.models import fetch_all_accounts, fetch_all_goals, fetch_assumptions, fetch_holding_totals_by_account
 
 projections_bp = Blueprint("projections", __name__)
 
@@ -65,6 +65,14 @@ def projections():
     years_remaining = years_to_retirement(computed_age, assumptions["retirement_age"], assumptions) if assumptions else 0
     chart_labels, chart_values = _year_by_year_chart(accounts, assumptions)
 
+    # ── Goals on-track check ─────────────────────────────────────────────────
+    goal_rows = fetch_all_goals(uid)
+    goal_targets = [
+        {"name": g["name"], "target": to_float(g["target_value"])}
+        for g in goal_rows if to_float(g["target_value"]) > 0
+    ]
+    primary_goal = goal_targets[0] if goal_targets else None
+
     metrics = {
         "growth_rate": float(assumptions["annual_growth_rate"]) if assumptions else 0,
         "retirement_age": assumptions["retirement_age"] if assumptions else 0,
@@ -83,5 +91,6 @@ def projections():
         account_rows=account_rows,
         chart_labels=chart_labels,
         chart_values=chart_values,
+        primary_goal=primary_goal,
         active_page="projections",
     )

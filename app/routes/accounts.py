@@ -30,6 +30,7 @@ from app.models import (
     reconnect_holdings_to_catalogue,
     sync_holding_prices_from_catalogue,
     fetch_assumptions,
+    fetch_latest_price_update,
     save_daily_snapshot,
     update_account,
     update_catalogue_price,
@@ -101,6 +102,20 @@ def _render_accounts_page(user_id, selected=None, detail_mode="view", position_e
     holdings_totals = fetch_holding_totals_by_account(user_id)
     effective_values = {row["id"]: effective_account_value(row, holdings_totals) for row in rows}
     contrib_breakdowns = {row["id"]: contribution_breakdown(row, assumptions) for row in rows}
+
+    # Staleness: flag holdings-based accounts if prices > 7 days old
+    prices_stale = False
+    last_price_update = fetch_latest_price_update(user_id)
+    if last_price_update:
+        try:
+            lpu = datetime.fromisoformat(str(last_price_update).replace(" UTC", "+00:00"))
+            if lpu.tzinfo is None:
+                lpu = lpu.replace(tzinfo=timezone.utc)
+            prices_stale = (datetime.now(timezone.utc) - lpu).days >= 7
+        except Exception:
+            prices_stale = True
+    else:
+        prices_stale = any(r["valuation_mode"] == "holdings" for r in rows)
     positions = fetch_holdings_for_account(selected["id"]) if selected else []
     catalogue_rows = fetch_catalogue_with_prices(user_id)
     catalogue_prices = {row["id"]: {"price": row["last_price"], "currency": row["price_currency"]} for row in catalogue_rows if row["last_price"]}
@@ -171,6 +186,7 @@ def _render_accounts_page(user_id, selected=None, detail_mode="view", position_e
         tax_band=assumptions["tax_band"] if assumptions and "tax_band" in assumptions.keys() else "basic",
         account_monthly_labels=account_monthly_labels,
         account_monthly_values=account_monthly_values,
+        prices_stale=prices_stale,
     )
 
 

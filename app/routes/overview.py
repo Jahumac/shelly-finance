@@ -202,6 +202,16 @@ def overview():
             "cta_href": "/allowance/#topup",
         })
 
+    # Nudge to set investment day if accounts exist but salary_day is not configured
+    if not salary_day and raw_accounts:
+        alerts.append({
+            "kind": "info",
+            "message": "Set your investment day in Settings — it tells Shelly when to remind you to do your Monthly Update.",
+            "cta_text": "Go to Settings",
+            "cta_href": "/settings/?mode=edit",
+            "cta_form_action": None,
+        })
+
     return render_template(
         "overview.html",
         metrics=metrics,
