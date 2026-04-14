@@ -1,0 +1,701 @@
+{% extends 'base.html' %}
+{% block title %}Overview · Shelly{% endblock %}
+{% block content %}
+
+{# ── Onboarding state ────────────────────────────────────────────────────── #}
+{% set has_profile = assumptions and assumptions.date_of_birth %}
+{% set has_accounts = accounts | length > 0 %}
+{% set has_goal = metrics.goal_target > 0 %}
+{% set has_history = history_labels | length > 0 %}
+{% set steps_done = [has_profile, has_accounts, has_goal, has_history] | select | list | length %}
+
+{# ── Getting started (shown first for new users) ─────────────────────────── #}
+{% if steps_done < 4 %}
+<section class="card onboarding-welcome mb-1">
+  <div class="onboarding-hero">
+    <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="" class="onboarding-turtle turtle-hello shelly-inline-icon shelly-icon-md">
+    <div>
+      <p class="eyebrow">Getting Started</p>
+      <h2 class="onboarding-title">Welcome to Shelly</h2>
+    </div>
+    <small class="text-muted onboarding-progress">{{ steps_done }}/4 complete</small>
+  </div>
+  <p class="helper-text mb-075">Hey! I'm Shelly — your personal finance companion. I'll help you track your savings, investments and goals. Let's get you set up — it only takes a couple of minutes.</p>
+  <div class="onboarding-steps">
+    <a href="/settings/?mode=edit" class="onboarding-step {% if has_profile %}onboarding-done{% endif %}">
+      <span class="onboarding-check">{% if has_profile %}✓{% else %}1{% endif %}</span>
+      <div>
+        <strong>Tell Shelly about yourself</strong>
+        <small>Date of birth, retirement age, investment day — so projections actually mean something.</small>
+      </div>
+    </a>
+    <a href="/accounts/?mode=create" class="onboarding-step {% if has_accounts %}onboarding-done{% endif %}">
+      <span class="onboarding-check">{% if has_accounts %}✓{% else %}2{% endif %}</span>
+      <div>
+        <strong>Add your first account</strong>
+        <small>ISA, pension, savings — anything you want to track.</small>
+      </div>
+    </a>
+    <a href="/goals/?mode=create" class="onboarding-step {% if has_goal %}onboarding-done{% endif %}">
+      <span class="onboarding-check">{% if has_goal %}✓{% else %}3{% endif %}</span>
+      <div>
+        <strong>Set a goal</strong>
+        <small>Give Shelly a target to aim for. Even a turtle needs a finish line.</small>
+      </div>
+    </a>
+    <a href="/monthly-review/" class="onboarding-step {% if has_history %}onboarding-done{% endif %}">
+      <span class="onboarding-check">{% if has_history %}✓{% else %}4{% endif %}</span>
+      <div>
+        <strong>Complete your first Monthly Update</strong>
+        <small>This is how Shelly tracks your progress over time.</small>
+      </div>
+    </a>
+  </div>
+</section>
+{% endif %}
+
+{# ── Monthly review nudge ────────────────────────────────────────────────── #}
+{% if review_nudge %}
+<section class="card review-nudge mb-1">
+  <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+    <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="" class="shelly-inline-icon shelly-icon-sm">
+    <div style="flex:1; min-width:200px;">
+      <strong>Your investments should be settled by now</strong>
+      <p class="helper-text" style="margin:0.15rem 0 0;">
+        {% if review_ready %}Ready since {{ review_ready.strftime('%-d %B') }}.{% endif %}
+        Time to check your holdings and lock in this month's numbers.
+      </p>
+    </div>
+    <a href="/monthly-review/" class="badge badge-primary-action">Do monthly review</a>
+  </div>
+</section>
+{% endif %}
+
+{# ── Month strip ─────────────────────────────────────────────────────────── #}
+{% include '_month_strip.html' %}
+
+{# ── Hero ─────────────────────────────────────────────────────────────────── #}
+<section class="card highlight mb-1 month-accent-{{ current_month_num }}">
+  <div class="hero-top">
+    <div>
+      <p class="eyebrow">Total Net Worth</p>
+      <h2 class="hero-value hero-value-xl">£{{ '{:,.2f}'.format(metrics.invested_total) }}</h2>
+      <p class="hero-subtitle">{{ metrics.current_date }} · {{ metrics.current_time }}</p>
+    </div>
+    <div class="hero-turtle-wrap">
+      <img src="{{ url_for('static', filename='icons/shelly/Overview.png') }}" alt="" class="hero-turtle">
+    </div>
+  </div>
+
+  <div class="hero-strip">
+    <div class="hero-strip-stat">
+      <span>Monthly contributions</span>
+      <strong>£{{ '{:,.0f}'.format(metrics.monthly_total) }}</strong>
+    </div>
+    <div class="hero-strip-stat">
+      <span>Projected at retirement</span>
+      <strong>£{{ '{:,.0f}'.format(metrics.projected_total) }}</strong>
+    </div>
+    <div class="hero-strip-stat">
+      <span>Accounts</span>
+      <strong>{{ accounts | length }}</strong>
+    </div>
+    <div class="hero-strip-stat">
+      <span>Tax Year {{ metrics.tax_year }}</span>
+      <strong>{{ metrics.tax_year_days_left }} days left</strong>
+    </div>
+    {% if metrics.goal_target > 0 %}
+    <div class="hero-strip-stat">
+      <span>Goal progress</span>
+      <strong>{{ '{:.1f}'.format(metrics.goal_progress * 100) }}%</strong>
+    </div>
+    {% endif %}
+  </div>
+
+  {# Portfolio chart #}
+  <div class="mt-125">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+      <p class="chart-label">Portfolio Value</p>
+      <div class="period-selector" style="display: flex; gap: 0.5rem;">
+        <button class="period-btn" data-period="1D" style="padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: transparent; cursor: pointer; font-size: 0.85rem;">1D</button>
+        <button class="period-btn" data-period="1M" style="padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: transparent; cursor: pointer; font-size: 0.85rem;">1M</button>
+        <button class="period-btn" data-period="6M" style="padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: transparent; cursor: pointer; font-size: 0.85rem;">6M</button>
+        <button class="period-btn" data-period="1Y" style="padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: transparent; cursor: pointer; font-size: 0.85rem;">1Y</button>
+        <button class="period-btn active" data-period="ALL" style="padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: var(--primary); color: white; cursor: pointer; font-size: 0.85rem;">ALL</button>
+      </div>
+    </div>
+    <div class="chart-wrap chart-wrap-sm">
+      <canvas id="dailyPortfolioChart" role="img" aria-label="Daily portfolio value chart"></canvas>
+    </div>
+    <p id="portfolio-chart-error" class="helper-text mt-05" style="display:none;"></p>
+    <div id="chartStats" style="display: flex; justify-content: space-between; margin-top: 0.75rem; font-size: 0.9rem;">
+      <div>
+        <p class="text-muted" style="margin: 0;">Latest Value</p>
+        <p id="latestValue" style="margin: 0; font-weight: 600;"></p>
+      </div>
+      <div style="text-align: right;">
+        <p class="text-muted" style="margin: 0;">Change</p>
+        <p id="changeValue" style="margin: 0; font-weight: 600;"></p>
+      </div>
+    </div>
+    {% if daily_labels | length == 0 %}
+    <p class="helper-text mt-05">No daily snapshots yet — hit ↻ Refresh to save your first point.</p>
+    {% elif daily_labels | length == 1 %}
+    <p class="helper-text mt-05">One snapshot so far — Shelly will draw a proper line once there are two days of data.</p>
+    {% endif %}
+  </div>
+
+  {% if daily_labels | length < 2 and history_labels | length >= 2 %}
+  <div class="mt-125">
+    <p class="chart-label">Net worth history</p>
+    <div class="chart-wrap chart-wrap-sm">
+      <canvas id="netWorthChart" role="img" aria-label="Net worth history chart"></canvas>
+    </div>
+  </div>
+  {% elif daily_labels | length < 2 and history_labels | length == 1 %}
+  <p class="helper-text mt-1">
+    One snapshot down — slow and steady. Complete next month's update and Shelly will start drawing your trend line.
+  </p>
+  {% elif daily_labels | length < 2 %}
+  <p class="helper-text mt-1">
+    Complete your first Monthly Update and Shelly will start tracking your net worth. Remember: slow and steady wins the race.
+  </p>
+  {% endif %}
+
+  {# Last updated indicator #}
+  <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+    <div>
+      <p class="text-muted" style="margin: 0; font-size: 0.9rem;">Prices last updated</p>
+      <p style="margin: 0; font-weight: 600;">
+        {% if last_price_update_display %}{{ last_price_update_display }}{% elif last_price_update %}{{ last_price_update[:16] }}{% elif last_snapshot_date %}{{ last_snapshot_date }}{% else %}Never{% endif %}
+      </p>
+    </div>
+    <div style="display:flex; align-items:center; gap:0.75rem;">
+      {% if assumptions and assumptions.auto_update_prices %}
+      <p class="text-muted" style="margin: 0; font-size: 0.85rem;">Auto-update: On</p>
+      {% else %}
+      <p class="text-muted" style="margin: 0; font-size: 0.85rem;">Auto-update: Off</p>
+      {% endif %}
+      <form method="post" action="/holdings/trigger-price-update" class="form-reset">
+        <button type="submit" class="badge badge-meta" title="Fetch latest prices now">↻ Refresh</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+{# ── Goal progress ────────────────────────────────────────────────────────── #}
+{% if metrics.goal_target > 0 %}
+<section class="card mb-1">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Primary Goal</p>
+      <h2>£{{ '{:,.0f}'.format(metrics.invested_total) }} / £{{ '{:,.0f}'.format(metrics.goal_target) }}</h2>
+    </div>
+    <strong class="goal-progress-pct">{{ '{:.1f}'.format(metrics.goal_progress * 100) }}%</strong>
+  </div>
+  <div class="progress"><div class="progress-bar" style="width: {{ [metrics.goal_progress * 100, 100]|min }}%;"></div></div>
+  <small>£{{ '{:,.0f}'.format([metrics.goal_target - metrics.invested_total, 0]|max) }} remaining to goal</small>
+</section>
+{% endif %}
+
+{# ── ISA Allowances ───────────────────────────────────────────────────────── #}
+<section class="card-grid allowance-grid mb-1">
+  <div class="card allowance-card">
+    <h2>ISA Allowance {{ metrics.tax_year }}</h2>
+    <p>£{{ '{:,.0f}'.format(metrics.isa_used) }} <span class="allowance-denom">/ £{{ '{:,.0f}'.format(metrics.isa_allowance) }}</span></p>
+    <div class="progress"><div class="progress-bar" style="width: {{ (metrics.isa_progress * 100)|round(1) }}%;"></div></div>
+    <small>{{ '{:.1f}'.format(metrics.isa_progress * 100) }}% used · includes LISA · {{ metrics.tax_year_days_left }} days left in tax year</small>
+    {% if metrics.projected_isa != metrics.isa_used %}
+    <small style="display:block; margin-top:0.25rem; color:var(--muted);">On track: £{{ '{:,.0f}'.format(metrics.projected_isa) }} / £{{ '{:,.0f}'.format(metrics.isa_allowance) }} by end of tax year</small>
+    {% endif %}
+    <div style="margin-top: 0.5rem;">
+      <a href="/allowance/" class="badge badge-sm">View breakdown</a>
+      <a href="/allowance/#topup" class="badge badge-sm" style="margin-left: 0.25rem;">Record top-up</a>
+    </div>
+  </div>
+  <div class="card allowance-card">
+    <h2>LISA Allowance {{ metrics.tax_year }}</h2>
+    <p>£{{ '{:,.0f}'.format(metrics.lisa_used) }} <span style="color:var(--muted); font-weight:400; font-size:0.95rem;">/ £{{ '{:,.0f}'.format(metrics.lisa_allowance) }}</span></p>
+    <div class="progress"><div class="progress-bar" style="width: {{ (metrics.lisa_progress * 100)|round(1) }}%;"></div></div>
+    <small>{{ '{:.1f}'.format(metrics.lisa_progress * 100) }}% used</small>
+    <div style="margin-top: 0.5rem;">
+      <a href="/allowance/" class="badge badge-sm">View breakdown</a>
+      <a href="/allowance/#topup" class="badge badge-sm" style="margin-left: 0.25rem;">Record top-up</a>
+    </div>
+  </div>
+  <div class="card allowance-card">
+    <h2>Pension Allowance {{ metrics.tax_year }}</h2>
+    <p>£{{ '{:,.0f}'.format(metrics.pension_used) }} <span class="allowance-denom">/ £{{ '{:,.0f}'.format(metrics.pension_allowance) }}</span></p>
+    <div class="progress"><div class="progress-bar" style="width: {{ (metrics.pension_progress * 100)|round(1) }}%;"></div></div>
+    <small>
+      {{ '{:.1f}'.format(metrics.pension_progress * 100) }}% used · Personal limit: £{{ '{:,.0f}'.format(metrics.pension_personal_limit) }}
+    </small>
+    {% if metrics.projected_pension != metrics.pension_used %}
+    <small style="display:block; margin-top:0.25rem; color:var(--muted);">
+      On track: £{{ '{:,.0f}'.format(metrics.projected_pension) }} / £{{ '{:,.0f}'.format(metrics.pension_allowance) }} by end of tax year
+    </small>
+    {% endif %}
+    <div style="margin-top: 0.5rem;">
+      <a href="/allowance/" class="badge badge-sm">View breakdown</a>
+      <a href="/allowance/#pension" class="badge badge-sm" style="margin-left: 0.25rem;">Record contribution</a>
+    </div>
+  </div>
+</section>
+
+{# ── Accounts ─────────────────────────────────────────────────────────────── #}
+<section class="card">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Breakdown</p>
+      <h2>Accounts</h2>
+    </div>
+    <small class="text-muted">{{ accounts|length }} active</small>
+  </div>
+  <div class="card-grid">
+    {% for account in accounts %}
+      <a class="card account-summary-card account-link" href="/accounts/{{ account.id }}">
+        <h2>{{ account.name }}</h2>
+        <p>£{{ '{:,.2f}'.format(metrics.effective_values[account.id]) }}</p>
+        <small>{{ account.provider }} · {{ account.wrapper_type }}</small>
+      </a>
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-state-icon"><img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="" class="shelly-inline-icon shelly-icon-lg"></div>
+        <h3>Nothing in the shell yet</h3>
+        <p>Every journey starts with a single step — even for a turtle. Add your first account and Shelly will start crunching the numbers.</p>
+        <a href="/accounts/?mode=create" class="badge badge-primary-action">+ Add your first account</a>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+
+{% if history_labels | length >= 2 %}
+<script>
+(function () {
+  var labels = {{ history_labels | tojson }};
+  var values = {{ history_values | tojson }};
+  var ctx = document.getElementById('netWorthChart').getContext('2d');
+  var S = getComputedStyle(document.documentElement);
+  var CSS = {
+    accent: S.getPropertyValue('--accent').trim(),
+    muted:  S.getPropertyValue('--muted').trim(),
+    grid:   S.getPropertyValue('--chart-grid').trim(),
+  };
+
+  var fmtLabels = labels.map(function(k) {
+    var parts = k.split('-');
+    var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+    return d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+  });
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: fmtLabels,
+      datasets: [{
+        data: values,
+        borderColor: CSS.accent,
+        backgroundColor: CSS.accent + '14',
+        borderWidth: 2,
+        pointRadius: values.length <= 12 ? 4 : 2,
+        pointBackgroundColor: CSS.accent,
+        fill: true,
+        tension: 0.35
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              return ' £' + ctx.parsed.y.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: CSS.grid },
+          ticks: { color: CSS.muted, font: { size: 11 } }
+        },
+        y: {
+          grid: { color: CSS.grid },
+          ticks: {
+            color: CSS.muted,
+            font: { size: 11 },
+            callback: function(v) { return '£' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v); }
+          }
+        }
+      }
+    }
+  });
+})();
+</script>
+{% endif %}
+
+{# Daily portfolio chart script #}
+<script>
+(function () {
+  try {
+  var allLabels = {{ daily_labels | tojson }};
+  var allValues = {{ daily_values | tojson }};
+  var chart = null;
+  var fallbackValue = {{ metrics.invested_total | round(2) }};
+
+  var S = getComputedStyle(document.documentElement);
+  var CSS = {
+    accent: (S.getPropertyValue('--accent').trim() || S.getPropertyValue('--primary').trim() || '#60a5fa'),
+    primary: (S.getPropertyValue('--primary').trim() || S.getPropertyValue('--accent').trim() || '#60a5fa'),
+    muted:  S.getPropertyValue('--muted').trim(),
+    grid:   S.getPropertyValue('--chart-grid').trim(),
+  };
+
+  // Period definitions (in days)
+  var periods = {
+    '1D': 1,
+    '1M': 30,
+    '6M': 180,
+    '1Y': 365,
+    'ALL': 999999
+  };
+
+  function parseYMD(dateStr) {
+    if (!dateStr || typeof dateStr !== 'string') return null;
+    var parts = dateStr.split('-');
+    if (parts.length < 3) return null;
+    var y = parseInt(parts[0], 10);
+    var m = parseInt(parts[1], 10);
+    var d = parseInt(parts[2], 10);
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d);
+  }
+
+  function ensureMinPoints(labels, values) {
+    if (!Array.isArray(labels) || !Array.isArray(values)) return { labels: [], values: [] };
+
+    if (labels.length === 0) {
+      var today = new Date();
+      var y = today.getFullYear();
+      var m = String(today.getMonth() + 1).padStart(2, '0');
+      var d = String(today.getDate()).padStart(2, '0');
+      var todayStr = y + '-' + m + '-' + d;
+      var yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+      var yy = yesterday.getFullYear();
+      var ym = String(yesterday.getMonth() + 1).padStart(2, '0');
+      var yd = String(yesterday.getDate()).padStart(2, '0');
+      var yesterdayStr = yy + '-' + ym + '-' + yd;
+      return { labels: [yesterdayStr, todayStr], values: [fallbackValue, fallbackValue] };
+    }
+
+    if (labels.length === 1) {
+      var onlyDate = parseYMD(labels[0]);
+      var prev = onlyDate ? new Date(onlyDate.getTime() - 24 * 60 * 60 * 1000) : new Date(Date.now() - 24 * 60 * 60 * 1000);
+      var py = prev.getFullYear();
+      var pm = String(prev.getMonth() + 1).padStart(2, '0');
+      var pd = String(prev.getDate()).padStart(2, '0');
+      var prevStr = py + '-' + pm + '-' + pd;
+      var v0 = Number(values[0]);
+      if (!isFinite(v0)) v0 = fallbackValue;
+      return { labels: [prevStr, labels[0]], values: [v0, v0] };
+    }
+
+    return { labels: labels, values: values };
+  }
+
+  function ymd(date) {
+    var y = date.getFullYear();
+    var m = String(date.getMonth() + 1).padStart(2, '0');
+    var d = String(date.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + d;
+  }
+
+  function addDays(date, n) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate() + n);
+  }
+
+  function buildSeries(period) {
+    var src = ensureMinPoints(allLabels, allValues);
+    var cutoffDays = periods[period] || 365;
+    var today = new Date();
+    var endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    var cutoffDate = new Date(endDate.getTime() - cutoffDays * 24 * 60 * 60 * 1000);
+
+    var points = [];
+    for (var i = 0; i < src.labels.length; i++) {
+      var ds = src.labels[i];
+      var dt = parseYMD(ds);
+      if (!dt) continue;
+      points.push({ d: dt, s: ds, v: Number(src.values[i]) });
+    }
+    points.sort(function(a, b) { return a.d - b.d; });
+
+    if (!points.length) {
+      return ensureMinPoints([], []);
+    }
+
+    var map = {};
+    for (var j = 0; j < points.length; j++) {
+      map[ymd(points[j].d)] = isFinite(points[j].v) ? points[j].v : fallbackValue;
+    }
+
+    var startDate = cutoffDate;
+    if (points[0].d > startDate) startDate = points[0].d;
+
+    var labels = [];
+    var values = [];
+
+    var lastKnown = null;
+    for (var k = 0; k < points.length; k++) {
+      if (points[k].d < startDate) {
+        lastKnown = isFinite(points[k].v) ? points[k].v : fallbackValue;
+      } else {
+        break;
+      }
+    }
+    if (lastKnown === null) {
+      lastKnown = isFinite(points[0].v) ? points[0].v : fallbackValue;
+    }
+
+    var doFill = cutoffDays <= 400;
+    if (doFill) {
+      for (var cur = startDate; cur <= endDate; cur = addDays(cur, 1)) {
+        var key = ymd(cur);
+        if (map.hasOwnProperty(key)) lastKnown = map[key];
+        labels.push(key);
+        values.push(lastKnown);
+      }
+      return { labels: labels, values: values };
+    }
+
+    for (var p = 0; p < points.length; p++) {
+      if (points[p].d >= startDate && points[p].d <= endDate) {
+        labels.push(ymd(points[p].d));
+        values.push(isFinite(points[p].v) ? points[p].v : fallbackValue);
+      }
+    }
+    var lastPointDate = parseYMD(labels[labels.length - 1]);
+    if (lastPointDate && lastPointDate < endDate) {
+      labels.push(ymd(endDate));
+      values.push(values[values.length - 1]);
+    }
+
+    return ensureMinPoints(labels, values);
+  }
+
+  function formatDate(dateStr) {
+    var date = parseYMD(dateStr) || new Date(dateStr);
+    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+  }
+
+  function updateChart(period) {
+    var data = buildSeries(period);
+    var fmtLabels = data.labels.map(formatDate);
+    var ctx = document.getElementById('dailyPortfolioChart').getContext('2d');
+
+    var hasChartJs = (typeof window.Chart === 'function');
+
+    function drawFallback(canvasCtx, labels, values) {
+      if (!canvasCtx || !canvasCtx.canvas) return;
+      var canvas = canvasCtx.canvas;
+      var rect = canvas.getBoundingClientRect();
+      var w = Math.max(1, Math.floor(rect.width));
+      var h = Math.max(1, Math.floor(rect.height));
+      var dpr = window.devicePixelRatio || 1;
+      if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
+        canvas.width = Math.floor(w * dpr);
+        canvas.height = Math.floor(h * dpr);
+      }
+      canvasCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      canvasCtx.clearRect(0, 0, w, h);
+
+      var padL = 44;
+      var padR = 12;
+      var padT = 10;
+      var padB = 22;
+      var innerW = Math.max(1, w - padL - padR);
+      var innerH = Math.max(1, h - padT - padB);
+
+      var minV = Infinity;
+      var maxV = -Infinity;
+      for (var i = 0; i < values.length; i++) {
+        var v = Number(values[i]);
+        if (!isFinite(v)) continue;
+        if (v < minV) minV = v;
+        if (v > maxV) maxV = v;
+      }
+      if (!isFinite(minV) || !isFinite(maxV)) {
+        minV = fallbackValue;
+        maxV = fallbackValue;
+      }
+      if (minV === maxV) {
+        minV = minV * 0.999;
+        maxV = maxV * 1.001;
+      }
+
+      function xFor(idx) {
+        if (values.length <= 1) return padL + innerW / 2;
+        return padL + (idx / (values.length - 1)) * innerW;
+      }
+      function yFor(val) {
+        var t = (val - minV) / (maxV - minV);
+        return padT + (1 - t) * innerH;
+      }
+
+      canvasCtx.strokeStyle = CSS.grid || 'rgba(148, 163, 184, 0.12)';
+      canvasCtx.lineWidth = 1;
+      canvasCtx.beginPath();
+      for (var g = 0; g <= 4; g++) {
+        var y = padT + (g / 4) * innerH;
+        canvasCtx.moveTo(padL, y);
+        canvasCtx.lineTo(padL + innerW, y);
+      }
+      canvasCtx.stroke();
+
+      canvasCtx.font = '11px Inter, system-ui, -apple-system, sans-serif';
+      canvasCtx.fillStyle = CSS.muted || '#94a3b8';
+      canvasCtx.textAlign = 'right';
+      canvasCtx.textBaseline = 'middle';
+      for (var t = 0; t <= 4; t++) {
+        var val = minV + (1 - t / 4) * (maxV - minV);
+        var yTick = padT + (t / 4) * innerH;
+        var label = '£' + (val >= 1000 ? (val / 1000).toFixed(0) + 'k' : Math.round(val));
+        canvasCtx.fillText(label, padL - 8, yTick);
+      }
+
+      canvasCtx.beginPath();
+      for (var p = 0; p < values.length; p++) {
+        var pv = Number(values[p]);
+        if (!isFinite(pv)) pv = fallbackValue;
+        var x = xFor(p);
+        var y = yFor(pv);
+        if (p === 0) canvasCtx.moveTo(x, y);
+        else canvasCtx.lineTo(x, y);
+      }
+      canvasCtx.lineWidth = 2;
+      canvasCtx.strokeStyle = CSS.primary || '#38bdf8';
+      canvasCtx.stroke();
+
+      canvasCtx.lineTo(padL + innerW, padT + innerH);
+      canvasCtx.lineTo(padL, padT + innerH);
+      canvasCtx.closePath();
+      canvasCtx.fillStyle = (CSS.primary || '#38bdf8') + '22';
+      canvasCtx.fill();
+    }
+
+    if (hasChartJs) {
+      if (chart) {
+        chart.destroy();
+      }
+
+      var gradient = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height || 220);
+      gradient.addColorStop(0, CSS.accent + '33');
+      gradient.addColorStop(1, CSS.accent + '00');
+
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: fmtLabels,
+          datasets: [{
+            data: data.values,
+            borderColor: CSS.accent,
+            backgroundColor: gradient,
+            borderWidth: 2,
+            pointRadius: data.values.length <= 30 ? 3 : 0,
+            pointBackgroundColor: CSS.accent,
+            fill: true,
+            tension: 0.25
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(ctx) {
+                  return ' £' + ctx.parsed.y.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: CSS.grid },
+              ticks: { color: CSS.muted, font: { size: 11 } }
+            },
+            y: {
+              grid: { color: CSS.grid },
+              ticks: {
+                color: CSS.muted,
+                font: { size: 11 },
+                callback: function(v) { return '£' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v); }
+              }
+            }
+          }
+        }
+      });
+    } else {
+      if (chart && typeof chart.destroy === 'function') {
+        try { chart.destroy(); } catch (e) {}
+        chart = null;
+      }
+      drawFallback(ctx, fmtLabels, data.values);
+    }
+
+    // Update stats
+    if (data.values.length > 0) {
+      var latest = data.values[data.values.length - 1];
+      var first = data.values[0];
+      var change = latest - first;
+      var changePct = first ? (change / first * 100) : null;
+
+      document.getElementById('latestValue').textContent = '£' + latest.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      var changeStr = (change >= 0 ? '+' : '') + change.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      if (changePct !== null) {
+        changeStr += ' (' + (changePct >= 0 ? '+' : '') + changePct.toFixed(2) + '%)';
+      }
+      var changeEl = document.getElementById('changeValue');
+      changeEl.textContent = changeStr;
+      changeEl.style.color = change >= 0 ? 'var(--success)' : 'var(--danger)';
+    }
+  }
+
+  // Period button handlers
+  document.querySelectorAll('.period-btn').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      document.querySelectorAll('.period-btn').forEach(function(b) {
+        b.style.background = 'transparent';
+        b.style.color = 'inherit';
+      });
+      this.style.background = CSS.primary;
+      this.style.color = 'white';
+      updateChart(this.dataset.period);
+    });
+  });
+
+  // Initial render
+  updateChart('ALL');
+  } catch (err) {
+    var msg = (err && err.message) ? err.message : String(err);
+    var el = document.getElementById('portfolio-chart-error');
+    if (el) {
+      el.style.display = 'block';
+      el.textContent = 'Portfolio chart failed to render: ' + msg;
+    }
+    try {
+      var latestEl = document.getElementById('latestValue');
+      var changeEl = document.getElementById('changeValue');
+      if (latestEl && !latestEl.textContent) latestEl.textContent = '—';
+      if (changeEl && !changeEl.textContent) changeEl.textContent = '—';
+    } catch (e) {}
+  }
+})();
+</script>
+
+{% endblock %}

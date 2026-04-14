@@ -1,0 +1,417 @@
+{% extends 'base.html' %}
+{% block title %}Settings · Shelly{% endblock %}
+{% block content %}
+{% set page_mode = request.args.get('mode', 'view') %}
+
+{# ── Month strip ─────────────────────────────────────────────────────────── #}
+{% include '_month_strip.html' %}
+
+{% if page_mode == 'edit' %}
+
+{# ── Edit mode ────────────────────────────────────────────────────────────── #}
+<section class="card highlight mb-1">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Global Settings</p>
+      <h2>Edit Assumptions</h2>
+    </div>
+    <a class="badge" href="/settings/">Cancel</a>
+  </div>
+</section>
+
+<section class="card">
+  <form method="post" class="settings-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-grid">
+      <label class="form-full-col">
+        <span>Dashboard name</span>
+        <input type="text" name="dashboard_name" value="{{ assumptions.dashboard_name if assumptions and assumptions.dashboard_name else 'Shelly' }}">
+        <small class="form-hint">Shown in the header on every page</small>
+      </label>
+      <label>
+        <span>Annual growth rate (%)</span>
+        <input type="number" step="0.1" name="annual_growth_rate" value="{{ '{:.1f}'.format((assumptions.annual_growth_rate if assumptions else 0.07) * 100) }}" min="0" max="30">
+        <small class="form-hint">Enter as a percentage — e.g. 7 for 7%, 3.6 for 3.6%. Shelly does not adjust for inflation — all projections are in nominal (today's money) terms. If you'd like a rough real-terms estimate, use a lower rate (e.g. 4–5% instead of 7%).</small>
+      </label>
+      <label>
+        <span>Income tax band</span>
+        {% set tb = assumptions.tax_band if assumptions and assumptions.tax_band else 'basic' %}
+        <select name="tax_band">
+          <option value="basic" {{ 'selected' if tb == 'basic' }}>Basic rate (20%)</option>
+          <option value="higher" {{ 'selected' if tb == 'higher' }}>Higher rate (40%)</option>
+          <option value="additional" {{ 'selected' if tb == 'additional' }}>Additional rate (45%)</option>
+        </select>
+        <small class="form-hint">Shelly uses this to calculate pension tax relief and show what you can reclaim</small>
+      </label>
+      <label>
+        <span>Date of birth</span>
+        <input type="date" name="date_of_birth" value="{{ assumptions.date_of_birth if assumptions and assumptions.date_of_birth else '' }}">
+        <small class="form-hint">Shelly uses this to calculate your age automatically{% if computed_age %} — you're currently {{ computed_age }}{% endif %}</small>
+      </label>
+      <label>
+        <span>Retirement age</span>
+        <input type="number" name="retirement_age" value="{{ assumptions.retirement_age if assumptions else 60 }}">
+      </label>
+      <label>
+        <span>Retirement date basis</span>
+        {% set rdm = assumptions.retirement_date_mode if assumptions and assumptions.retirement_date_mode else 'birthday' %}
+        <select name="retirement_date_mode">
+          <option value="birthday" {{ 'selected' if rdm == 'birthday' }}>On your birthday</option>
+          <option value="end_of_year" {{ 'selected' if rdm == 'end_of_year' }}>End of the calendar year</option>
+          <option value="end_of_tax_year" {{ 'selected' if rdm == 'end_of_tax_year' }}>End of the tax year (5 April)</option>
+        </select>
+        <small class="form-hint">When Shelly should count you as "retired" — affects projections and years-to-go</small>
+      </label>
+      <label>
+        <span>ISA allowance</span>
+        <input type="number" step="0.01" name="isa_allowance" value="{{ assumptions.isa_allowance if assumptions else 20000 }}">
+        <small class="form-hint">Annual limit — includes LISA</small>
+      </label>
+      <label>
+        <span>LISA allowance</span>
+        <input type="number" step="0.01" name="lisa_allowance" value="{{ assumptions.lisa_allowance if assumptions else 4000 }}">
+        <small class="form-hint">Sub-limit within ISA allowance</small>
+      </label>
+      <label>
+        <span>Dividend allowance</span>
+        <input type="number" step="0.01" name="dividend_allowance" value="{{ assumptions.dividend_allowance if assumptions and assumptions.dividend_allowance is not none else 500 }}">
+        <small class="form-hint">Tax-free dividend income outside ISA (UK allowance)</small>
+      </label>
+      <label>
+        <span>Annual income (£)</span>
+        <input type="number" step="0.01" name="annual_income" value="{{ assumptions.annual_income if assumptions and assumptions.annual_income is not none else 0 }}">
+        <small class="form-hint">Used to estimate your personal pension tax-relief limit (typically up to 100% of relevant earnings)</small>
+      </label>
+      <label>
+        <span>Pension annual allowance (£)</span>
+        <input type="number" step="0.01" name="pension_annual_allowance" value="{{ assumptions.pension_annual_allowance if assumptions and assumptions.pension_annual_allowance is not none else 60000 }}">
+        <small class="form-hint">Total gross pension contributions limit (personal + employer) before carry-forward and tapering</small>
+      </label>
+      <label class="form-full-col">
+        <input type="checkbox" name="mpaa_enabled" value="1" id="mpaa-toggle" {{ 'checked' if assumptions and assumptions.mpaa_enabled else '' }}>
+        <span style="font-weight:600; font-size:0.95rem;">Money Purchase Annual Allowance (MPAA) applies</span>
+        <small class="form-hint" style="margin-top:-0.25rem;">Enable if you've flexibly accessed a DC pension (MPAA reduces your allowance)</small>
+      </label>
+      <div id="mpaa-row" style="display:grid; grid-template-columns:1fr; gap:0.75rem; padding-left:1.5rem;">
+        <label>
+          <span>MPAA allowance (£)</span>
+          <input type="number" step="0.01" name="mpaa_allowance" value="{{ assumptions.mpaa_allowance if assumptions and assumptions.mpaa_allowance is not none else 10000 }}">
+        </label>
+      </div>
+      <script>
+        (function() {
+          var toggle = document.getElementById('mpaa-toggle');
+          var row = document.getElementById('mpaa-row');
+          function sync() { row.style.display = toggle.checked ? '' : 'none'; }
+          toggle.addEventListener('change', sync);
+          sync();
+        })();
+      </script>
+
+      <label class="form-full-col" style="border-top:1px solid var(--border); padding-top:1rem; margin-top:0.5rem;">
+        <input type="checkbox" name="auto_update_prices" value="1" id="auto-update-toggle" {{ 'checked' if not assumptions or assumptions.auto_update_prices != 0 else '' }}>
+        <span style="font-weight:600; font-size:0.95rem;">Auto-update portfolio prices</span>
+        <small class="form-hint" style="margin-top:-0.25rem;">Shelly will automatically fetch fresh prices at the times below (UK time)</small>
+      </label>
+      <div id="update-times-row" style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; padding-left:1.5rem;">
+        <label>
+          <span>Morning update</span>
+          <input type="time" name="update_time_morning" value="{{ assumptions.update_time_morning if assumptions and assumptions.update_time_morning else '08:30' }}">
+          <small class="form-hint">After UK market opens (8:00 AM)</small>
+        </label>
+        <label>
+          <span>Evening update</span>
+          <input type="time" name="update_time_evening" value="{{ assumptions.update_time_evening if assumptions and assumptions.update_time_evening else '18:00' }}">
+          <small class="form-hint">After UK market closes (4:30 PM)</small>
+        </label>
+      </div>
+      <script>
+        (function() {
+          var toggle = document.getElementById('auto-update-toggle');
+          var timesRow = document.getElementById('update-times-row');
+          function sync() { timesRow.style.display = toggle.checked ? '' : 'none'; }
+          toggle.addEventListener('change', sync);
+          sync();
+        })();
+      </script>
+
+      <label class="form-full-col" style="border-top:1px solid var(--border); padding-top:1rem; margin-top:0.5rem;">
+        <span style="font-weight:600; font-size:0.95rem;">Monthly Update Timing</span>
+        <small class="form-hint" style="margin-top:-0.25rem;">Shelly uses this to calculate when your investments have settled and it's time to review</small>
+      </label>
+      <label>
+        <span>Investment day of month</span>
+        <select name="salary_day">
+          <option value="0" {{ 'selected' if not assumptions or not assumptions.salary_day }}>Not set</option>
+          {% for d in range(1, 32) %}
+          <option value="{{ d }}" {{ 'selected' if assumptions and assumptions.salary_day == d }}>{{ d }}{{ 'st' if d in [1,21,31] else ('nd' if d in [2,22] else ('rd' if d in [3,23] else 'th')) }}</option>
+          {% endfor %}
+        </select>
+        <small class="form-hint">The day your ISA contributions and standing orders go out — usually when your salary arrives or a day after. Shelly will figure out settlement times and weekends automatically.</small>
+      </label>
+    </div>
+    <div class="badge-row mt-1">
+      <button type="submit">Save settings</button>
+      <a class="badge" href="/settings/">Cancel</a>
+    </div>
+  </form>
+</section>
+
+{% elif page_mode == 'diagnostics' %}
+
+<section class="card highlight mb-1 month-accent-{{ current_month_num }}">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Diagnostics</p>
+      <h2>System Health</h2>
+      <p class="hero-subtitle">Quick status checks for scheduler, prices and database</p>
+    </div>
+    <a class="badge" href="/settings/">Back</a>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Status</p>
+      <h3>Overview</h3>
+    </div>
+  </div>
+  <table class="data-table">
+    <tbody>
+      <tr>
+        <td>Database</td>
+        <td class="num">{% if diagnostics and diagnostics.db_ok %}OK{% else %}Error{% endif %}</td>
+      </tr>
+      <tr>
+        <td>Scheduler last run</td>
+        <td class="num">
+          {% if diagnostics and diagnostics.scheduler_last_run %}
+            {{ diagnostics.scheduler_last_run.run_date }} {{ diagnostics.scheduler_last_run.slot }}
+          {% else %}
+            —
+          {% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td>Latest portfolio snapshot</td>
+        <td class="num">
+          {% if diagnostics and diagnostics.latest_portfolio_snapshot %}
+            {{ diagnostics.latest_portfolio_snapshot.snapshot_date }} · £{{ '{:,.2f}'.format(diagnostics.latest_portfolio_snapshot.total_value or 0) }}
+          {% else %}
+            —
+          {% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td>Latest price update (raw)</td>
+        <td class="num">{% if diagnostics and diagnostics.latest_price_update_utc %}{{ diagnostics.latest_price_update_utc }}{% else %}—{% endif %}</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="panel mt-1">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Counts</p>
+      <h3>Data</h3>
+    </div>
+  </div>
+  <table class="data-table">
+    <tbody>
+      <tr><td>Accounts</td><td class="num">{{ diagnostics.counts.accounts if diagnostics and diagnostics.counts else 0 }}</td></tr>
+      <tr><td>Holdings</td><td class="num">{{ diagnostics.counts.holdings if diagnostics and diagnostics.counts else 0 }}</td></tr>
+      <tr><td>Catalogue active</td><td class="num">{{ diagnostics.counts.catalogue_active if diagnostics and diagnostics.counts else 0 }}</td></tr>
+      <tr><td>Catalogue in use</td><td class="num">{{ diagnostics.catalogue_in_use_count if diagnostics else 0 }}</td></tr>
+      <tr><td>Portfolio daily snapshots</td><td class="num">{{ diagnostics.counts.portfolio_daily_snapshots if diagnostics and diagnostics.counts else 0 }}</td></tr>
+      <tr><td>Stale prices (sample, &gt;2d/none)</td><td class="num">{{ diagnostics.catalogue_stale_2d_count_in_sample if diagnostics else 0 }}</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="panel mt-1">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Prices</p>
+      <h3>Latest Instruments</h3>
+    </div>
+  </div>
+  {% if diagnostics and diagnostics.catalogue_in_use_sample %}
+  <div style="overflow-x:auto;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Holding</th>
+          <th>Ticker</th>
+          <th class="num">Last price</th>
+          <th>Currency</th>
+          <th>Updated</th>
+          <th class="num">Linked</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in diagnostics.catalogue_in_use_sample %}
+        <tr>
+          <td>{{ r.holding_name }}</td>
+          <td>{{ r.ticker or '—' }}</td>
+          <td class="num">{% if r.last_price is not none %}{{ '{:,.4f}'.format(r.last_price) }}{% else %}—{% endif %}</td>
+          <td>{{ r.price_currency or '—' }}</td>
+          <td>{{ (r.price_updated_at or '—')[:16] }}</td>
+          <td class="num">{{ r.linked_holdings }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="helper-text">No holdings with catalogue links yet.</p>
+  {% endif %}
+</section>
+
+{% else %}
+
+{# ── View mode ────────────────────────────────────────────────────────────── #}
+<section class="card highlight mb-1 month-accent-{{ current_month_num }}">
+  <div class="hero-top">
+    <div>
+      <p class="eyebrow">Settings</p>
+      <h2 class="hero-value" style="font-size:2rem;">{{ assumptions.dashboard_name if assumptions and assumptions.dashboard_name else 'Shelly' }}</h2>
+      <p class="hero-subtitle">The numbers Shelly uses behind the scenes — growth rates, ages, and allowances</p>
+    </div>
+    <div class="hero-turtle-wrap">
+      <img src="{{ url_for('static', filename='icons/shelly/Settings.png') }}" alt="" class="hero-turtle">
+    </div>
+  </div>
+  <div class="hero-strip">
+    <div class="hero-strip-stat">
+      <span>Growth rate</span>
+      <strong>{{ '{:.1f}'.format((assumptions.annual_growth_rate if assumptions else 0.07) * 100) }}%</strong>
+    </div>
+    <div class="hero-strip-stat">
+      <span>Age</span>
+      <strong>{{ computed_age if computed_age else 'Not set' }}</strong>
+    </div>
+    <div class="hero-strip-stat">
+      <span>Retirement age</span>
+      <strong>{{ assumptions.retirement_age if assumptions else 60 }}</strong>
+    </div>
+    <div class="hero-strip-stat">
+      <span>ISA allowance</span>
+      <strong>£{{ '{:,.0f}'.format(assumptions.isa_allowance if assumptions else 20000) }}</strong>
+    </div>
+    <div class="hero-strip-stat">
+      <span>LISA allowance</span>
+      <strong>£{{ '{:,.0f}'.format(assumptions.lisa_allowance if assumptions else 4000) }}</strong>
+    </div>
+    <div class="hero-strip-stat">
+      <span>Pension allowance</span>
+      <strong>£{{ '{:,.0f}'.format(assumptions.pension_annual_allowance if assumptions and assumptions.pension_annual_allowance is not none else 60000) }}</strong>
+    </div>
+    <div class="hero-strip-stat">
+      <span>Annual income</span>
+      <strong>£{{ '{:,.0f}'.format(assumptions.annual_income if assumptions and assumptions.annual_income is not none else 0) }}</strong>
+    </div>
+    <div class="hero-strip-stat">
+      <span>Investment day</span>
+      <strong>{{ (assumptions.salary_day ~ ('st' if assumptions.salary_day in [1,21,31] else ('nd' if assumptions.salary_day in [2,22] else ('rd' if assumptions.salary_day in [3,23] else 'th')))) if assumptions and assumptions.salary_day else 'Not set' }}</strong>
+    </div>
+  </div>
+</section>
+
+<div class="row-end">
+  <a class="badge badge-primary-action" href="/settings/?mode=edit">Edit settings</a>
+  <a class="badge" href="/settings/?mode=diagnostics" style="margin-left:0.5rem;">Diagnostics</a>
+</div>
+
+{% endif %}
+
+{% if current_user.is_authenticated and current_user.is_admin %}
+<section class="panel mt-1">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Admin</p>
+      <h3>User Management</h3>
+    </div>
+    <a class="badge badge-primary-action" href="/users">Manage users</a>
+  </div>
+  <p class="helper-text">Control who gets to peek inside Shelly's shell. Add or remove user accounts here.</p>
+</section>
+{% endif %}
+
+{# ── Danger Zone · Reset ─────────────────────────────────────────────────── #}
+<section class="panel mt-1 danger-zone" id="danger-zone">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow danger-eyebrow">Danger Zone</p>
+      <h3>Start fresh</h3>
+    </div>
+  </div>
+  <p class="helper-text">
+    Sometimes you just need a clean slate. This will wipe <strong>everything</strong> —
+    accounts, holdings, goals, budget, monthly reviews, assumptions — the lot.
+    Shelly will forget it all and greet you like it's day one.
+    Your login stays, but the data doesn't.
+  </p>
+  <p class="helper-text" style="margin-top:0.5rem;color:var(--danger);">
+    This cannot be undone. Shelly means it — once it's gone, it's gone. <img src="{{ url_for('static', filename='icons/icon-192.png') }}" alt="" class="shelly-inline-icon shelly-icon-xs">
+  </p>
+
+  <div id="reset-confirm" style="margin-top:1rem;">
+    <button type="button" class="badge badge-danger" id="reset-reveal-btn">
+      Reset my account
+    </button>
+  </div>
+
+  <div id="reset-form" style="display:none;margin-top:1rem;">
+    <form method="post" action="/settings/reset" id="reset-form-el">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <p class="text-sm" style="margin-bottom:0.75rem;">
+        Type <strong>RESET</strong> below to confirm. No going back after this.
+      </p>
+      <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+        <input type="text" name="confirm_reset" id="reset-input"
+               class="input-standard" placeholder="Type RESET" autocomplete="off"
+               style="max-width:12rem;text-transform:uppercase;">
+        <button type="submit" class="badge badge-danger" id="reset-submit" disabled>
+          Wipe everything
+        </button>
+        <button type="button" class="badge" id="reset-cancel">
+          Never mind
+        </button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<script>
+(function() {
+  var revealBtn  = document.getElementById('reset-reveal-btn');
+  var formWrap   = document.getElementById('reset-form');
+  var confirmWrap= document.getElementById('reset-confirm');
+  var input      = document.getElementById('reset-input');
+  var submitBtn  = document.getElementById('reset-submit');
+  var cancelBtn  = document.getElementById('reset-cancel');
+
+  if (!revealBtn) return;
+
+  revealBtn.addEventListener('click', function() {
+    confirmWrap.style.display = 'none';
+    formWrap.style.display = '';
+    input.focus();
+  });
+
+  cancelBtn.addEventListener('click', function() {
+    formWrap.style.display = 'none';
+    confirmWrap.style.display = '';
+    input.value = '';
+    submitBtn.disabled = true;
+  });
+
+  input.addEventListener('input', function() {
+    submitBtn.disabled = input.value.trim().toUpperCase() !== 'RESET';
+  });
+})();
+</script>
+
+{% endblock %}
