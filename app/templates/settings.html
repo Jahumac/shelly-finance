@@ -165,7 +165,12 @@
       <h2>System Health</h2>
       <p class="hero-subtitle">Quick status checks for scheduler, prices and database</p>
     </div>
-    <a class="badge" href="/settings/">Back</a>
+    <div style="display:flex;align-items:center;gap:0.75rem;">
+      <div class="hero-turtle-wrap">
+        <img src="{{ url_for('static', filename='icons/shelly/Settings.png') }}" alt="" class="hero-turtle">
+      </div>
+      <a class="badge" href="/settings/">Back</a>
+    </div>
   </div>
 </section>
 
