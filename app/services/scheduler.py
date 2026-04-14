@@ -182,186 +182,137 @@ def _scheduled_check(app):
                 logger.error(f"Scheduled check error for user {user_id}: {e}")
 
 
-def _run_price_update_for_user(app, user_id, slot_name=None):
-    """Fetch fresh prices and save a snapshot for a single user."""
-    # Imports moved inside app_context
-    with app.app_context():
-        from app.models import (
-            get_connection, fetch_holding_catalogue_in_use, fetch_all_accounts,
-            fetch_holding_totals_by_account, save_daily_snapshot,
-            sync_holding_prices_from_catalogue
-        )
-        from app.calculations import effective_account_value
-        from app.services.prices import refresh_catalogue_prices
+def _accrue_manual_accounts(user_id, accounts):
+    """Accrue growth, contributions, and cash interest for manual-valuation
+    accounts and Cash ISAs. Mutates the DB via update_account; callers should
+    re-fetch accounts afterwards to get the updated values."""
+    from app.models import update_account, fetch_assumptions
+    from app.calculations import to_float
 
+    now = datetime.now(timezone.utc)
+    for acc in accounts:
+        is_cash_isa = acc.get("wrapper_type", "").lower() == "cash isa"
+        if acc["valuation_mode"] != "manual" and not is_cash_isa:
+            continue
+        last_updated_str = acc.get("last_updated")
+        if not last_updated_str:
+            continue
         try:
-            catalogue = fetch_holding_catalogue_in_use(user_id)
-            if not catalogue:
-                accounts = fetch_all_accounts(user_id)
-                holdings_totals = fetch_holding_totals_by_account(user_id)
-                
-                from app.models import update_account, fetch_assumptions
-                from app.calculations import to_float
-                now = datetime.now(timezone.utc)
-                for acc in accounts:
-                    is_cash_isa = acc.get("wrapper_type", "").lower() == "cash isa"
-                    if acc["valuation_mode"] == "manual" or is_cash_isa:
-                        last_updated_str = acc.get("last_updated")
-                        if last_updated_str:
-                            try:
-                                last_updated = datetime.fromisoformat(last_updated_str.replace("Z", "+00:00"))
-                                if last_updated.tzinfo is None:
-                                    last_updated = last_updated.replace(tzinfo=timezone.utc)
-                            except ValueError:
-                                last_updated = now
-                            
-                            days_elapsed = (now - last_updated).days
-                            if days_elapsed > 0:
-                                current_val = to_float(acc.get("current_value", 0))
-                                rate = to_float(acc.get("growth_rate_override")) if acc.get("growth_rate_override") is not None else 0.0
-                                if acc.get("growth_mode") != "custom":
-                                    row = fetch_assumptions(user_id)
-                                    rate = to_float(row["annual_growth_rate"]) if row else 0.05
-                                
-                                daily_rate = rate / 365.0
-                                monthly_contrib = to_float(acc.get("monthly_contribution", 0))
-                                daily_contrib = (monthly_contrib * 12) / 365.0
-                                
-                                new_val = current_val * ((1 + daily_rate) ** days_elapsed) + (daily_contrib * days_elapsed)
-                                
-                                update_payload = dict(acc)
-                                update_payload["current_value"] = new_val
-                                update_payload["last_updated"] = now.isoformat()
-                                update_payload.setdefault("employer_contribution", 0)
-                                update_payload.setdefault("contribution_method", "standard")
-                                update_payload.setdefault("annual_fee_pct", 0)
-                                update_payload.setdefault("platform_fee_pct", 0)
-                                update_payload.setdefault("platform_fee_flat", 0)
-                                update_payload.setdefault("platform_fee_cap", 0)
-                                update_payload.setdefault("fund_fee_pct", 0)
-                                update_payload.setdefault("uninvested_cash", acc.get("uninvested_cash", 0))
-                                update_payload.setdefault("cash_interest_rate", acc.get("cash_interest_rate", 0))
-                                
-                                # Accrue uninvested cash interest too
-                                cash_rate = to_float(acc.get("cash_interest_rate", 0)) / 365.0
-                                cash_val = to_float(acc.get("uninvested_cash", 0))
-                                if cash_val > 0 and cash_rate > 0:
-                                    update_payload["uninvested_cash"] = cash_val * ((1 + cash_rate) ** days_elapsed)
-                                
-                                update_account(update_payload)
-                
-                accounts = fetch_all_accounts(user_id)
-                total_value = sum(
-                    effective_account_value(account, holdings_totals)
-                    for account in accounts
-                )
-                save_daily_snapshot(user_id, total_value)
-                logger.info(f"Saved portfolio snapshot for user {user_id} ({slot_name or 'manual'})")
-                return
+            last_updated = datetime.fromisoformat(last_updated_str.replace("Z", "+00:00"))
+            if last_updated.tzinfo is None:
+                last_updated = last_updated.replace(tzinfo=timezone.utc)
+        except ValueError:
+            last_updated = now
 
-            logger.info(f"Fetching prices for {len(catalogue)} instruments...")
-            price_results = refresh_catalogue_prices(catalogue)
+        days_elapsed = (now - last_updated).days
+        if days_elapsed <= 0:
+            continue
 
-            with get_connection() as conn:
-                for result in price_results:
-                    if result.get("success"):
-                        conn.execute(
-                            """
-                            UPDATE holding_catalogue
-                            SET last_price = ?, price_currency = ?, price_change_pct = ?, price_updated_at = ?
-                            WHERE id = ?
-                            """,
-                            (
-                                result.get("price"),
-                                result.get("currency"),
-                                result.get("change_pct"),
-                                result.get("updated_at"),
-                                result.get("id"),
-                            ),
-                        )
-                        # Propagate fresh price to all linked holdings in account pots
-                        sync_holding_prices_from_catalogue(
-                            result.get("id"),
-                            result.get("price"),
-                            result.get("currency")
-                        )
-                    else:
-                        current_app.logger.error(f"[Shelly] ✗ {result.get('ticker')}: {result.get('error')}")
-                conn.commit()
+        current_val = to_float(acc.get("current_value", 0))
+        rate = to_float(acc.get("growth_rate_override")) if acc.get("growth_rate_override") is not None else 0.0
+        if acc.get("growth_mode") != "custom":
+            row = fetch_assumptions(user_id)
+            rate = to_float(row["annual_growth_rate"]) if row else 0.05
 
+        daily_rate = rate / 365.0
+        monthly_contrib = to_float(acc.get("monthly_contribution", 0))
+        daily_contrib = (monthly_contrib * 12) / 365.0
+        new_val = current_val * ((1 + daily_rate) ** days_elapsed) + (daily_contrib * days_elapsed)
+
+        update_payload = dict(acc)
+        update_payload["current_value"] = new_val
+        update_payload["last_updated"] = now.isoformat()
+        update_payload.setdefault("employer_contribution", 0)
+        update_payload.setdefault("contribution_method", "standard")
+        update_payload.setdefault("annual_fee_pct", 0)
+        update_payload.setdefault("platform_fee_pct", 0)
+        update_payload.setdefault("platform_fee_flat", 0)
+        update_payload.setdefault("platform_fee_cap", 0)
+        update_payload.setdefault("fund_fee_pct", 0)
+        update_payload.setdefault("uninvested_cash", acc.get("uninvested_cash", 0))
+        update_payload.setdefault("cash_interest_rate", acc.get("cash_interest_rate", 0))
+
+        cash_rate = to_float(acc.get("cash_interest_rate", 0)) / 365.0
+        cash_val = to_float(acc.get("uninvested_cash", 0))
+        if cash_val > 0 and cash_rate > 0:
+            update_payload["uninvested_cash"] = cash_val * ((1 + cash_rate) ** days_elapsed)
+
+        update_account(update_payload)
+
+
+def _run_price_update_for_user(app, user_id, slot_name=None):
+    """Fetch fresh prices and save a snapshot for a single user.
+    Must be called from within an active app context."""
+    from app.models import (
+        get_connection, fetch_holding_catalogue_in_use, fetch_all_accounts,
+        fetch_holding_totals_by_account, save_daily_snapshot,
+        sync_holding_prices_from_catalogue
+    )
+    from app.calculations import effective_account_value
+    from app.services.prices import refresh_catalogue_prices
+
+    try:
+        catalogue = fetch_holding_catalogue_in_use(user_id)
+        if not catalogue:
             accounts = fetch_all_accounts(user_id)
             holdings_totals = fetch_holding_totals_by_account(user_id)
-            
-            # Auto-accrue manual accounts and Cash ISAs
-            from app.models import update_account, fetch_assumptions
-            from app.calculations import to_float
-            now = datetime.now(timezone.utc)
-            for acc in accounts:
-                is_cash_isa = acc.get("wrapper_type", "").lower() == "cash isa"
-                if acc["valuation_mode"] == "manual" or is_cash_isa:
-                    last_updated_str = acc.get("last_updated")
-                    if last_updated_str:
-                        try:
-                            last_updated = datetime.fromisoformat(last_updated_str.replace("Z", "+00:00"))
-                            if last_updated.tzinfo is None:
-                                last_updated = last_updated.replace(tzinfo=timezone.utc)
-                        except ValueError:
-                            last_updated = now
-                        
-                        days_elapsed = (now - last_updated).days
-                        if days_elapsed > 0:
-                            current_val = to_float(acc.get("current_value", 0))
-                            rate = to_float(acc.get("growth_rate_override")) if acc.get("growth_rate_override") is not None else 0.0
-                            if acc.get("growth_mode") != "custom":
-                                row = fetch_assumptions(user_id)
-                                rate = to_float(row["annual_growth_rate"]) if row else 0.05
-                            
-                            daily_rate = rate / 365.0
-                            monthly_contrib = to_float(acc.get("monthly_contribution", 0))
-                            daily_contrib = (monthly_contrib * 12) / 365.0
-                            
-                            new_val = current_val * ((1 + daily_rate) ** days_elapsed) + (daily_contrib * days_elapsed)
-                            
-                            # Create an update payload including all required fields
-                            update_payload = dict(acc)
-                            update_payload["current_value"] = new_val
-                            update_payload["last_updated"] = now.isoformat()
-                            # Default missing fields for safety
-                            update_payload.setdefault("employer_contribution", 0)
-                            update_payload.setdefault("contribution_method", "standard")
-                            update_payload.setdefault("annual_fee_pct", 0)
-                            update_payload.setdefault("platform_fee_pct", 0)
-                            update_payload.setdefault("platform_fee_flat", 0)
-                            update_payload.setdefault("platform_fee_cap", 0)
-                            update_payload.setdefault("fund_fee_pct", 0)
-                            update_payload.setdefault("uninvested_cash", acc.get("uninvested_cash", 0))
-                            update_payload.setdefault("cash_interest_rate", acc.get("cash_interest_rate", 0))
-                            
-                            # Accrue uninvested cash interest too
-                            cash_rate = to_float(acc.get("cash_interest_rate", 0)) / 365.0
-                            cash_val = to_float(acc.get("uninvested_cash", 0))
-                            if cash_val > 0 and cash_rate > 0:
-                                update_payload["uninvested_cash"] = cash_val * ((1 + cash_rate) ** days_elapsed)
-
-                            update_account(update_payload)
-                            
-            # Re-fetch accounts to get the updated values
+            _accrue_manual_accounts(user_id, accounts)
             accounts = fetch_all_accounts(user_id)
-
             total_value = sum(
                 effective_account_value(account, holdings_totals)
                 for account in accounts
             )
-
             save_daily_snapshot(user_id, total_value)
+            logger.info(f"Saved portfolio snapshot for user {user_id} ({slot_name or 'manual'})")
+            return
 
-            successful = sum(1 for r in price_results if r.get("success"))
-            failed = len(price_results) - successful
-            logger.info(f"Updated {successful}/{len(price_results)} holdings for user {user_id} ({slot_name or 'manual'})")
+        logger.info(f"Fetching prices for {len(catalogue)} instruments...")
+        price_results = refresh_catalogue_prices(catalogue)
 
-        except Exception as e:
-            current_app.logger.error(f"[Shelly] Price update FAILED for user {user_id}: {e}")
-            logger.error(f"Price update failed for user {user_id}: {e}")
+        with get_connection() as conn:
+            for result in price_results:
+                if result.get("success"):
+                    conn.execute(
+                        """
+                        UPDATE holding_catalogue
+                        SET last_price = ?, price_currency = ?, price_change_pct = ?, price_updated_at = ?
+                        WHERE id = ?
+                        """,
+                        (
+                            result.get("price"),
+                            result.get("currency"),
+                            result.get("change_pct"),
+                            result.get("updated_at"),
+                            result.get("id"),
+                        ),
+                    )
+                    # Propagate fresh price to all linked holdings in account pots
+                    sync_holding_prices_from_catalogue(
+                        result.get("id"),
+                        result.get("price"),
+                        result.get("currency")
+                    )
+                else:
+                    current_app.logger.error(f"[Shelly] ✗ {result.get('ticker')}: {result.get('error')}")
+            conn.commit()
+
+        accounts = fetch_all_accounts(user_id)
+        holdings_totals = fetch_holding_totals_by_account(user_id)
+        _accrue_manual_accounts(user_id, accounts)
+        accounts = fetch_all_accounts(user_id)
+
+        total_value = sum(
+            effective_account_value(account, holdings_totals)
+            for account in accounts
+        )
+        save_daily_snapshot(user_id, total_value)
+
+        successful = sum(1 for r in price_results if r.get("success"))
+        logger.info(f"Updated {successful}/{len(price_results)} holdings for user {user_id} ({slot_name or 'manual'})")
+
+    except Exception as e:
+        current_app.logger.error(f"[Shelly] Price update FAILED for user {user_id}: {e}")
+        logger.error(f"Price update failed for user {user_id}: {e}")
 
 
 def trigger_manual_update(app, user_id):

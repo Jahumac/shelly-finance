@@ -1,15 +1,37 @@
-.venv/
-.claude/
+# Python
 __pycache__/
 *.py[cod]
-*.sqlite3
-*.db
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Database & user data
+data/finance.db
+data/backups/
+data/*.db
 data/
+
+# Secrets / env
 .env
-.DS_Store
-instance/
+*.env
+
+# Test / build artefacts
 .pytest_cache/
 .mypy_cache/
+.coverage
+htmlcov/
+
+# Editor
+.DS_Store
+*.swp
+*.swo
 .vscode/
 .idea/
+
+# Other
+instance/
 shelly_icons/
+
+# Claude Code
+.claude/
