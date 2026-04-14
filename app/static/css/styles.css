@@ -1028,13 +1028,16 @@ button.badge-like-button {
 
 .holdings-row {
   display: grid;
+  /* Every column has a fixed/flex width with no `auto` — `auto` would
+     size to content, making the header row (empty actions cell) narrower
+     than data rows and throwing the numeric columns out of alignment. */
   grid-template-columns:
     minmax(0, 1fr)   /* name */
     minmax(0, 1fr)   /* bucket */
     6rem             /* units */
     7rem             /* price */
     7rem             /* value */
-    auto;            /* actions */
+    8.5rem;          /* actions (Save + Remove badges) */
   gap: 0.75rem;
   align-items: center;
   padding: 0.6rem 0.75rem;
