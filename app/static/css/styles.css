@@ -1073,12 +1073,18 @@ button.badge-like-button {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-align: center;
 }
 
 .holdings-cell-units,
-.holdings-cell-price,
-.holdings-cell-value {
+.holdings-cell-price {
   text-align: right;
+}
+
+.holdings-cell-value {
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: center;
 }
 
 /* Anchor the numeric cells and actions to the top of the row so their
@@ -1092,18 +1098,6 @@ button.badge-like-button {
   /* Small nudge so the £ text and Save/Remove buttons visually sit on
      the input's baseline rather than against the row's top edge. */
   padding-top: 0.35rem;
-}
-
-.holdings-cell-value {
-  font-weight: 600;
-  white-space: nowrap;
-  /* Matches .holdings-input's right padding so header, input text, and value
-     text all line up at the same x-position on the right edge. */
-  padding-right: 0.5rem;
-}
-
-.holdings-row-head > div {
-  padding-right: 0.5rem;
 }
 
 .holdings-timestamp {
@@ -1164,10 +1158,10 @@ button.badge-like-button {
     background: rgba(255, 255, 255, 0.03);
   }
   .holdings-cell-name    { grid-area: name;    text-align: left; }
-  .holdings-cell-bucket  { grid-area: bucket;  font-size: 0.78rem; }
+  .holdings-cell-bucket  { grid-area: bucket;  font-size: 0.78rem; text-align: left; }
   .holdings-cell-units   { grid-area: units;   text-align: left; }
   .holdings-cell-price   { grid-area: price;   text-align: left; }
-  .holdings-cell-value   { grid-area: value;   font-size: 1.05rem; }
+  .holdings-cell-value   { grid-area: value;   font-size: 1.05rem; text-align: right; }
   .holdings-cell-actions { grid-area: actions; padding-top: 0.5rem; border-top: 1px solid rgba(51, 65, 85, 0.3); }
   .holdings-label        { display: block; }
   .holdings-cell-bucket:empty { display: none; }
