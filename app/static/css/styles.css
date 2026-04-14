@@ -1036,6 +1036,7 @@ button.badge-like-button {
 
 .responsive-table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ── Holdings: desktop table vs mobile cards ─────────────────────────── */
