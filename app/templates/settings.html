@@ -4,15 +4,15 @@
 {% block content %}
 {% set page_mode = request.args.get('mode', 'view') %}
 
-{# ── Month strip ─────────────────────────────────────────────────────────── #}
-{% include '_month_strip.html' %}
-
 {% if page_mode != 'edit' %}
 <nav class="subnav">
   <a href="/settings/" {% if page_mode != 'diagnostics' %}class="subnav-active"{% endif %}>Settings</a>
   <a href="/settings/?mode=diagnostics" {% if page_mode == 'diagnostics' %}class="subnav-active"{% endif %}>Diagnostics</a>
 </nav>
 {% endif %}
+
+{# ── Month strip ─────────────────────────────────────────────────────────── #}
+{% include '_month_strip.html' %}
 
 {% if page_mode == 'edit' %}
 
@@ -312,7 +312,6 @@
 
 <div class="row-end">
   <a class="badge badge-primary-action" href="/settings/?mode=edit">Edit settings</a>
-  <a class="badge" href="/settings/?mode=diagnostics" style="margin-left:0.5rem;">Diagnostics</a>
 </div>
 
 {% if current_user.is_authenticated and current_user.is_admin %}
