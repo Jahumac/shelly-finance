@@ -391,10 +391,14 @@ def account_detail(account_id):
             return redirect(url_for("accounts.accounts"))
 
         if form_name == "add_override":
+            # The form now uses <input type="date"> for cross-browser calendar
+            # support; we truncate YYYY-MM-DD (or YYYY-MM) to just YYYY-MM.
+            from_raw = request.form.get("from_month", "")
+            to_raw = request.form.get("to_month", "")
             create_contribution_override({
                 "account_id": account_id,
-                "from_month": request.form.get("from_month", ""),
-                "to_month": request.form.get("to_month", ""),
+                "from_month": from_raw[:7],
+                "to_month": to_raw[:7],
                 "override_amount": _optional_float(request.form.get("override_amount"), 0.0),
                 "reason": request.form.get("reason", "").strip(),
             })

@@ -83,21 +83,19 @@
         <small class="form-hint">Used to estimate your personal pension tax-relief limit (typically up to 100% of relevant earnings)</small>
       </label>
       <label>
-        <span>Pension annual allowance (£)</span>
+        <span>Pension allowance (£)</span>
         <input type="number" step="0.01" name="pension_annual_allowance" value="{{ assumptions.pension_annual_allowance if assumptions and assumptions.pension_annual_allowance is not none else 60000 }}">
-        <small class="form-hint">Total gross pension contributions limit (personal + employer) before carry-forward and tapering</small>
+        <small class="form-hint">Annual gross limit (personal + employer) before carry-forward and tapering</small>
       </label>
       <label class="form-full-col">
         <input type="checkbox" name="mpaa_enabled" value="1" id="mpaa-toggle" {{ 'checked' if assumptions and assumptions.mpaa_enabled else '' }}>
         <span style="font-weight:600; font-size:0.95rem;">Money Purchase Annual Allowance (MPAA) applies</span>
         <small class="form-hint" style="margin-top:-0.25rem;">Enable if you've flexibly accessed a DC pension (MPAA reduces your allowance)</small>
       </label>
-      <div id="mpaa-row" style="display:grid; grid-template-columns:1fr; gap:0.75rem; padding-left:1.5rem;">
-        <label>
-          <span>MPAA allowance (£)</span>
-          <input type="number" step="0.01" name="mpaa_allowance" value="{{ assumptions.mpaa_allowance if assumptions and assumptions.mpaa_allowance is not none else 10000 }}">
-        </label>
-      </div>
+      <label id="mpaa-row">
+        <span>MPAA allowance (£)</span>
+        <input type="number" step="0.01" name="mpaa_allowance" value="{{ assumptions.mpaa_allowance if assumptions and assumptions.mpaa_allowance is not none else 10000 }}">
+      </label>
       <script>
         (function() {
           var toggle = document.getElementById('mpaa-toggle');
