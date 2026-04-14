@@ -242,6 +242,7 @@ def init_db():
         conn.executescript(SCHEMA)
 
         # ── Legacy column additions (accounts) ───────────────────────────────
+        existing_cols = {row['name'] for row in conn.execute("PRAGMA table_info(accounts)").fetchall()}
         for col_name, col_def in [
             ("goal_value", "REAL"),
             ("valuation_mode", "TEXT DEFAULT 'manual'"),
@@ -250,13 +251,11 @@ def init_db():
             ("tags", "TEXT DEFAULT ''"),
             ("pension_contribution_day", "INTEGER DEFAULT 0"),
         ]:
-            try:
-                # Check if column exists first
-                info = conn.execute(f"PRAGMA table_info(accounts)").fetchall()
-                if not any(row['name'] == col_name for row in info):
+            if col_name not in existing_cols:
+                try:
                     conn.execute(f"ALTER TABLE accounts ADD COLUMN {col_name} {col_def}")
-            except Exception as e:
-                current_app.logger.error(f"Migration error (accounts.{col_name}): {e}")
+                except Exception as e:
+                    current_app.logger.error(f"Migration error (accounts.{col_name}): {e}")
 
         # ── Legacy column additions (other tables) ───────────────────────────
         for col_sql in [

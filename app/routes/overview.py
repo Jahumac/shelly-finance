@@ -4,6 +4,7 @@ from flask import Blueprint, render_template
 from flask_login import current_user, login_required
 
 from app.calculations import (
+    SCHEDULER_STALE_AFTER_HOURS,
     allowance_progress,
     calculate_isa_usage,
     calculate_pension_usage,
@@ -157,7 +158,7 @@ def overview():
                     lpu_dt = datetime.fromisoformat(str(last_price_update))
                     if lpu_dt.tzinfo is None:
                         lpu_dt = lpu_dt.replace(tzinfo=timezone.utc)
-                price_stale = (datetime.now(timezone.utc) - lpu_dt).total_seconds() > 86400
+                price_stale = (datetime.now(timezone.utc) - lpu_dt).total_seconds() > SCHEDULER_STALE_AFTER_HOURS * 3600
             except Exception:
                 price_stale = True
         if price_stale:

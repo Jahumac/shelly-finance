@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta, timezone
 
-PRICE_STALE_AFTER_HOURS = 36  # >36h since last successful fetch ⇒ stale
+PRICE_STALE_AFTER_HOURS = 36     # >36h since last successful fetch ⇒ stale badge on holdings
+SCHEDULER_STALE_AFTER_HOURS = 24  # >24h since last scheduler run ⇒ alert on overview
 
 
 def is_price_stale(price_updated_at, now=None):
@@ -50,11 +51,11 @@ def current_age_from_assumptions(assumptions):
     """Get the user's current age, preferring date_of_birth over legacy current_age."""
     if not assumptions:
         return 0.0
-    dob = assumptions.get("date_of_birth") if hasattr(assumptions, 'get') else (assumptions["date_of_birth"] if "date_of_birth" in assumptions.keys() else None)
+    dob = _safe_get(assumptions, "date_of_birth")
     if dob:
         return age_from_dob(dob)
     # Legacy fallback
-    return to_float(assumptions.get("current_age") if hasattr(assumptions, 'get') else assumptions["current_age"])
+    return to_float(_safe_get(assumptions, "current_age", 0))
 
 
 TAX_BAND_RATES = {"basic": 0.20, "higher": 0.40, "additional": 0.45}
@@ -74,14 +75,14 @@ def contribution_breakdown(account, assumptions=None):
         self_assessment — additional relief reclaimable by higher/additional-rate taxpayers
         method_label    — human-readable description of the method
     """
-    personal = to_float(account.get("monthly_contribution") if hasattr(account, 'get') else account["monthly_contribution"])
-    employer = to_float(account.get("employer_contribution") if hasattr(account, 'get') else (account["employer_contribution"] if "employer_contribution" in account.keys() else 0))
-    wrapper = (account.get("wrapper_type") if hasattr(account, 'get') else account["wrapper_type"]) or ""
-    method = (account.get("contribution_method") if hasattr(account, 'get') else (account["contribution_method"] if "contribution_method" in account.keys() else "standard")) or "standard"
+    personal = to_float(_safe_get(account, "monthly_contribution", 0))
+    employer = to_float(_safe_get(account, "employer_contribution", 0))
+    wrapper = (_safe_get(account, "wrapper_type") or "")
+    method = (_safe_get(account, "contribution_method") or "standard")
 
     tax_band = "basic"
     if assumptions:
-        tax_band = (assumptions.get("tax_band") if hasattr(assumptions, 'get') else (assumptions["tax_band"] if "tax_band" in assumptions.keys() else "basic")) or "basic"
+        tax_band = (_safe_get(assumptions, "tax_band") or "basic")
 
     tax_relief = 0.0
     government_bonus = 0.0
@@ -166,10 +167,19 @@ def to_float(value):
         return 0.0
 
 
+def _safe_get(row, key, default=None):
+    """Get a value from a sqlite3.Row or dict, returning default if missing or None."""
+    try:
+        v = row[key]
+        return v if v is not None else default
+    except (KeyError, IndexError):
+        return default
+
+
 def effective_account_value(account, holdings_totals=None):
     """Return the value of the account based on its valuation mode and uninvested cash."""
     holdings_totals = holdings_totals or {}
-    uninvested = to_float(account.get("uninvested_cash", 0) if hasattr(account, 'get') else (account["uninvested_cash"] if "uninvested_cash" in account.keys() else 0))
+    uninvested = to_float(_safe_get(account, "uninvested_cash", 0))
     if account["valuation_mode"] == "holdings":
         return to_float(holdings_totals.get(account["id"], 0)) + uninvested
     return to_float(account["current_value"]) + uninvested
@@ -230,8 +240,8 @@ def years_to_retirement(current_age, retirement_age, assumptions=None):
     an exact date calculation. Otherwise falls back to simple subtraction.
     """
     if assumptions:
-        dob = assumptions.get("date_of_birth") if hasattr(assumptions, 'get') else None
-        mode = assumptions.get("retirement_date_mode", "birthday") if hasattr(assumptions, 'get') else "birthday"
+        dob = _safe_get(assumptions, "date_of_birth")
+        mode = _safe_get(assumptions, "retirement_date_mode") or "birthday"
         if dob:
             target = retirement_target_date(dob, retirement_age, mode)
             if target:
@@ -239,16 +249,6 @@ def years_to_retirement(current_age, retirement_age, assumptions=None):
                 delta = target - today
                 return max(delta.days / 365.25, 0)
     return max(retirement_age - current_age, 0)
-
-
-def _safe_get(account, key, default=0):
-    """Safely get a value from a dict-like account row."""
-    if hasattr(account, 'get'):
-        return account.get(key, default)
-    try:
-        return account[key] if key in account.keys() else default
-    except Exception:
-        return default
 
 
 def effective_fee_pct(account):
@@ -840,23 +840,8 @@ def pension_allowance_limits(assumptions=None):
 def is_pension_account(account):
     if not account:
         return False
-    try:
-        cat_raw = account.get("category")
-    except AttributeError:
-        try:
-            cat_raw = account["category"]
-        except Exception:
-            cat_raw = None
-    try:
-        wt_raw = account.get("wrapper_type")
-    except AttributeError:
-        try:
-            wt_raw = account["wrapper_type"]
-        except Exception:
-            wt_raw = None
-
-    cat = (cat_raw or "").strip().lower()
-    wt = (wt_raw or "").strip().lower()
+    cat = (_safe_get(account, "category") or "").strip().lower()
+    wt = (_safe_get(account, "wrapper_type") or "").strip().lower()
     return (cat == "pension") or ("pension" in wt) or ("sipp" in wt)
 
 
@@ -893,13 +878,7 @@ def calculate_pension_usage(accounts, ad_hoc_contributions, assumptions=None, to
         monthly_personal_net = float(b.get("personal") or 0)
         monthly_tax_relief = float(b.get("tax_relief") or 0)
 
-        try:
-            method = (acc.get("contribution_method") or "")
-        except AttributeError:
-            try:
-                method = (acc["contribution_method"] or "")
-            except Exception:
-                method = ""
+        method = (_safe_get(acc, "contribution_method") or "")
 
         if method == "salary_sacrifice":
             monthly_personal_gross = 0.0
@@ -917,13 +896,9 @@ def calculate_pension_usage(accounts, ad_hoc_contributions, assumptions=None, to
         projected_total += projected
 
         breakdown.append({
-            "account_id": (acc["id"] if "id" in acc.keys() else acc.get("id")),
-            "account_name": (acc["name"] if "name" in acc.keys() else acc.get("name")),
-            "wrapper_type": (
-                (acc.get("wrapper_type") if hasattr(acc, "get") else acc["wrapper_type"])
-                if ("wrapper_type" in acc.keys() or hasattr(acc, "get"))
-                else ""
-            ) or "",
+            "account_id": _safe_get(acc, "id"),
+            "account_name": _safe_get(acc, "name"),
+            "wrapper_type": (_safe_get(acc, "wrapper_type") or ""),
             "monthly_total": monthly_total,
             "monthly_personal": monthly_personal_gross,
             "monthly_employer": monthly_employer_gross,
