@@ -263,6 +263,23 @@ Shelly uses Flask-Login for authentication with hashed passwords. It's designed 
 
 Shelly is a personal project shared for others to use and learn from. If you find a bug or have a feature idea, feel free to open an issue. Pull requests are welcome.
 
+### Visual screenshots (Playwright)
+
+For quickly eyeballing UI changes across desktop + mobile widths, there's a Playwright-based screenshot script. One-time setup:
+
+```bash
+.venv/bin/pip install playwright
+.venv/bin/playwright install chromium
+```
+
+Then, with the app running on `localhost:8000`:
+
+```bash
+.venv/bin/python scripts/screenshot.py --user alice --password <pw>
+```
+
+PNGs land in `tests/screenshots/<timestamp>/`, one per page × viewport. Run before and after a UI change and diff the folders.
+
 ---
 
 ## License
