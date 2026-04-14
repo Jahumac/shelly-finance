@@ -511,6 +511,7 @@ def update_holding(payload, user_id):
                 value = ?,
                 units = ?,
                 price = ?,
+                book_cost = ?,
                 notes = ?
             WHERE id = ?
               AND account_id IN (SELECT id FROM accounts WHERE user_id = ?)
@@ -525,6 +526,7 @@ def update_holding(payload, user_id):
                 payload["value"],
                 payload["units"],
                 payload["price"],
+                payload.get("book_cost"),
                 payload["notes"],
                 payload["id"],
                 user_id,

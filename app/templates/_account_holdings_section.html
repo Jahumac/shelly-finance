@@ -65,10 +65,20 @@
                 <span class="holdings-label">Price (£)</span>
                 <input type="number" step="any" name="price" form="edit-holding-{{ position.id }}" value="{{ '{:.4f}'.format(position.price or 0) }}" class="holdings-input">
                 {% if position.price_updated_at %}<small class="holdings-timestamp">{{ position.price_updated_at[:16] }}</small>{% endif %}
+                {% if selected.wrapper_type and 'general' in selected.wrapper_type | lower %}
+                <span class="holdings-label mt-025">Book cost (£)</span>
+                <input type="number" step="any" name="book_cost" form="edit-holding-{{ position.id }}" value="{{ '{:.2f}'.format(position.book_cost) if position.book_cost is not none else '' }}" class="holdings-input" placeholder="optional">
+                {% endif %}
               </div>
               <div class="holdings-cell-value" role="cell">
                 <span class="holdings-label">Value</span>
                 £{{ '{:,.2f}'.format(position.value or 0) }}
+                {% if selected.wrapper_type and 'general' in selected.wrapper_type | lower and position.book_cost %}
+                  {% set gl = (position.value or 0) - position.book_cost %}
+                  <small class="{% if gl >= 0 %}text-gain{% else %}text-loss{% endif %} block">
+                    {{ '+' if gl >= 0 else '' }}£{{ '{:,.2f}'.format(gl) }}
+                  </small>
+                {% endif %}
               </div>
               <div class="holdings-cell-actions" role="cell">
                 <form method="post" action="/accounts/{{ selected.id }}/holdings/{{ position.id }}/edit" id="edit-holding-{{ position.id }}" class="form-reset">

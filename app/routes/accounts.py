@@ -621,6 +621,7 @@ def account_edit_holding(account_id, holding_id):
 
     units = _optional_float(request.form.get("units"), None)
     price = _optional_float(request.form.get("price"), None)
+    book_cost = _optional_float(request.form.get("book_cost"), None)
     notes = request.form.get("notes", "").strip()
 
     if units is not None and price is not None:
@@ -644,6 +645,7 @@ def account_edit_holding(account_id, holding_id):
         "value": value if value is not None else float(existing["value"] or 0),
         "units": units if units is not None else float(existing["units"] or 0),
         "price": price if price is not None else float(existing["price"] or 0),
+        "book_cost": book_cost if book_cost is not None else (float(existing["book_cost"]) if existing["book_cost"] is not None else None),
         "notes": notes,
     }
     update_holding(payload, current_user.id)

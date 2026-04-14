@@ -2334,6 +2334,10 @@ button.badge-like-button {
   border-radius: 99px;
   padding: 0.2rem 0.5rem;
 }
+.acct-rate-chip-interest {
+  color: #86efac;
+  background: rgba(134,239,172,0.12);
+}
 
 .acct-card-mid {
   flex: 1;
@@ -3980,7 +3984,9 @@ button.badge-like-button {
 .text-muted   { color: var(--muted); }
 .text-accent  { color: var(--accent); }
 .text-danger  { color: var(--danger); }
-.text-success { color: #86efac; } /* No --success var yet; matches existing JS colour */
+.text-success { color: #86efac; }
+.text-gain    { color: #86efac; }
+.text-loss    { color: var(--danger); } /* No --success var yet; matches existing JS colour */
 .text-sm      { font-size: 0.8rem; }
 .text-sm-2    { font-size: 0.875rem; }
 .text-xs      { font-size: 0.75rem; }

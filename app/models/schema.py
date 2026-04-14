@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS holdings (
     value REAL DEFAULT 0,
     units REAL,
     price REAL,
+    book_cost REAL,
     notes TEXT,
     FOREIGN KEY(account_id) REFERENCES accounts(id),
     FOREIGN KEY(holding_catalogue_id) REFERENCES holding_catalogue(id)
@@ -274,6 +275,7 @@ def init_db():
             "ALTER TABLE assumptions ADD COLUMN retirement_goal_value REAL DEFAULT 1000000",
             "ALTER TABLE assumptions ADD COLUMN dividend_allowance REAL DEFAULT 500",
             "ALTER TABLE holdings ADD COLUMN holding_catalogue_id INTEGER",
+            "ALTER TABLE holdings ADD COLUMN book_cost REAL",
             "ALTER TABLE goals ADD COLUMN selected_tags TEXT DEFAULT ''",
             "ALTER TABLE monthly_snapshots ADD COLUMN month_key TEXT",
         ]:

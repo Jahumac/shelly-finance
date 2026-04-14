@@ -61,6 +61,9 @@
       {% endif %}
       <span class="acct-mode-dot {% if account.valuation_mode == 'holdings' %}dot-positions{% else %}dot-manual{% endif %}"
             title="{{ 'Built from holdings' if account.valuation_mode == 'holdings' else 'Manual' }}"></span>
+      {% if account.cash_interest_rate and account.cash_interest_rate > 0 %}
+        <span class="acct-rate-chip acct-rate-chip-interest" title="Auto-compounding interest">{{ '{:.2g}'.format(account.cash_interest_rate * 100) }}% p.a.</span>
+      {% endif %}
     </div>
   </a>
   {% else %}
