@@ -17,7 +17,7 @@ from flask import Blueprint, current_app, g, jsonify, request
 from datetime import datetime, timezone
 from pathlib import Path
 
-from app.calculations import is_price_stale
+from app.calculations import effective_account_value, is_price_stale
 from app.models import (
     add_dividend_record,
     add_isa_contribution,
@@ -29,11 +29,14 @@ from app.models import (
     fetch_assumptions,
     fetch_budget_entries,
     fetch_budget_items,
+    fetch_holding_totals_by_account,
     fetch_holdings_for_account,
     fetch_latest_price_update,
+    fetch_or_create_monthly_review,
     fetch_user_by_api_token,
     get_connection,
     update_account,
+    update_monthly_review,
     upsert_monthly_snapshot,
 )
 
@@ -301,6 +304,40 @@ def log_dividend():
     add_dividend_record(g.api_user.id, int(account_id), amount, date,
                         payload.get("note"))
     return jsonify({"ok": True}), 201
+
+
+@api_bp.route("/monthly-review/<month_key>/complete", methods=["POST"])
+@api_auth_required
+def complete_monthly_review(month_key):
+    """Mark a monthly review as complete and snapshot every account's
+    current effective value for that month. Mirrors the web UI's
+    'mark complete' button exactly."""
+    if len(month_key) != 7 or month_key[4] != "-":
+        return _err("bad_request", "month_key must be YYYY-MM", 400)
+
+    payload = request.get_json(silent=True) or {}
+    notes = (payload.get("notes") or "").strip()
+
+    uid = g.api_user.id
+    review = fetch_or_create_monthly_review(month_key, uid)
+    accounts = fetch_all_accounts(uid)
+    holdings_totals = fetch_holding_totals_by_account(uid)
+
+    snapshots_taken = 0
+    for acc in accounts:
+        balance = effective_account_value(acc, holdings_totals)
+        upsert_monthly_snapshot(acc["id"], month_key, balance)
+        snapshots_taken += 1
+
+    update_monthly_review(review["id"], "complete", notes)
+
+    return jsonify({
+        "ok": True,
+        "month": month_key,
+        "review_id": review["id"],
+        "status": "complete",
+        "snapshots_taken": snapshots_taken,
+    })
 
 
 # ── Health check (unauthenticated) ────────────────────────────────────────────

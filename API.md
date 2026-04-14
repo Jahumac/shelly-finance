@@ -127,6 +127,14 @@ Log a dividend receipt.
 { "account_id": 2, "amount": 50, "date": "2026-04-10", "note": "optional" }
 ```
 
+### `POST /monthly-review/<YYYY-MM>/complete`
+Mark a month's review as complete. Takes a snapshot of every account's
+effective current value (same as the web UI's "mark complete" button).
+```json
+{ "notes": "all good" }    ← notes optional
+```
+Returns the review id, status, and how many account snapshots were taken.
+
 ---
 
 ## Example

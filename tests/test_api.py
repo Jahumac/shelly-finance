@@ -223,6 +223,52 @@ def test_pension_contribution_rejects_bad_kind(app, client, token):
     assert resp.status_code == 400
 
 
+# ── Monthly review completion ────────────────────────────────────────────────
+
+def test_complete_monthly_review_bad_month_key(client, token):
+    resp = client.post(
+        "/api/v1/monthly-review/2026/complete",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 400
+
+
+def test_complete_monthly_review_success(app, client, token):
+    with app.app_context():
+        from app.models import get_connection, get_user_by_username
+        uid = get_user_by_username("apiuser").id
+        with get_connection() as conn:
+            conn.execute(
+                "INSERT INTO accounts (user_id, name, current_value, is_active) "
+                "VALUES (?, 'A', 1000, 1)",
+                (uid,),
+            )
+            conn.execute(
+                "INSERT INTO accounts (user_id, name, current_value, is_active) "
+                "VALUES (?, 'B', 2000, 1)",
+                (uid,),
+            )
+            conn.commit()
+
+    resp = client.post(
+        "/api/v1/monthly-review/2026-04/complete",
+        json={"notes": "done from phone"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "complete"
+    assert body["snapshots_taken"] == 2
+
+    # Verify the review is actually marked complete in the DB
+    with app.app_context():
+        from app.models import fetch_or_create_monthly_review, get_user_by_username
+        uid = get_user_by_username("apiuser").id
+        review = fetch_or_create_monthly_review("2026-04", uid)
+        assert review["status"] == "complete"
+        assert review["notes"] == "done from phone"
+
+
 # ── Health check ──────────────────────────────────────────────────────────────
 
 def test_health_check_no_auth_required(client):
