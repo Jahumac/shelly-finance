@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from '_macros.html' import hero_stat %}
 {% block title %}Performance{% endblock %}
 {% block content %}
 
@@ -32,28 +33,22 @@
   </div>
   {% if perf %}
   <div class="hero-strip">
-    <div class="hero-strip-stat">
-      <span>Total return</span>
+    {% call hero_stat('Total return') %}
       <strong class="{% if perf.total_return >= 0 %}perf-positive{% else %}perf-negative{% endif %}">
         {{ '{:+.1f}'.format(perf.total_return) }}%
       </strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>Market gain</span>
+    {% endcall %}
+    {% call hero_stat('Market gain') %}
       <strong class="{% if perf.total_market_gain >= 0 %}perf-positive{% else %}perf-negative{% endif %}">
         {% if perf.total_market_gain >= 0 %}+{% endif %}£{{ '{:,.0f}'.format(perf.total_market_gain) }}
       </strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>vs Plan</span>
+    {% endcall %}
+    {% call hero_stat('vs Plan') %}
       <strong class="{% if perf.vs_plan >= 0 %}perf-positive{% else %}perf-negative{% endif %}">
         {% if perf.vs_plan >= 0 %}+{% endif %}£{{ '{:,.0f}'.format(perf.vs_plan) }}
       </strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>Contributed</span>
-      <strong>£{{ '{:,.0f}'.format(perf.total_contributed) }}</strong>
-    </div>
+    {% endcall %}
+    {% call hero_stat('Contributed') %}<strong>£{{ '{:,.0f}'.format(perf.total_contributed) }}</strong>{% endcall %}
   </div>
   <div class="badge-row" style="margin-top: 1rem;">
     <a href="/performance/export.xlsx" class="badge badge-meta">Download monthly report (.xlsx)</a>

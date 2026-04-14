@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_macros.html' import hero_stat %}
 {% block title %}Instruments · Shelly{% endblock %}
 {% block content %}
 {% set page_mode = request.args.get('mode', 'list') %}
@@ -19,22 +20,10 @@
     </div>
   </div>
   <div class="hero-strip">
-    <div class="hero-strip-stat">
-      <span>ETFs</span>
-      <strong>{{ instruments_in_use | selectattr('asset_type', 'equalto', 'ETF') | list | length }}</strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>Funds</span>
-      <strong>{{ instruments_in_use | selectattr('asset_type', 'equalto', 'Fund') | list | length }}</strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>Pensions</span>
-      <strong>{{ instruments_in_use | selectattr('asset_type', 'equalto', 'Pension Fund') | list | length }}</strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>Live prices</span>
-      <strong>{{ instruments_in_use | selectattr('last_price') | list | length }}</strong>
-    </div>
+    {% call hero_stat('ETFs') %}<strong>{{ instruments_in_use | selectattr('asset_type', 'equalto', 'ETF') | list | length }}</strong>{% endcall %}
+    {% call hero_stat('Funds') %}<strong>{{ instruments_in_use | selectattr('asset_type', 'equalto', 'Fund') | list | length }}</strong>{% endcall %}
+    {% call hero_stat('Pensions') %}<strong>{{ instruments_in_use | selectattr('asset_type', 'equalto', 'Pension Fund') | list | length }}</strong>{% endcall %}
+    {% call hero_stat('Live prices') %}<strong>{{ instruments_in_use | selectattr('last_price') | list | length }}</strong>{% endcall %}
   </div>
 </section>
 

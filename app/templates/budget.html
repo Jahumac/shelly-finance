@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_macros.html' import hero_stat %}
 {% block title %}Budget · Shelly{% endblock %}
 {% block content %}
 
@@ -42,24 +43,14 @@
     </div>
   </div>
   <div class="hero-strip">
-    <div class="hero-strip-stat">
-      <span>Income</span>
-      <strong id="stat-income">£{{ '{:,.0f}'.format(summary.total_income) }}</strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>Expenses</span>
-      <strong id="stat-expenses">£{{ '{:,.0f}'.format(summary.total_expenses) }}</strong>
-    </div>
-    <div class="hero-strip-stat" id="stat-surplus-container">
-      <span>Left over</span>
+    {% call hero_stat('Income') %}<strong id="stat-income">£{{ '{:,.0f}'.format(summary.total_income) }}</strong>{% endcall %}
+    {% call hero_stat('Expenses') %}<strong id="stat-expenses">£{{ '{:,.0f}'.format(summary.total_expenses) }}</strong>{% endcall %}
+    {% call hero_stat('Left over', stat_id='stat-surplus-container') %}
       <strong id="stat-surplus" class="{% if summary.surplus >= 0 %}stat-positive-text{% else %}stat-negative-text{% endif %}">
         {% if summary.surplus >= 0 %}+{% endif %}£{{ '{:,.0f}'.format(summary.surplus) }}
       </strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>Savings Rate</span>
-      <strong id="stat-savings" title="Based on amounts in your Investment / Savings sections">{{ '{:.1f}'.format(summary.savings_rate) }}%</strong>
-    </div>
+    {% endcall %}
+    {% call hero_stat('Savings Rate') %}<strong id="stat-savings" title="Based on amounts in your Investment / Savings sections">{{ '{:.1f}'.format(summary.savings_rate) }}%</strong>{% endcall %}
   </div>
 </section>
 

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_macros.html' import hero_stat %}
 {% block title %}Settings · Shelly{% endblock %}
 {% block content %}
 {% set page_mode = request.args.get('mode', 'view') %}
@@ -282,38 +283,14 @@
     </div>
   </div>
   <div class="hero-strip">
-    <div class="hero-strip-stat">
-      <span>Growth rate</span>
-      <strong>{{ '{:.1f}'.format((assumptions.annual_growth_rate if assumptions else 0.07) * 100) }}%</strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>Age</span>
-      <strong>{{ computed_age if computed_age else 'Not set' }}</strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>Retirement age</span>
-      <strong>{{ assumptions.retirement_age if assumptions else 60 }}</strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>ISA allowance</span>
-      <strong>£{{ '{:,.0f}'.format(assumptions.isa_allowance if assumptions else 20000) }}</strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>LISA allowance</span>
-      <strong>£{{ '{:,.0f}'.format(assumptions.lisa_allowance if assumptions else 4000) }}</strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>Pension allowance</span>
-      <strong>£{{ '{:,.0f}'.format(assumptions.pension_annual_allowance if assumptions and assumptions.pension_annual_allowance is not none else 60000) }}</strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>Annual income</span>
-      <strong>£{{ '{:,.0f}'.format(assumptions.annual_income if assumptions and assumptions.annual_income is not none else 0) }}</strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>Investment day</span>
-      <strong>{{ (assumptions.salary_day ~ ('st' if assumptions.salary_day in [1,21,31] else ('nd' if assumptions.salary_day in [2,22] else ('rd' if assumptions.salary_day in [3,23] else 'th')))) if assumptions and assumptions.salary_day else 'Not set' }}</strong>
-    </div>
+    {% call hero_stat('Growth rate') %}<strong>{{ '{:.1f}'.format((assumptions.annual_growth_rate if assumptions else 0.07) * 100) }}%</strong>{% endcall %}
+    {% call hero_stat('Age') %}<strong>{{ computed_age if computed_age else 'Not set' }}</strong>{% endcall %}
+    {% call hero_stat('Retirement age') %}<strong>{{ assumptions.retirement_age if assumptions else 60 }}</strong>{% endcall %}
+    {% call hero_stat('ISA allowance') %}<strong>£{{ '{:,.0f}'.format(assumptions.isa_allowance if assumptions else 20000) }}</strong>{% endcall %}
+    {% call hero_stat('LISA allowance') %}<strong>£{{ '{:,.0f}'.format(assumptions.lisa_allowance if assumptions else 4000) }}</strong>{% endcall %}
+    {% call hero_stat('Pension allowance') %}<strong>£{{ '{:,.0f}'.format(assumptions.pension_annual_allowance if assumptions and assumptions.pension_annual_allowance is not none else 60000) }}</strong>{% endcall %}
+    {% call hero_stat('Annual income') %}<strong>£{{ '{:,.0f}'.format(assumptions.annual_income if assumptions and assumptions.annual_income is not none else 0) }}</strong>{% endcall %}
+    {% call hero_stat('Investment day') %}<strong>{{ (assumptions.salary_day ~ ('st' if assumptions.salary_day in [1,21,31] else ('nd' if assumptions.salary_day in [2,22] else ('rd' if assumptions.salary_day in [3,23] else 'th')))) if assumptions and assumptions.salary_day else 'Not set' }}</strong>{% endcall %}
   </div>
 </section>
 

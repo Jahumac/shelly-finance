@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_macros.html' import hero_stat %}
 {% block title %}Overview · Shelly{% endblock %}
 {% block content %}
 
@@ -88,27 +89,12 @@
   </div>
 
   <div class="hero-strip">
-    <div class="hero-strip-stat">
-      <span>Monthly contributions</span>
-      <strong>£{{ '{:,.0f}'.format(metrics.monthly_total) }}</strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>Projected at retirement</span>
-      <strong>£{{ '{:,.0f}'.format(metrics.projected_total) }}</strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>Accounts</span>
-      <strong>{{ accounts | length }}</strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>Tax Year {{ metrics.tax_year }}</span>
-      <strong>{{ metrics.tax_year_days_left }} days left</strong>
-    </div>
+    {% call hero_stat('Monthly contributions') %}<strong>£{{ '{:,.0f}'.format(metrics.monthly_total) }}</strong>{% endcall %}
+    {% call hero_stat('Projected at retirement') %}<strong>£{{ '{:,.0f}'.format(metrics.projected_total) }}</strong>{% endcall %}
+    {% call hero_stat('Accounts') %}<strong>{{ accounts | length }}</strong>{% endcall %}
+    {% call hero_stat('Tax Year ' ~ metrics.tax_year) %}<strong>{{ metrics.tax_year_days_left }} days left</strong>{% endcall %}
     {% if metrics.goal_target > 0 %}
-    <div class="hero-strip-stat">
-      <span>Goal progress</span>
-      <strong>{{ '{:.1f}'.format(metrics.goal_progress * 100) }}%</strong>
-    </div>
+      {% call hero_stat('Goal progress') %}<strong>{{ '{:.1f}'.format(metrics.goal_progress * 100) }}%</strong>{% endcall %}
     {% endif %}
   </div>
 

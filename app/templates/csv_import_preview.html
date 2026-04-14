@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_macros.html' import hero_stat %}
 {% block title %}CSV Import Preview · Shelly{% endblock %}
 {% block content %}
 
@@ -17,18 +18,9 @@
     <a href="/monthly-review/" class="badge">Cancel</a>
   </div>
   <div class="hero-strip">
-    <div class="hero-strip-stat">
-      <span>Matched</span>
-      <strong>{{ matched | length }}</strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>Unmatched in CSV</span>
-      <strong>{{ csv_only | length }}</strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>Not in CSV</span>
-      <strong>{{ db_only | length }}</strong>
-    </div>
+    {% call hero_stat('Matched') %}<strong>{{ matched | length }}</strong>{% endcall %}
+    {% call hero_stat('Unmatched in CSV') %}<strong>{{ csv_only | length }}</strong>{% endcall %}
+    {% call hero_stat('Not in CSV') %}<strong>{{ db_only | length }}</strong>{% endcall %}
   </div>
 </section>
 

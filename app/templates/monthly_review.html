@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_macros.html' import hero_stat %}
 {% block title %}Monthly Update · Shelly{% endblock %}
 {% block content %}
 
@@ -58,18 +59,9 @@
     </div>
   </div>
   <div class="hero-strip">
-    <div class="hero-strip-stat">
-      <span>Status</span>
-      <strong>{{ 'Complete' if review.status == 'complete' else 'In progress' }}</strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>Accounts</span>
-      <strong>{{ (holdings_items | length) + (manual_items | length) }}</strong>
-    </div>
-    <div class="hero-strip-stat">
-      <span>Expected contributions</span>
-      <strong>£{{ '{:,.0f}'.format(contribution_items | sum(attribute='expected_contribution')) }}</strong>
-    </div>
+    {% call hero_stat('Status') %}<strong>{{ 'Complete' if review.status == 'complete' else 'In progress' }}</strong>{% endcall %}
+    {% call hero_stat('Accounts') %}<strong>{{ (holdings_items | length) + (manual_items | length) }}</strong>{% endcall %}
+    {% call hero_stat('Expected contributions') %}<strong>£{{ '{:,.0f}'.format(contribution_items | sum(attribute='expected_contribution')) }}</strong>{% endcall %}
   </div>
 </section>
 
