@@ -132,7 +132,7 @@
                   <input type="checkbox" value="{{ tag }}" data-tag-checkbox {% if tag in selected_tags %}checked{% endif %}>
                   <span>{{ tag }}</span>
                   {% if tag in custom_tags %}
-                  <button type="button" class="tag-delete" data-delete-tag="{{ tag }}" title="Remove custom tag">&times;</button>
+                  <button type="button" class="tag-delete" data-delete-tag="{{ tag }}" aria-label="Remove tag {{ tag }}">&times;</button>
                   {% endif %}
                 </label>
                 {% endfor %}
@@ -374,7 +374,7 @@
                   <span>{{ '{:.1f}'.format(row.percentage) }}%</span>
                 </div>
                 <small>£{{ '{:,.2f}'.format(row.value) }}</small>
-                <div class="progress">
+                <div class="progress" role="progressbar" aria-valuenow="{{ row.percentage|round(1) }}" aria-valuemin="0" aria-valuemax="100" aria-label="{{ row.bucket }} allocation">
                   <div class="progress-bar" data-pct="{{ row.percentage }}" data-color="{{ color }}"></div>
                 </div>
               </div>
