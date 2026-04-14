@@ -78,6 +78,9 @@
                 <td>
                   <strong>{{ h.holding_name }}</strong>
                   {% if h.ticker %}<br><span class="import-ticker">{{ h.ticker }}</span>{% endif %}
+                  {% if m.match_type == 'name' %}
+                  <br><span class="badge badge-meta" style="font-size:0.7rem;padding:0.1rem 0.4rem;" title="Matched by name — verify this is correct">matched by name</span>
+                  {% endif %}
                 </td>
                 <td>{{ h.account_name }}</td>
                 <td class="col-num muted">
@@ -120,7 +123,10 @@
       </div>
 
     {% else %}
-      <p class="helper-text">Shelly couldn't match anything — make sure the tickers in your holdings match what's in the CSV.</p>
+      <p class="helper-text">Shelly couldn't match anything. To match, your holdings need a ticker that appears in the CSV, or a name that closely matches.</p>
+      {% if csv_headers %}
+      <p class="helper-text mt-05">Columns detected in your CSV: <span class="import-ticker">{{ csv_headers | join(', ') }}</span></p>
+      {% endif %}
     {% endif %}
   </section>
 

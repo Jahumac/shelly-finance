@@ -22,6 +22,7 @@ from app.models import (
 )
 from app.services.csv_parsers import (
     count_csv_rows,
+    detect_csv_headers,
     diagnose_parsed_holdings,
     match_parsed_to_holdings,
     parse_ajbell,
@@ -219,6 +220,9 @@ def import_csv():
     existing = fetch_all_holdings(current_user.id)
     matched, csv_only, db_only = match_parsed_to_holdings(parsed, existing)
 
+    # If nothing matched, surface the raw CSV headers so users can self-debug
+    csv_headers = detect_csv_headers(file_bytes) if not matched else []
+
     # Store parsed data in session so confirm step can re-validate
     session["csv_import"] = {
         "platform": platform,
@@ -239,6 +243,7 @@ def import_csv():
         matched=matched,
         csv_only=csv_only,
         db_only=db_only,
+        csv_headers=csv_headers,
         active_page="monthly_review",
     )
 

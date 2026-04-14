@@ -53,6 +53,20 @@ def diagnose_parsed_holdings(holdings, raw_row_count):
     return warnings
 
 
+def detect_csv_headers(file_bytes):
+    """Return the column headers from the first row of a CSV, or [] on failure."""
+    try:
+        text = file_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = file_bytes.decode("latin-1", errors="replace")
+    try:
+        reader = csv.reader(io.StringIO(text))
+        headers = next(reader, [])
+        return [h.strip() for h in headers if h.strip()]
+    except Exception:
+        return []
+
+
 def count_csv_rows(file_bytes):
     """Count data rows (excluding header) in a CSV. Tolerant of encoding."""
     try:
@@ -579,6 +593,7 @@ def match_parsed_to_holdings(parsed_rows, existing_holdings):
         csv_name = (csv_row.get("name") or "").lower().strip()
 
         best = None
+        match_type = None
 
         # Pass 1: exact ticker match
         if csv_ticker:
@@ -586,6 +601,7 @@ def match_parsed_to_holdings(parsed_rows, existing_holdings):
                 h_ticker = (h["ticker"] or "").upper().strip()
                 if h_ticker and h_ticker == csv_ticker:
                     best = h
+                    match_type = "ticker"
                     break
 
         # Pass 2: name substring match (both directions)
@@ -594,10 +610,11 @@ def match_parsed_to_holdings(parsed_rows, existing_holdings):
                 h_name = (h["holding_name"] or "").lower().strip()
                 if (csv_name in h_name or h_name in csv_name) and len(csv_name) > 3:
                     best = h
+                    match_type = "name"
                     break
 
         if best is not None:
-            matched.append({"csv": csv_row, "holding": dict(best)})
+            matched.append({"csv": csv_row, "holding": dict(best), "match_type": match_type})
             matched_holding_ids.add(best["id"])
         else:
             csv_only.append(csv_row)
