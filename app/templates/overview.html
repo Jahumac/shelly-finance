@@ -466,6 +466,24 @@
     var fmtLabels = data.labels.map(formatDate);
     var ctx = document.getElementById('dailyPortfolioChart').getContext('2d');
 
+    // Compute Y-axis range for smart tick formatting and padding
+    var dataVals = data.values.filter(function(v) { return isFinite(v); });
+    var yDataMin = dataVals.length ? Math.min.apply(null, dataVals) : 0;
+    var yDataMax = dataVals.length ? Math.max.apply(null, dataVals) : 1;
+    var yRange = yDataMax - yDataMin;
+    var yRelRange = yDataMax > 0 ? yRange / yDataMax : 1;
+    // When movement is small relative to the total, show more decimal places on k labels
+    var kDecimals = yRelRange < 0.005 ? 2 : (yRelRange < 0.05 ? 1 : 0);
+    // Add vertical padding so the line never hugs the top or bottom edge
+    var yPad = yRange > 0 ? yRange * 0.25 : yDataMax * 0.01;
+    var yAxisMin = yDataMin - yPad;
+    var yAxisMax = yDataMax + yPad;
+
+    function fmtTick(v) {
+      if (v >= 1000) return '£' + (v / 1000).toFixed(kDecimals) + 'k';
+      return '£' + Math.round(v);
+    }
+
     var hasChartJs = (typeof window.Chart === 'function');
 
     function drawFallback(canvasCtx, labels, values) {
@@ -489,22 +507,9 @@
       var innerW = Math.max(1, w - padL - padR);
       var innerH = Math.max(1, h - padT - padB);
 
-      var minV = Infinity;
-      var maxV = -Infinity;
-      for (var i = 0; i < values.length; i++) {
-        var v = Number(values[i]);
-        if (!isFinite(v)) continue;
-        if (v < minV) minV = v;
-        if (v > maxV) maxV = v;
-      }
-      if (!isFinite(minV) || !isFinite(maxV)) {
-        minV = fallbackValue;
-        maxV = fallbackValue;
-      }
-      if (minV === maxV) {
-        minV = minV * 0.999;
-        maxV = maxV * 1.001;
-      }
+      var minV = isFinite(yAxisMin) ? yAxisMin : fallbackValue * 0.999;
+      var maxV = isFinite(yAxisMax) ? yAxisMax : fallbackValue * 1.001;
+      if (minV === maxV) { minV = minV * 0.999; maxV = maxV * 1.001; }
 
       function xFor(idx) {
         if (values.length <= 1) return padL + innerW / 2;
@@ -532,7 +537,7 @@
       for (var t = 0; t <= 4; t++) {
         var val = minV + (1 - t / 4) * (maxV - minV);
         var yTick = padT + (t / 4) * innerH;
-        var label = '£' + (val >= 1000 ? (val / 1000).toFixed(0) + 'k' : Math.round(val));
+        var label = fmtTick(val);
         canvasCtx.fillText(label, padL - 8, yTick);
       }
 
@@ -580,7 +585,11 @@
         options: ChartHelpers.lineOptions({
           tooltip: ChartHelpers.gbpTooltip(2),
           extraScales: {
-            y: { ticks: { color: CSS.muted, font: { size: 11 }, callback: function(v) { return '£' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v); } } }
+            y: {
+              min: yAxisMin,
+              max: yAxisMax,
+              ticks: { color: CSS.muted, font: { size: 11 }, callback: fmtTick }
+            }
           }
         })
       });
