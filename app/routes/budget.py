@@ -411,7 +411,7 @@ def budget_items_view():
         grouped.append({"key": section_key, "label": sec["label"], "rows": section_items})
 
     selected_id = request.args.get("item_id", type=int)
-    selected = fetch_budget_item(selected_id) if selected_id else None
+    selected = fetch_budget_item(selected_id, uid) if selected_id else None
     page_mode = request.args.get("mode", "view" if selected_id else "list")
     section_options = [(s["key"], s["label"]) for s in db_sections]
 

@@ -15,8 +15,13 @@ def fetch_budget_items(user_id):
         ).fetchall()
 
 
-def fetch_budget_item(item_id):
+def fetch_budget_item(item_id, user_id=None):
     with get_connection() as conn:
+        if user_id is not None:
+            return conn.execute(
+                "SELECT * FROM budget_items WHERE id = ? AND user_id = ?",
+                (item_id, user_id),
+            ).fetchone()
         return conn.execute(
             "SELECT * FROM budget_items WHERE id = ?", (item_id,)
         ).fetchone()

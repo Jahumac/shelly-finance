@@ -30,6 +30,7 @@ from app.models import (
     reconnect_holdings_to_catalogue,
     sync_holding_prices_from_catalogue,
     fetch_assumptions,
+    save_daily_snapshot,
     update_account,
     update_catalogue_price,
     update_holding,
