@@ -1379,7 +1379,10 @@ button.badge-like-button {
 }
 
 .hero-strip-stat {
-  flex: 1;
+  /* 1 1 auto — each stat starts at its natural content width, then grows
+     equally to fill the row. Short labels like "AGE" don't steal space
+     that longer labels like "PENSION ALLOWANCE" need to stay on one line. */
+  flex: 1 1 auto;
   min-width: 100px;
   display: flex;
   flex-direction: column;
@@ -1392,12 +1395,14 @@ button.badge-like-button {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  white-space: nowrap;
 }
 
 .hero-strip-stat strong {
   font-size: 1.1rem;
   font-weight: 700;
   color: #ffffff;
+  white-space: nowrap;
 }
 
 @media (max-width: 640px) {

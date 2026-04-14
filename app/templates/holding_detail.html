@@ -63,12 +63,27 @@
       <p class="eyebrow">Performance</p>
       <h3>Price history</h3>
     </div>
-    <div class="badge-row badge-row-end">
+    <div class="badge-row badge-row-end" id="history-period-tabs">
       <a class="badge {% if history_period == '1d' %}badge-primary-action{% else %}badge-meta{% endif %}" href="/holdings/{{ item.id }}?period=1d">1D</a>
       <a class="badge {% if history_period == '1m' %}badge-primary-action{% else %}badge-meta{% endif %}" href="/holdings/{{ item.id }}?period=1m">1M</a>
       <a class="badge {% if history_period == '6m' %}badge-primary-action{% else %}badge-meta{% endif %}" href="/holdings/{{ item.id }}?period=6m">6M</a>
       <a class="badge {% if history_period == '1y' %}badge-primary-action{% else %}badge-meta{% endif %}" href="/holdings/{{ item.id }}?period=1y">1Y</a>
     </div>
+    <script>
+      /* Period tabs: use location.replace() so flipping between 1D / 1M / 6M /
+         1Y swaps the current history entry instead of stacking new ones. That
+         means the browser Back button jumps straight out to wherever the user
+         came from — not through every period they peeked at. */
+      (function () {
+        var tabs = document.querySelectorAll('#history-period-tabs a');
+        tabs.forEach(function (a) {
+          a.addEventListener('click', function (e) {
+            e.preventDefault();
+            window.location.replace(a.getAttribute('href'));
+          });
+        });
+      })();
+    </script>
   </div>
   
   <div class="chart-wrap mt-1">
