@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from flask import Blueprint, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.calculations import current_age_from_assumptions
@@ -26,8 +26,20 @@ def settings():
         # Remember whether this is the first time DOB is being set (for redirect)
         had_no_dob = not (assumptions and assumptions["date_of_birth"])
 
-        salary_day = int(request.form.get("salary_day", 0))
-        update_day = int(request.form.get("update_day", 0))
+        def _f(key, default=0.0):
+            try:
+                return float(request.form.get(key) or default)
+            except (ValueError, TypeError):
+                return float(default)
+
+        def _i(key, default=0):
+            try:
+                return int(request.form.get(key) or default)
+            except (ValueError, TypeError):
+                return int(default)
+
+        salary_day = _i("salary_day", 0)
+        update_day = _i("update_day", 0)
 
         # Auto-calculate update day: salary day + 5 calendar days (settlement buffer)
         if salary_day and not update_day:
@@ -38,17 +50,17 @@ def settings():
         new_dob = request.form.get("date_of_birth", "").strip()
 
         payload = {
-            "annual_growth_rate": float(request.form.get("annual_growth_rate", 7)) / 100.0,
-            "retirement_age": int(request.form.get("retirement_age", 60)),
+            "annual_growth_rate": _f("annual_growth_rate", 7) / 100.0,
+            "retirement_age": _i("retirement_age", 60),
             "date_of_birth": new_dob,
             "retirement_goal_value": assumptions["retirement_goal_value"] if assumptions else 1000000,
-            "isa_allowance": float(request.form.get("isa_allowance", 20000)),
-            "lisa_allowance": float(request.form.get("lisa_allowance", 4000)),
-            "dividend_allowance": float(request.form.get("dividend_allowance", 500)),
-            "annual_income": float(request.form.get("annual_income", 0) or 0),
-            "pension_annual_allowance": float(request.form.get("pension_annual_allowance", 60000) or 60000),
+            "isa_allowance": _f("isa_allowance", 20000),
+            "lisa_allowance": _f("lisa_allowance", 4000),
+            "dividend_allowance": _f("dividend_allowance", 500),
+            "annual_income": _f("annual_income", 0),
+            "pension_annual_allowance": _f("pension_annual_allowance", 60000),
             "mpaa_enabled": 1 if request.form.get("mpaa_enabled") else 0,
-            "mpaa_allowance": float(request.form.get("mpaa_allowance", 10000) or 10000),
+            "mpaa_allowance": _f("mpaa_allowance", 10000),
             "target_dev_pct": assumptions["target_dev_pct"] if assumptions else 0.90,
             "target_em_pct": assumptions["target_em_pct"] if assumptions else 0.10,
             "emergency_fund_target": assumptions["emergency_fund_target"] if assumptions else 3000,

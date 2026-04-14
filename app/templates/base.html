@@ -48,7 +48,10 @@
     {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
     {% for category, message in messages %}
-    <div class="flash-msg flash-{{ category }}">{{ message }}</div>
+    <div class="flash-msg flash-{{ category }}">
+      <span>{{ message }}</span>
+      <button class="flash-dismiss" onclick="this.parentElement.remove()" aria-label="Dismiss">&times;</button>
+    </div>
     {% endfor %}
     {% endif %}
     {% endwith %}

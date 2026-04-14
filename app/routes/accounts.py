@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 
-from flask import Blueprint, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.calculations import contribution_breakdown, effective_account_value
@@ -393,15 +393,18 @@ def account_detail(account_id):
         if form_name == "add_override":
             # The form now uses <input type="date"> for cross-browser calendar
             # support; we truncate YYYY-MM-DD (or YYYY-MM) to just YYYY-MM.
-            from_raw = request.form.get("from_month", "")
-            to_raw = request.form.get("to_month", "")
-            create_contribution_override({
-                "account_id": account_id,
-                "from_month": from_raw[:7],
-                "to_month": to_raw[:7],
-                "override_amount": _optional_float(request.form.get("override_amount"), 0.0),
-                "reason": request.form.get("reason", "").strip(),
-            })
+            from_raw = request.form.get("from_month", "")[:7]
+            to_raw = request.form.get("to_month", "")[:7]
+            if from_raw and to_raw and from_raw > to_raw:
+                flash("'From' month must be before or equal to 'To' month.", "error")
+            else:
+                create_contribution_override({
+                    "account_id": account_id,
+                    "from_month": from_raw,
+                    "to_month": to_raw,
+                    "override_amount": _optional_float(request.form.get("override_amount"), 0.0),
+                    "reason": request.form.get("reason", "").strip(),
+                })
             return redirect(url_for("accounts.account_detail", account_id=account_id))
 
         if form_name == "delete_override":
@@ -438,10 +441,12 @@ def account_add_holding(account_id):
     units = _optional_float(request.form.get("units"), None)
 
     if not ticker or not units or units <= 0:
+        flash("Please enter a valid ticker and number of units.", "error")
         return redirect(url_for("accounts.account_detail", account_id=account_id))
 
     price_data = fetch_price(ticker)
     if not price_data:
+        flash(f"Couldn't fetch a price for '{ticker}'. Check the ticker and try again.", "error")
         return redirect(url_for("accounts.account_detail", account_id=account_id))
 
     price_raw = price_data["price"]
@@ -511,6 +516,7 @@ def account_add_holding_manual(account_id):
     price = _optional_float(request.form.get("price"), None)
 
     if not name or not units or not price or units <= 0 or price <= 0:
+        flash("Please fill in the holding name, units, and price.", "error")
         return redirect(url_for("accounts.account_detail", account_id=account_id))
 
     catalogue_id = add_holding_catalogue_item({
