@@ -329,7 +329,8 @@
       var useRate = rateChanged ? (globalPct / 100) : acctRate;
 
       var proj = projectAccount(current, monthly, useRate, retAge, isLISA);
-      var plan = projectAccount(current, planEffective, useRate, retAge, isLISA);
+      // plan = baseline: original contributions + original rate + original retirement age
+      var plan = projectAccount(current, planEffective, acctRate, BASE_RETIREMENT_AGE, isLISA);
 
       scenarioTotal += proj;
       planTotal     += plan;

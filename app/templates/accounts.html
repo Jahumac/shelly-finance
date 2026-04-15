@@ -333,6 +333,17 @@
           <span>Valuation</span>
           <strong>{{ 'From holdings' if selected.valuation_mode == 'holdings' else 'Manual' }}</strong>
         </div>
+        {% if selected.cash_interest_rate and selected.cash_interest_rate > 0 %}
+        {% set _bal = effective_values[selected.id] or 0 %}
+        <div class="acct-detail-stat">
+          <span>Est. daily accrual</span>
+          <strong class="text-gain">£{{ '{:.2f}'.format(_bal * selected.cash_interest_rate / 365) }}</strong>
+        </div>
+        <div class="acct-detail-stat">
+          <span>Est. monthly interest</span>
+          <strong class="text-gain">£{{ '{:,.2f}'.format(_bal * selected.cash_interest_rate / 12) }}</strong>
+        </div>
+        {% endif %}
         {% if selected.goal_value %}
         <div class="acct-detail-stat">
           <span>Account goal</span>
@@ -542,6 +553,13 @@
         </div>
 
         {% if account_monthly_labels and account_monthly_labels | length >= 2 %}
+        <div class="chart-range-pills">
+          <button class="chart-range-pill" data-range="3">3M</button>
+          <button class="chart-range-pill" data-range="6">6M</button>
+          <button class="chart-range-pill chart-range-pill-active" data-range="12">1Y</button>
+          <button class="chart-range-pill" data-range="24">2Y</button>
+          <button class="chart-range-pill" data-range="0">All</button>
+        </div>
         <div class="chart-wrap chart-wrap-sm">
           <canvas id="acctMonthlyChart" role="img" aria-label="Monthly account value chart" data-labels='{{ account_monthly_labels | tojson | safe }}' data-values='{{ account_monthly_values | tojson | safe }}'></canvas>
         </div>
@@ -552,10 +570,21 @@
           try {
             var canvas = document.getElementById('acctMonthlyChart');
             if (!canvas) return;
-            var labels = JSON.parse(canvas.dataset.labels || '[]');
-            var values = JSON.parse(canvas.dataset.values || '[]');
+            var allLabels = JSON.parse(canvas.dataset.labels || '[]');
+            var allValues = JSON.parse(canvas.dataset.values || '[]');
             var ctx = canvas.getContext('2d');
             var c = ChartHelpers.colors();
+            var chartInstance = null;
+
+            function sliceData(range) {
+              if (!range || range <= 0 || range >= allLabels.length) {
+                return { labels: allLabels, values: allValues };
+              }
+              return {
+                labels: allLabels.slice(-range),
+                values: allValues.slice(-range),
+              };
+            }
 
             function drawFallback(canvasCtx, values) {
               var rect = canvas.getBoundingClientRect();
@@ -569,15 +598,11 @@
               canvasCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
               canvasCtx.clearRect(0, 0, w, h);
 
-              var padL = 44;
-              var padR = 12;
-              var padT = 10;
-              var padB = 22;
+              var padL = 44, padR = 12, padT = 10, padB = 22;
               var innerW = Math.max(1, w - padL - padR);
               var innerH = Math.max(1, h - padT - padB);
 
-              var minV = Infinity;
-              var maxV = -Infinity;
+              var minV = Infinity, maxV = -Infinity;
               for (var i = 0; i < values.length; i++) {
                 var v = Number(values[i]);
                 if (!isFinite(v)) continue;
@@ -585,27 +610,22 @@
                 if (v > maxV) maxV = v;
               }
               if (!isFinite(minV) || !isFinite(maxV)) return;
-              if (minV === maxV) {
-                minV = minV * 0.999;
-                maxV = maxV * 1.001;
-              }
+              if (minV === maxV) { minV = minV * 0.999; maxV = maxV * 1.001; }
 
               function xFor(idx) {
-                if (values.length <= 1) return padL + innerW / 2;
-                return padL + (idx / (values.length - 1)) * innerW;
+                return values.length <= 1 ? padL + innerW / 2 : padL + (idx / (values.length - 1)) * innerW;
               }
               function yFor(val) {
-                var t = (val - minV) / (maxV - minV);
-                return padT + (1 - t) * innerH;
+                return padT + (1 - (val - minV) / (maxV - minV)) * innerH;
               }
 
               canvasCtx.strokeStyle = c.grid;
               canvasCtx.lineWidth = 1;
               canvasCtx.beginPath();
               for (var g = 0; g <= 4; g++) {
-                var y = padT + (g / 4) * innerH;
-                canvasCtx.moveTo(padL, y);
-                canvasCtx.lineTo(padL + innerW, y);
+                var gy = padT + (g / 4) * innerH;
+                canvasCtx.moveTo(padL, gy);
+                canvasCtx.lineTo(padL + innerW, gy);
               }
               canvasCtx.stroke();
 
@@ -613,39 +633,54 @@
               for (var p = 0; p < values.length; p++) {
                 var pv = Number(values[p]);
                 if (!isFinite(pv)) continue;
-                var x = xFor(p);
-                var y = yFor(pv);
-                if (p === 0) canvasCtx.moveTo(x, y);
-                else canvasCtx.lineTo(x, y);
+                var px = xFor(p), py = yFor(pv);
+                if (p === 0) canvasCtx.moveTo(px, py);
+                else canvasCtx.lineTo(px, py);
               }
               canvasCtx.lineWidth = 2;
               canvasCtx.strokeStyle = c.primary;
               canvasCtx.stroke();
             }
 
-            if (typeof window.Chart === 'function') {
-              new Chart(ctx, {
-                type: 'line',
-                data: {
-                  labels: labels,
-                  datasets: [ChartHelpers.lineDataset({
-                    values: values,
-                    color: c.primary,
-                    fillAlphaHex: '22',
-                  })]
-                },
-                options: ChartHelpers.lineOptions()
-              });
-            } else {
-              drawFallback(ctx, values);
+            function renderChart(range) {
+              var d = sliceData(range);
+              if (typeof window.Chart === 'function') {
+                if (chartInstance) {
+                  chartInstance.data.labels = d.labels;
+                  chartInstance.data.datasets[0].data = d.values;
+                  chartInstance.update();
+                } else {
+                  chartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                      labels: d.labels,
+                      datasets: [ChartHelpers.lineDataset({ values: d.values, color: c.primary, fillAlphaHex: '22' })]
+                    },
+                    options: ChartHelpers.lineOptions()
+                  });
+                }
+              } else {
+                drawFallback(ctx, d.values);
+              }
             }
+
+            // Initial render — default to 1Y (12 months)
+            renderChart(12);
+
+            // Wire up range pills
+            var pills = document.querySelectorAll('.chart-range-pill');
+            pills.forEach(function(pill) {
+              pill.addEventListener('click', function() {
+                pills.forEach(function(p) { p.classList.remove('chart-range-pill-active'); });
+                pill.classList.add('chart-range-pill-active');
+                renderChart(parseInt(pill.dataset.range) || 0);
+              });
+            });
+
           } catch (err) {
             var msg = (err && err.message) ? err.message : String(err);
             var el = document.getElementById('acct-chart-error');
-            if (el) {
-              el.style.display = 'block';
-              el.textContent = 'Account chart failed to render: ' + msg;
-            }
+            if (el) { el.style.display = 'block'; el.textContent = 'Account chart failed to render: ' + msg; }
           }
         })();
         </script>
