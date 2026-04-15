@@ -451,7 +451,7 @@ def projected_accounts(accounts, assumptions):
     return rows
 
 
-def compute_performance_series(monthly_data, assumed_rate, assumed_monthly):
+def compute_performance_series(monthly_data, assumed_rate, assumed_monthly, benchmark_rate=None):
     """Compute actual vs projected performance from monthly snapshot data.
 
     Args:
@@ -536,7 +536,10 @@ def compute_performance_series(monthly_data, assumed_rate, assumed_monthly):
         "labels":            display_labels,
         "actual_values":     [round(b, 0) for b in balances],
         "projected_values":  projected_values,
-        "benchmark_values":  None,       # slot for future benchmark data
+        "benchmark_values":  [
+            round(future_value(start_balance, assumed_monthly, benchmark_rate, i / 12.0), 0)
+            for i in range(len(monthly_data))
+        ] if benchmark_rate is not None else None,
         "monthly_returns":   monthly_returns,
         "table_rows":        rows,
         "n_months":          n,

@@ -4667,3 +4667,38 @@ a.link-accent:hover {
 .contrib-tick      { color: #22c55e; margin-left: 4px; font-size: 0.75rem; }
 .contrib-totals td { border-top: 1px solid var(--border); padding-top: 0.75rem; }
 .mt-1 { margin-top: 1rem; }
+
+/* ── Asset allocation chart ─────────────────────────────────────────────── */
+.allocation-wrap {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.allocation-chart-wrap {
+  width: 160px;
+  height: 160px;
+  flex-shrink: 0;
+}
+.allocation-legend {
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.allocation-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+.allocation-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.allocation-label { flex: 1; }
+.allocation-value { font-weight: 600; white-space: nowrap; }
+.allocation-pct   { min-width: 3.5rem; text-align: right; }

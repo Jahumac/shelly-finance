@@ -598,6 +598,11 @@ def _run_migrations(conn):
             conn.execute(f"ALTER TABLE assumptions ADD COLUMN {col}")
         except Exception:
             pass
+    try:
+        conn.execute("ALTER TABLE assumptions ADD COLUMN benchmark_rate REAL DEFAULT NULL")
+    except Exception:
+        pass
+
     # ── Custom tags per user ─────────────────────────────────────────────
     conn.execute("""
         CREATE TABLE IF NOT EXISTS custom_tags (

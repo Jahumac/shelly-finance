@@ -81,7 +81,7 @@
     <div class="perf-legend">
       <span class="perf-legend-dot" style="background:var(--accent-2)"></span><span>Actual</span>
       <span class="perf-legend-dot" style="background:var(--muted);opacity:0.6"></span><span>Plan</span>
-      {% if perf.benchmark_values %}<span class="perf-legend-dot" style="background:var(--accent)"></span><span>Benchmark</span>{% endif %}
+      {% if perf.benchmark_values %}<span class="perf-legend-dot" style="background:var(--accent)"></span><span>Benchmark ({{ benchmark_rate_pct }}%)</span>{% endif %}
     </div>
   </div>
   <canvas id="perfChart" height="90" role="img" aria-label="Portfolio performance chart showing actual vs plan"></canvas>
@@ -115,6 +115,39 @@
         <td class="num {% if row.return_pct >= 0 %}perf-positive{% else %}perf-negative{% endif %}">
           {{ '{:+.2f}'.format(row.return_pct) }}%
         </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{# ── Account-level performance ─────────────────────────────────────── #}
+{% if account_perf %}
+<div class="panel" style="overflow-x:auto;">
+  <h3 class="section-title">By Account</h3>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Account</th>
+        <th class="num">Current Value</th>
+        <th class="num">Total Return</th>
+        <th class="num">Annualised</th>
+        <th class="num">Months</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ap in account_perf %}
+      <tr>
+        <td>{{ ap.account_name }}</td>
+        <td class="num">£{{ '{:,.0f}'.format(ap.current_value) }}</td>
+        <td class="num {% if ap.total_return >= 0 %}perf-positive{% else %}perf-negative{% endif %}">
+          {{ '{:+.1f}'.format(ap.total_return) }}%
+        </td>
+        <td class="num {% if ap.annualised_return is not none %}{% if ap.annualised_return >= assumed_rate_pct %}perf-positive{% else %}perf-negative{% endif %}{% endif %}">
+          {% if ap.annualised_return is not none %}{{ '{:+.1f}'.format(ap.annualised_return) }}%{% else %}<span class="text-muted">—</span>{% endif %}
+        </td>
+        <td class="num text-muted">{{ ap.n_months }}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -158,7 +191,7 @@
 
   if (bench.length) {
     datasets.push({
-      label: 'Benchmark',
+      label: 'Benchmark (' + {{ benchmark_rate_pct or '' }} + '%)',
       data: bench,
       borderColor: c.accent,
       backgroundColor: 'transparent',

@@ -4,7 +4,7 @@ from flask import Blueprint, render_template
 from flask_login import current_user, login_required
 
 from app.calculations import compute_performance_series, to_float, uk_tax_year_start, uk_tax_year_end, uk_tax_year_label
-from app.models import fetch_all_accounts, fetch_assumptions, fetch_monthly_performance_data, fetch_tax_year_contributions
+from app.models import fetch_all_accounts, fetch_assumptions, fetch_monthly_performance_data, fetch_monthly_performance_data_by_account, fetch_tax_year_contributions
 
 performance_bp = Blueprint("performance", __name__)
 
@@ -19,13 +19,38 @@ def performance():
 
     assumed_rate    = to_float(assumptions["annual_growth_rate"]) if assumptions else 0.07
     assumed_monthly = sum(to_float(a["monthly_contribution"]) for a in accounts)
+    benchmark_rate  = to_float(assumptions["benchmark_rate"]) if assumptions and assumptions["benchmark_rate"] is not None else None
 
-    perf = compute_performance_series(monthly_data, assumed_rate, assumed_monthly)
+    perf = compute_performance_series(monthly_data, assumed_rate, assumed_monthly, benchmark_rate=benchmark_rate)
+
+    benchmark_rate_pct = round(benchmark_rate * 100, 1) if benchmark_rate is not None else None
+
+    # Per-account performance
+    by_account_raw = fetch_monthly_performance_data_by_account(uid)
+    account_perf = []
+    for aid, info in by_account_raw.items():
+        rows = info["rows"]
+        if len(rows) < 2:
+            continue
+        acct_data = [(mk, bal, contrib) for mk, bal, contrib in rows]
+        ap = compute_performance_series(acct_data, assumed_rate, 0, benchmark_rate=None)
+        if ap:
+            account_perf.append({
+                "account_id":  aid,
+                "account_name": info["account_name"],
+                "total_return": ap["total_return"],
+                "annualised_return": ap["annualised_return"],
+                "current_value": ap["current_value"],
+                "n_months": ap["n_months"],
+            })
+    account_perf.sort(key=lambda x: (x["annualised_return"] is None, -(x["annualised_return"] or 0)))
 
     return render_template(
         "performance.html",
         perf=perf,
         assumed_rate_pct=round(assumed_rate * 100, 1),
+        benchmark_rate_pct=benchmark_rate_pct,
+        account_perf=account_perf,
         active_page="performance",
     )
 

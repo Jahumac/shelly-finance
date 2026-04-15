@@ -46,6 +46,7 @@ def update_assumptions(payload, user_id):
                 auto_update_prices = ?,
                 update_time_morning = ?,
                 update_time_evening = ?,
+                benchmark_rate = ?,
                 updated_at = ?
             WHERE user_id = ?
             """,
@@ -72,6 +73,7 @@ def update_assumptions(payload, user_id):
                 payload.get("auto_update_prices", 1),
                 payload.get("update_time_morning", "08:30"),
                 payload.get("update_time_evening", "18:00"),
+                payload.get("benchmark_rate"),
                 payload["updated_at"],
                 user_id,
             ),

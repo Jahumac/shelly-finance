@@ -29,6 +29,7 @@ from app.models import (
     fetch_all_active_overrides,
     fetch_all_goals,
     fetch_all_holdings,
+    fetch_all_holdings_grouped,
     fetch_assumptions,
     fetch_holding_totals_by_account,
     fetch_isa_contributions,
@@ -364,6 +365,21 @@ def overview():
                     "cta_href": None,
                 })
 
+    # ── Asset allocation by bucket ────────────────────────────────────────────
+    all_holdings_grouped = fetch_all_holdings_grouped(uid)
+    bucket_totals: dict = {}
+    for h in all_holdings_grouped:
+        bucket = (h["bucket"] or "Other").strip() or "Other"
+        val = float(h["value"] or 0)
+        bucket_totals[bucket] = bucket_totals.get(bucket, 0) + val
+    # Sort by value descending, filter out zero buckets
+    allocation = sorted(
+        [(b, v) for b, v in bucket_totals.items() if v > 0],
+        key=lambda x: -x[1],
+    )
+    allocation_labels = [a[0] for a in allocation]
+    allocation_values = [round(a[1], 2) for a in allocation]
+
     return render_template(
         "overview.html",
         metrics=metrics,
@@ -381,5 +397,7 @@ def overview():
         review_nudge=review_nudge,
         review_ready=review_ready,
         alerts=alerts,
+        allocation_labels=allocation_labels,
+        allocation_values=allocation_values,
         active_page="overview",
     )
