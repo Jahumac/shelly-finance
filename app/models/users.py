@@ -55,7 +55,7 @@ def create_user(username, password, is_admin=False):
 
 def count_users():
     with get_connection() as conn:
-        return conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        return conn.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"]
 
 
 def fetch_all_users():
@@ -81,8 +81,8 @@ def update_user(user_id, username=None, password=None, is_admin=None):
         # Safety: can't remove admin from the last admin
         if is_admin is False and target["is_admin"]:
             admin_count = conn.execute(
-                "SELECT COUNT(*) FROM users WHERE is_admin = 1"
-            ).fetchone()[0]
+                "SELECT COUNT(*) AS n FROM users WHERE is_admin = 1"
+            ).fetchone()["n"]
             if admin_count <= 1:
                 return False, "Cannot remove admin rights from the only admin account."
         # Build update
@@ -102,8 +102,8 @@ def delete_user(user_id):
     with get_connection() as conn:
         # Safety: must not be the last admin
         admin_count = conn.execute(
-            "SELECT COUNT(*) FROM users WHERE is_admin = 1"
-        ).fetchone()[0]
+            "SELECT COUNT(*) AS n FROM users WHERE is_admin = 1"
+        ).fetchone()["n"]
         target = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
         if target is None:
             return False, "User not found."
