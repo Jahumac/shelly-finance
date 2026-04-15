@@ -137,6 +137,10 @@ def monthly_review():
                 balance = effective_account_value(acc, holdings_totals)
                 upsert_monthly_snapshot(acc["id"], month_key, balance)
             update_monthly_review(review["id"], "complete", request.form.get("notes", ""), uid)
+        elif form_name == "reopen":
+            review = fetch_monthly_review(month_key, uid)
+            if review:
+                update_monthly_review(review["id"], "not_started", review.get("notes") or "", uid)
         return redirect(url_for("monthly_review.monthly_review", month=month_key))
 
     review = fetch_or_create_monthly_review(month_key, uid)

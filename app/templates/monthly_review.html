@@ -40,6 +40,16 @@
   <div class="review-actions-strip">
     {% if review.status == 'complete' %}
       <span class="badge badge-complete">✓ Completed</span>
+      <form method="post" class="form-reset" style="display:inline;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="form_name" value="reopen">
+        <input type="hidden" name="month" value="{{ month_key }}">
+        <button type="submit" class="badge badge-meta"
+                data-confirm="Reopen {{ month_label }}?"
+                data-confirm-title="Reopen review?"
+                data-confirm-ok="Yes, reopen it"
+                data-confirm-cancel="Keep it complete">Reopen</button>
+      </form>
     {% else %}
       <form method="post" class="form-reset" id="mark-complete-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
