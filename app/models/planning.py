@@ -819,6 +819,19 @@ def create_contribution_override(payload):
         return cursor.lastrowid
 
 
+def remove_contribution_override_for_month(account_id, month_key, user_id):
+    """Delete a single-month skip override (from_month == to_month == month_key)
+    scoped to user_id so cross-user deletes are impossible."""
+    with get_connection() as conn:
+        conn.execute(
+            """DELETE FROM contribution_overrides
+               WHERE account_id = ? AND from_month = ? AND to_month = ?
+               AND account_id IN (SELECT id FROM accounts WHERE user_id = ?)""",
+            (account_id, month_key, month_key, user_id),
+        )
+        conn.commit()
+
+
 def delete_contribution_override(override_id, user_id=None):
     with get_connection() as conn:
         if user_id is not None:

@@ -4515,6 +4515,20 @@ a.link-accent:hover {
 .contribution-amount {
   white-space: nowrap;
 }
+.contribution-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+.contribution-skipped {
+  opacity: 0.5;
+  background: rgba(100, 116, 139, 0.08);
+  border-color: rgba(100, 116, 139, 0.2);
+}
+.contribution-check-disabled {
+  pointer-events: none;
+}
 .stat-row {
   display: flex;
   justify-content: space-between;

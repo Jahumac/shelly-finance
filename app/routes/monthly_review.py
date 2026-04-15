@@ -10,9 +10,11 @@ from app.calculations import (
     total_invested,
 )
 from app.models import (
+    create_contribution_override,
     ensure_monthly_review_items,
     fetch_account,
     fetch_all_accounts,
+    fetch_all_active_overrides,
     fetch_all_holdings,
     fetch_all_holdings_grouped,
     fetch_assumptions,
@@ -23,6 +25,7 @@ from app.models import (
     fetch_or_create_monthly_review,
     fetch_primary_goal,
     mark_review_item_updated,
+    remove_contribution_override_for_month,
     set_contribution_confirmed,
     update_account,
     update_holding,
@@ -145,6 +148,7 @@ def monthly_review():
     assumptions = fetch_assumptions(uid)
 
     # Calculate the smart review-ready date for this month
+    import calendar as _cal
     try:
         salary_day = int(assumptions["salary_day"]) if assumptions and assumptions["salary_day"] else 0
     except (KeyError, TypeError):
@@ -152,11 +156,26 @@ def monthly_review():
     mk_year, mk_month = [int(x) for x in month_key.split("-")]
     ready_date = calc_review_ready_date(mk_year, mk_month, salary_day) if salary_day else None
 
-    # Progress tracking stats
+    # Salary date for this review (day salary_day of this review's month)
+    salary_date = None
+    if salary_day:
+        max_day = _cal.monthrange(mk_year, mk_month)[1]
+        salary_date = date(mk_year, mk_month, min(salary_day, max_day))
+
+    # Active overrides for this month (account_id → override row)
+    active_overrides = fetch_all_active_overrides(month_key, uid)
+    skipped_account_ids = {
+        aid for aid, ov in active_overrides.items()
+        if float(ov.get("override_amount") or 0) == 0
+    }
+
+    # Progress tracking stats — skipped contributions don't count as unconfirmed
     accounts_updated = sum(1 for item in items if item.get("holdings_updated") or item.get("balance_updated"))
     unconfirmed_count = sum(
         1 for item in contribution_items
-        if not item.get("contribution_confirmed") and (item.get("expected_contribution") or 0) > 0
+        if not item.get("contribution_confirmed")
+        and (item.get("expected_contribution") or 0) > 0
+        and item["account_id"] not in skipped_account_ids
     )
 
     # Goal progress
@@ -202,6 +221,8 @@ def monthly_review():
         holdings_by_account=holdings_by_account,
         assumptions=assumptions,
         review_ready_date=ready_date,
+        salary_date=salary_date,
+        skipped_account_ids=skipped_account_ids,
         accounts_updated=accounts_updated,
         total_accounts=len(items),
         unconfirmed_count=unconfirmed_count,
@@ -230,6 +251,47 @@ def api_confirm_contribution():
     # Verify ownership via the review
     review = fetch_or_create_monthly_review(month_key, uid)
     set_contribution_confirmed(item_id, review["id"], confirmed)
+    return jsonify({"ok": True})
+
+
+@monthly_review_bp.route("/api/skip-contribution", methods=["POST"])
+@login_required
+def api_skip_contribution():
+    """Skip a contribution for this month only — creates a zero-amount override."""
+    uid = current_user.id
+    data = request.get_json(silent=True) or {}
+    account_id = data.get("account_id")
+    month_key = data.get("month_key") or default_month_key()
+    reason = (data.get("reason") or "Skipped").strip() or "Skipped"
+
+    if not account_id:
+        return jsonify({"ok": False, "error": "account_id required"}), 400
+    if not fetch_account(account_id, uid):
+        return jsonify({"ok": False, "error": "Account not found"}), 404
+
+    create_contribution_override({
+        "account_id": account_id,
+        "from_month": month_key,
+        "to_month": month_key,
+        "override_amount": 0,
+        "reason": reason,
+    })
+    return jsonify({"ok": True})
+
+
+@monthly_review_bp.route("/api/restore-contribution", methods=["POST"])
+@login_required
+def api_restore_contribution():
+    """Remove a single-month skip override, restoring the expected contribution."""
+    uid = current_user.id
+    data = request.get_json(silent=True) or {}
+    account_id = data.get("account_id")
+    month_key = data.get("month_key") or default_month_key()
+
+    if not account_id:
+        return jsonify({"ok": False, "error": "account_id required"}), 400
+
+    remove_contribution_override_for_month(account_id, month_key, uid)
     return jsonify({"ok": True})
 
 

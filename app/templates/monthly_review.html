@@ -26,6 +26,12 @@
       <p class="eyebrow">Monthly Update</p>
       <h2 class="hero-value">{{ month_label }}</h2>
       <p class="hero-subtitle">Shelly's monthly check-in — update your numbers and lock in the snapshot</p>
+      {% if salary_date %}
+      <p class="hero-subtitle" style="margin-top:0.25rem; opacity:0.75; font-size:0.85rem;">
+        Based on your salary around <strong>{{ salary_date.strftime('%-d %B') }}</strong>
+        {% if review_ready_date %} · settled from <strong>{{ review_ready_date.strftime('%-d %B') }}</strong>{% endif %}
+      </p>
+      {% endif %}
     </div>
     <div class="hero-turtle-wrap">
       <img src="{{ url_for('static', filename='icons/shelly/Budget.png') }}" alt="" class="hero-turtle">
@@ -88,8 +94,16 @@
         <div class="guide-step-num">1</div>
         <div>
           <strong>Wait for investments to settle</strong>
-          <p>After your contributions go in{% if assumptions and assumptions.salary_day %} (around the {{ assumptions.salary_day }}{{ 'st' if assumptions.salary_day in [1,21,31] else ('nd' if assumptions.salary_day in [2,22] else ('rd' if assumptions.salary_day in [3,23] else 'th')) }}){% endif %}, Shelly allows a couple of business days for settlement.
-          {% if review_ready_date %} <strong>This month you're good to update from {{ review_ready_date.strftime('%-d %B') }}.</strong>{% endif %}</p>
+          <p>
+            {% if salary_date %}
+              This review covers your salary around <strong>{{ salary_date.strftime('%-d %B') }}</strong>.
+              Shelly allows 2 business days for investments to settle.
+              {% if review_ready_date %}<strong>You're good to update from {{ review_ready_date.strftime('%-d %B') }}.</strong>{% endif %}
+            {% else %}
+              After your contributions go in, Shelly allows a couple of business days for settlement.
+              {% if review_ready_date %}<strong>You're good to update from {{ review_ready_date.strftime('%-d %B') }}.</strong>{% endif %}
+            {% endif %}
+          </p>
         </div>
       </div>
       <div class="guide-step">
@@ -131,20 +145,31 @@
     </div>
   </div>
   {% if contribution_items %}
-    <p class="helper-text mb-075">Tick each one off once you've seen it land in your account.</p>
+    <p class="helper-text mb-075">Tick each one off once you've seen it land in your account. Use <strong>Skip</strong> if you're not investing this month.</p>
     <div class="simple-list" id="contribution-checklist">
       {% for item in contribution_items %}
-        <div class="simple-list-item contribution-check-row {% if item.contribution_confirmed %}contribution-confirmed{% endif %}"
-             data-item-id="{{ item.id }}">
-          <label class="contribution-check-label">
+        {% set is_skipped = item.account_id in skipped_account_ids %}
+        <div class="simple-list-item contribution-check-row {% if item.contribution_confirmed %}contribution-confirmed{% endif %} {% if is_skipped %}contribution-skipped{% endif %}"
+             data-item-id="{{ item.id }}"
+             data-account-id="{{ item.account_id }}">
+          <label class="contribution-check-label {% if is_skipped %}contribution-check-disabled{% endif %}">
             <input type="checkbox" class="contribution-cb"
-                   {% if item.contribution_confirmed %}checked{% endif %}>
+                   {% if item.contribution_confirmed %}checked{% endif %}
+                   {% if is_skipped %}disabled{% endif %}>
             <div>
               <strong>{{ item.account_name }}</strong>
               <p>{{ item.provider }} · {{ item.wrapper_type }}</p>
             </div>
           </label>
-          <strong class="contribution-amount">£{{ '{:,.2f}'.format(item.expected_contribution) }}</strong>
+          <div class="contribution-actions">
+            {% if is_skipped %}
+              <span class="badge" style="opacity:0.6;">Skipped</span>
+              <button type="button" class="badge badge-meta contribution-restore-btn" title="Restore this contribution">Restore</button>
+            {% else %}
+              <strong class="contribution-amount">£{{ '{:,.2f}'.format(item.expected_contribution) }}</strong>
+              <button type="button" class="badge badge-meta contribution-skip-btn" title="Skip this contribution for this month">Skip</button>
+            {% endif %}
+          </div>
         </div>
       {% endfor %}
     </div>
@@ -154,24 +179,58 @@
 </section>
 
 <script>
-/* ── Contribution confirmation checkboxes ──────────────────────────── */
+/* ── Contribution confirmation + skip/restore ──────────────────────── */
 (function() {
   var MONTH_KEY = '{{ month_key }}';
   var CSRF = '{{ csrf_token() }}';
+
+  function apiPost(url, body) {
+    return fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+      body: JSON.stringify(body),
+    });
+  }
+
+  /* Confirm checkboxes */
   document.querySelectorAll('.contribution-cb').forEach(function(cb) {
     cb.addEventListener('change', function() {
       var row = cb.closest('.contribution-check-row');
       var itemId = parseInt(row.dataset.itemId);
       var confirmed = cb.checked;
       row.classList.toggle('contribution-confirmed', confirmed);
-      fetch('/monthly-review/api/confirm-contribution', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
-        body: JSON.stringify({item_id: itemId, confirmed: confirmed, month_key: MONTH_KEY}),
-      }).catch(function() {
-        cb.checked = !confirmed;
-        row.classList.toggle('contribution-confirmed', !confirmed);
-      });
+      apiPost('/monthly-review/api/confirm-contribution',
+        {item_id: itemId, confirmed: confirmed, month_key: MONTH_KEY})
+        .catch(function() {
+          cb.checked = !confirmed;
+          row.classList.toggle('contribution-confirmed', !confirmed);
+        });
+    });
+  });
+
+  /* Skip buttons */
+  document.querySelectorAll('.contribution-skip-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var row = btn.closest('.contribution-check-row');
+      var accountId = parseInt(row.dataset.accountId);
+      btn.disabled = true; btn.textContent = '…';
+      apiPost('/monthly-review/api/skip-contribution',
+        {account_id: accountId, month_key: MONTH_KEY, reason: 'Skipped'})
+        .then(function(r) { if (r.ok) location.reload(); })
+        .catch(function() { btn.disabled = false; btn.textContent = 'Skip'; });
+    });
+  });
+
+  /* Restore buttons */
+  document.querySelectorAll('.contribution-restore-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var row = btn.closest('.contribution-check-row');
+      var accountId = parseInt(row.dataset.accountId);
+      btn.disabled = true; btn.textContent = '…';
+      apiPost('/monthly-review/api/restore-contribution',
+        {account_id: accountId, month_key: MONTH_KEY})
+        .then(function(r) { if (r.ok) location.reload(); })
+        .catch(function() { btn.disabled = false; btn.textContent = 'Restore'; });
     });
   });
 }());

@@ -254,10 +254,18 @@ def overview():
     # Unconfirmed contributions: review is complete but some contributions weren't ticked off
     current_review = fetch_monthly_review(current_month_key, uid)
     if current_review and current_review["status"] == "complete":
+        from app.models import fetch_all_active_overrides
         review_items = fetch_monthly_review_items(current_review["id"])
+        active_overrides = fetch_all_active_overrides(current_month_key, uid)
+        skipped_ids = {
+            aid for aid, ov in active_overrides.items()
+            if float(ov.get("override_amount") or 0) == 0
+        }
         unconfirmed = [
             item for item in review_items
-            if (item.get("expected_contribution") or 0) > 0 and not item.get("contribution_confirmed")
+            if (item.get("expected_contribution") or 0) > 0
+            and not item.get("contribution_confirmed")
+            and item["account_id"] not in skipped_ids
         ]
         if unconfirmed:
             names = ", ".join(item["account_name"] for item in unconfirmed[:3])
