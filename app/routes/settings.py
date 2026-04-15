@@ -72,7 +72,7 @@ def settings():
             "auto_update_prices": 1 if request.form.get("auto_update_prices") else 0,
             "update_time_morning": request.form.get("update_time_morning", "08:30").strip() or "08:30",
             "update_time_evening": request.form.get("update_time_evening", "18:00").strip() or "18:00",
-            "updated_at": datetime.now().isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         update_assumptions(payload, uid)
 

@@ -83,7 +83,7 @@ def _account_payload_from_form(form):
         "growth_rate_override": _optional_float(form.get("growth_rate_override"), None, divide_by_100=True),
         "owner": form.get("owner", ""),
         "notes": form.get("notes", ""),
-        "last_updated": datetime.now().isoformat(),
+        "last_updated": datetime.now(timezone.utc).isoformat(),
         "employer_contribution": _optional_float(form.get("employer_contribution"), 0.0),
         "contribution_method": form.get("contribution_method", "standard"),
         "annual_fee_pct": _optional_float(form.get("annual_fee_pct"), 0.0),
@@ -212,30 +212,7 @@ def accounts():
         new_id = create_account(payload, uid)
         return redirect(url_for("accounts.accounts"))
 
-    rows = fetch_all_accounts(uid)
-    assumptions = fetch_assumptions(uid)
-    holdings_totals = fetch_holding_totals_by_account(uid)
-    effective_values = {row["id"]: effective_account_value(row, holdings_totals) for row in rows}
-    contrib_breakdowns = {row["id"]: contribution_breakdown(row, assumptions) for row in rows}
-    return render_template(
-        "accounts.html",
-        accounts=rows,
-        selected=None,
-        detail_mode="list",
-        holdings_totals=holdings_totals,
-        effective_values=effective_values,
-        total_value=sum(effective_values.values()),
-        total_monthly=sum(float(r["monthly_contribution"] or 0) for r in rows),
-        contrib_breakdowns=contrib_breakdowns,
-        active_page="accounts",
-        wrapper_type_options=WRAPPER_TYPE_OPTIONS,
-        category_options=CATEGORY_OPTIONS,
-        tag_options=fetch_user_tags(uid),
-        custom_tags=fetch_custom_tags(uid),
-        default_tags=DEFAULT_TAG_OPTIONS,
-        selected_tags=[],
-        tax_band=assumptions["tax_band"] if assumptions and "tax_band" in assumptions.keys() else "basic",
-    )
+    return _render_accounts_page(uid, detail_mode="list")
 
 
 @accounts_bp.route("/api/tags", methods=["POST"])
@@ -533,7 +510,7 @@ def account_add_holding(account_id):
 
     if account["valuation_mode"] != "holdings":
         update_account({**dict(account), "valuation_mode": "holdings",
-                        "last_updated": datetime.now().isoformat()}, uid)
+                        "last_updated": datetime.now(timezone.utc).isoformat()}, uid)
 
     return redirect(url_for("accounts.account_detail", account_id=account_id))
 
@@ -588,7 +565,7 @@ def account_add_holding_manual(account_id):
 
     if account["valuation_mode"] != "holdings":
         update_account({**dict(account), "valuation_mode": "holdings",
-                        "last_updated": datetime.now().isoformat()}, uid)
+                        "last_updated": datetime.now(timezone.utc).isoformat()}, uid)
 
     return redirect(url_for("accounts.account_detail", account_id=account_id))
 

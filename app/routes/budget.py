@@ -53,7 +53,8 @@ def _build_monthly_data(month_key, user_id):
     prior_entries = fetch_prior_month_budget_entries(month_key, user_id)
     prior_entry_map = {e["budget_item_id"]: e for e in prior_entries}
 
-    income_key = db_sections[0]["key"] if db_sections else "income"
+    _income_sec = next((s for s in db_sections if "income" in s["key"].lower()), None)
+    income_key = _income_sec["key"] if _income_sec else (db_sections[0]["key"] if db_sections else "income")
 
     sections = []
     section_totals = {}
@@ -139,7 +140,8 @@ def budget():
 
     sections, summary = _build_monthly_data(month_key, uid)
     db_sections = fetch_budget_sections(uid)
-    income_key = db_sections[0]["key"] if db_sections else "income"
+    _income_sec = next((s for s in db_sections if "income" in s["key"].lower()), None)
+    income_key = _income_sec["key"] if _income_sec else (db_sections[0]["key"] if db_sections else "income")
 
     # ── 12-month strip: build tax-year range (Apr → Mar) ─────────────────
     saved_months = fetch_months_with_budget_entries(uid)

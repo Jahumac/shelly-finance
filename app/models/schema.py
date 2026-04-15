@@ -267,11 +267,14 @@ CREATE TABLE IF NOT EXISTS account_daily_snapshots (
 """
 
 
-def init_db():
-    with get_connection() as conn:
-        conn.executescript(SCHEMA)
+def _run_migrations(conn):
+    """All incremental schema changes applied after the base SCHEMA is created.
 
-        # ── Legacy column additions (accounts) ───────────────────────────────
+    Safe to call on any DB — every statement is either idempotent or guarded
+    by a schema_migrations version check. Split out of init_db() to keep that
+    function short and easy to read.
+    """
+    # ── Legacy column additions (accounts) ───────────────────────────────
         existing_cols = {row['name'] for row in conn.execute("PRAGMA table_info(accounts)").fetchall()}
         for col_name, col_def in [
             ("goal_value", "REAL"),
@@ -629,46 +632,6 @@ def init_db():
             )
         """)
 
-        # ── Performance indexes on foreign-key and frequently-queried columns ──
-        for stmt in [
-            "CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_accounts_active ON accounts(user_id, is_active)",
-            "CREATE INDEX IF NOT EXISTS idx_goals_user_id ON goals(user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_holding_catalogue_user_id ON holding_catalogue(user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_holdings_account_id ON holdings(account_id)",
-            "CREATE INDEX IF NOT EXISTS idx_holdings_catalogue_id ON holdings(holding_catalogue_id)",
-            "CREATE INDEX IF NOT EXISTS idx_monthly_snapshots_account_id ON monthly_snapshots(account_id)",
-            "CREATE INDEX IF NOT EXISTS idx_monthly_snapshots_date ON monthly_snapshots(snapshot_date)",
-            "CREATE INDEX IF NOT EXISTS idx_monthly_snapshots_month_key ON monthly_snapshots(month_key)",
-            "CREATE INDEX IF NOT EXISTS idx_monthly_reviews_user_month ON monthly_reviews(user_id, month_key)",
-            "CREATE INDEX IF NOT EXISTS idx_monthly_review_items_review_id ON monthly_review_items(review_id)",
-            "CREATE INDEX IF NOT EXISTS idx_monthly_review_items_account_id ON monthly_review_items(account_id)",
-            "CREATE INDEX IF NOT EXISTS idx_budget_items_user_id ON budget_items(user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_budget_items_linked_account ON budget_items(linked_account_id)",
-            "CREATE INDEX IF NOT EXISTS idx_budget_entries_month ON budget_entries(month_key)",
-            "CREATE INDEX IF NOT EXISTS idx_budget_entries_item ON budget_entries(budget_item_id)",
-            "CREATE INDEX IF NOT EXISTS idx_budget_sections_user_id ON budget_sections(user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_contribution_overrides_account ON contribution_overrides(account_id)",
-            "CREATE INDEX IF NOT EXISTS idx_isa_contributions_user ON isa_contributions(user_id, contribution_date)",
-            "CREATE INDEX IF NOT EXISTS idx_isa_contributions_account ON isa_contributions(account_id)",
-            "CREATE INDEX IF NOT EXISTS idx_pension_contributions_user ON pension_contributions(user_id, contribution_date)",
-            "CREATE INDEX IF NOT EXISTS idx_pension_contributions_account ON pension_contributions(account_id)",
-            "CREATE INDEX IF NOT EXISTS idx_dividend_records_user ON dividend_records(user_id, dividend_date)",
-            "CREATE INDEX IF NOT EXISTS idx_dividend_records_account ON dividend_records(account_id)",
-            "CREATE INDEX IF NOT EXISTS idx_scheduler_runs_user_date ON scheduler_runs(user_id, run_date)",
-            "CREATE INDEX IF NOT EXISTS idx_portfolio_daily_user_date ON portfolio_daily_snapshots(user_id, snapshot_date)",
-            "CREATE INDEX IF NOT EXISTS idx_custom_tags_user ON custom_tags(user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_api_tokens_token ON api_tokens(token)",
-            "CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_cgt_disposals_user ON cgt_disposals(user_id, disposal_date)",
-            "CREATE INDEX IF NOT EXISTS idx_cgt_disposals_account ON cgt_disposals(account_id)",
-            "CREATE INDEX IF NOT EXISTS idx_account_daily_account_date ON account_daily_snapshots(account_id, snapshot_date)",
-        ]:
-            try:
-                conn.execute(stmt)
-            except Exception as e:
-                current_app.logger.warning(f"Index create failed ({stmt.split()[-1]}): {e}")
-
         # ── cgt_disposals: add optional account_id ───────────────────────────
         try:
             conn.execute("ALTER TABLE cgt_disposals ADD COLUMN account_id INTEGER REFERENCES accounts(id)")
@@ -690,5 +653,60 @@ def init_db():
         except Exception:
             pass
 
+
+def _ensure_indexes(conn):
+    """Create performance indexes. All statements are idempotent (IF NOT EXISTS)."""
+    for stmt in [
+        "CREATE INDEX IF NOT EXISTS idx_accounts_user_id ON accounts(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_accounts_active ON accounts(user_id, is_active)",
+        "CREATE INDEX IF NOT EXISTS idx_goals_user_id ON goals(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_holding_catalogue_user_id ON holding_catalogue(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_holdings_account_id ON holdings(account_id)",
+        "CREATE INDEX IF NOT EXISTS idx_holdings_catalogue_id ON holdings(holding_catalogue_id)",
+        "CREATE INDEX IF NOT EXISTS idx_monthly_snapshots_account_id ON monthly_snapshots(account_id)",
+        "CREATE INDEX IF NOT EXISTS idx_monthly_snapshots_date ON monthly_snapshots(snapshot_date)",
+        "CREATE INDEX IF NOT EXISTS idx_monthly_snapshots_month_key ON monthly_snapshots(month_key)",
+        "CREATE INDEX IF NOT EXISTS idx_monthly_reviews_user_month ON monthly_reviews(user_id, month_key)",
+        "CREATE INDEX IF NOT EXISTS idx_monthly_review_items_review_id ON monthly_review_items(review_id)",
+        "CREATE INDEX IF NOT EXISTS idx_monthly_review_items_account_id ON monthly_review_items(account_id)",
+        "CREATE INDEX IF NOT EXISTS idx_budget_items_user_id ON budget_items(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_budget_items_linked_account ON budget_items(linked_account_id)",
+        "CREATE INDEX IF NOT EXISTS idx_budget_entries_month ON budget_entries(month_key)",
+        "CREATE INDEX IF NOT EXISTS idx_budget_entries_item ON budget_entries(budget_item_id)",
+        "CREATE INDEX IF NOT EXISTS idx_budget_sections_user_id ON budget_sections(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_contribution_overrides_account ON contribution_overrides(account_id)",
+        "CREATE INDEX IF NOT EXISTS idx_isa_contributions_user ON isa_contributions(user_id, contribution_date)",
+        "CREATE INDEX IF NOT EXISTS idx_isa_contributions_account ON isa_contributions(account_id)",
+        "CREATE INDEX IF NOT EXISTS idx_pension_contributions_user ON pension_contributions(user_id, contribution_date)",
+        "CREATE INDEX IF NOT EXISTS idx_pension_contributions_account ON pension_contributions(account_id)",
+        "CREATE INDEX IF NOT EXISTS idx_dividend_records_user ON dividend_records(user_id, dividend_date)",
+        "CREATE INDEX IF NOT EXISTS idx_dividend_records_account ON dividend_records(account_id)",
+        "CREATE INDEX IF NOT EXISTS idx_scheduler_runs_user_date ON scheduler_runs(user_id, run_date)",
+        "CREATE INDEX IF NOT EXISTS idx_portfolio_daily_user_date ON portfolio_daily_snapshots(user_id, snapshot_date)",
+        "CREATE INDEX IF NOT EXISTS idx_custom_tags_user ON custom_tags(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_api_tokens_token ON api_tokens(token)",
+        "CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_cgt_disposals_user ON cgt_disposals(user_id, disposal_date)",
+        "CREATE INDEX IF NOT EXISTS idx_cgt_disposals_account ON cgt_disposals(account_id)",
+        "CREATE INDEX IF NOT EXISTS idx_account_daily_account_date ON account_daily_snapshots(account_id, snapshot_date)",
+    ]:
+        try:
+            conn.execute(stmt)
+        except Exception as e:
+            current_app.logger.warning(f"Index create failed ({stmt.split()[-1]}): {e}")
+
+
+def init_db():
+    """Initialise or migrate the database.
+
+    Three phases:
+    1. Apply base SCHEMA (all CREATE TABLE IF NOT EXISTS — idempotent).
+    2. Run incremental migrations (column additions, table rewrites, data fixes).
+    3. Ensure performance indexes exist.
+    """
+    with get_connection() as conn:
+        conn.executescript(SCHEMA)
+        _run_migrations(conn)
+        _ensure_indexes(conn)
         conn.commit()
 

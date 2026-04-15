@@ -315,121 +315,96 @@ def account_gross_growth_rate(account, assumptions):
     return to_float(assumptions["annual_growth_rate"]) if assumptions else 0.0
 
 
+def _project_with_lisa_cap(current, monthly, rate, years, current_age, is_lisa):
+    """Project future value, capping LISA contributions at age 50.
+
+    For non-LISA accounts this is just future_value(). Extracted to avoid
+    repeating the cap logic across six projection functions.
+    """
+    if is_lisa:
+        contrib_years = max(min(years, 50 - current_age), 0)
+        frozen_years = years - contrib_years
+        return future_value(future_value(current, monthly, rate, contrib_years), 0, rate, frozen_years)
+    return future_value(current, monthly, rate, years)
+
+
 def projected_account_value_at_year(account, assumptions, yr):
     """Project account value at `yr` years from now, respecting LISA contribution cap at 50."""
-    current = to_float(account["current_value"])
-    monthly = effective_monthly_contribution(account, assumptions)
-    growth = account_growth_rate(account, assumptions)
-    current_age = current_age_from_assumptions(assumptions)
-
-    if account["wrapper_type"] == "Lifetime ISA":
-        contrib_years = max(min(yr, 50 - current_age), 0)
-        frozen_years = yr - contrib_years
-        value_at_cap = future_value(current, monthly, growth, contrib_years)
-        return future_value(value_at_cap, 0, growth, frozen_years)
-
-    return future_value(current, monthly, growth, yr)
+    return _project_with_lisa_cap(
+        to_float(account["current_value"]),
+        effective_monthly_contribution(account, assumptions),
+        account_growth_rate(account, assumptions),
+        yr,
+        current_age_from_assumptions(assumptions),
+        account["wrapper_type"] == "Lifetime ISA",
+    )
 
 
 def projected_account_value_at_month(account, assumptions, month_count):
-    """Project account value at `month_count` months from now.
-
-    Like projected_account_value_at_year but with month precision.
-    Respects LISA contribution cap at age 50.
-    """
-    years = month_count / 12.0
-    current = to_float(account["current_value"])
-    monthly = effective_monthly_contribution(account, assumptions)
-    growth = account_growth_rate(account, assumptions)
-    current_age = current_age_from_assumptions(assumptions)
-
-    if account["wrapper_type"] == "Lifetime ISA":
-        contrib_years = max(min(years, 50 - current_age), 0)
-        frozen_years = years - contrib_years
-        value_at_cap = future_value(current, monthly, growth, contrib_years)
-        return future_value(value_at_cap, 0, growth, frozen_years)
-
-    return future_value(current, monthly, growth, years)
+    """Project account value at `month_count` months from now, respecting LISA cap at 50."""
+    return _project_with_lisa_cap(
+        to_float(account["current_value"]),
+        effective_monthly_contribution(account, assumptions),
+        account_growth_rate(account, assumptions),
+        month_count / 12.0,
+        current_age_from_assumptions(assumptions),
+        account["wrapper_type"] == "Lifetime ISA",
+    )
 
 
 def projected_account_value_at_month_no_fees(account, assumptions, month_count):
     """Same as projected_account_value_at_month but using gross growth rate."""
-    years = month_count / 12.0
-    current = to_float(account["current_value"])
-    monthly = effective_monthly_contribution(account, assumptions)
-    gross = account_gross_growth_rate(account, assumptions)
-    current_age = current_age_from_assumptions(assumptions)
-
-    if account["wrapper_type"] == "Lifetime ISA":
-        contrib_years = max(min(years, 50 - current_age), 0)
-        frozen_years = years - contrib_years
-        value_at_cap = future_value(current, monthly, gross, contrib_years)
-        return future_value(value_at_cap, 0, gross, frozen_years)
-
-    return future_value(current, monthly, gross, years)
+    return _project_with_lisa_cap(
+        to_float(account["current_value"]),
+        effective_monthly_contribution(account, assumptions),
+        account_gross_growth_rate(account, assumptions),
+        month_count / 12.0,
+        current_age_from_assumptions(assumptions),
+        account["wrapper_type"] == "Lifetime ISA",
+    )
 
 
 def projected_account_value(account, assumptions):
     if not assumptions:
         return 0.0
-
-    current = to_float(account["current_value"])
-    monthly = effective_monthly_contribution(account, assumptions)
-    growth = account_growth_rate(account, assumptions)
     current_age = current_age_from_assumptions(assumptions)
     retirement_age = to_float(assumptions["retirement_age"])
-    total_years = years_to_retirement(current_age, retirement_age, assumptions)
-
-    if account["wrapper_type"] == "Lifetime ISA":
-        contribution_end_age = min(50, retirement_age)
-        contribution_years = max(contribution_end_age - current_age, 0)
-        frozen_years = max(retirement_age - contribution_end_age, 0)
-
-        value_at_contribution_end = future_value(current, monthly, growth, contribution_years)
-        return future_value(value_at_contribution_end, 0, growth, frozen_years)
-
-    return future_value(current, monthly, growth, total_years)
+    return _project_with_lisa_cap(
+        to_float(account["current_value"]),
+        effective_monthly_contribution(account, assumptions),
+        account_growth_rate(account, assumptions),
+        years_to_retirement(current_age, retirement_age, assumptions),
+        current_age,
+        account["wrapper_type"] == "Lifetime ISA",
+    )
 
 
 def projected_account_value_no_fees(account, assumptions):
-    """Same as projected_account_value but using the gross growth rate (ignoring fees).
-
-    The difference between this and projected_account_value is the lifetime cost of fees.
-    """
+    """Same as projected_account_value but using the gross growth rate (ignoring fees)."""
     if not assumptions:
         return 0.0
-
-    current = to_float(account["current_value"])
-    monthly = effective_monthly_contribution(account, assumptions)
-    gross = account_gross_growth_rate(account, assumptions)
     current_age = current_age_from_assumptions(assumptions)
     retirement_age = to_float(assumptions["retirement_age"])
-    total_years = years_to_retirement(current_age, retirement_age, assumptions)
-
-    if account["wrapper_type"] == "Lifetime ISA":
-        contribution_end_age = min(50, retirement_age)
-        contribution_years = max(contribution_end_age - current_age, 0)
-        frozen_years = max(retirement_age - contribution_end_age, 0)
-        value_at_contribution_end = future_value(current, monthly, gross, contribution_years)
-        return future_value(value_at_contribution_end, 0, gross, frozen_years)
-
-    return future_value(current, monthly, gross, total_years)
+    return _project_with_lisa_cap(
+        to_float(account["current_value"]),
+        effective_monthly_contribution(account, assumptions),
+        account_gross_growth_rate(account, assumptions),
+        years_to_retirement(current_age, retirement_age, assumptions),
+        current_age,
+        account["wrapper_type"] == "Lifetime ISA",
+    )
 
 
 def projected_account_value_at_year_no_fees(account, assumptions, yr):
     """Same as projected_account_value_at_year but using gross growth rate."""
-    current = to_float(account["current_value"])
-    monthly = effective_monthly_contribution(account, assumptions)
-    gross = account_gross_growth_rate(account, assumptions)
-    current_age = current_age_from_assumptions(assumptions)
-
-    if account["wrapper_type"] == "Lifetime ISA":
-        contrib_years = max(min(yr, 50 - current_age), 0)
-        frozen_years = yr - contrib_years
-        value_at_cap = future_value(current, monthly, gross, contrib_years)
-        return future_value(value_at_cap, 0, gross, frozen_years)
-
-    return future_value(current, monthly, gross, yr)
+    return _project_with_lisa_cap(
+        to_float(account["current_value"]),
+        effective_monthly_contribution(account, assumptions),
+        account_gross_growth_rate(account, assumptions),
+        yr,
+        current_age_from_assumptions(assumptions),
+        account["wrapper_type"] == "Lifetime ISA",
+    )
 
 
 def projected_total_retirement_value(accounts, assumptions):

@@ -170,7 +170,7 @@ def _scheduled_check(app):
                     # Claim this run
                     slot_time = now.strftime('%H:%M')
                     conn.execute(
-                        "INSERT INTO scheduler_runs (user_id, run_date, slot) VALUES (?, ?, ?)",
+                        "INSERT OR IGNORE INTO scheduler_runs (user_id, run_date, slot) VALUES (?, ?, ?)",
                         (user_id, today_str, slot_time),
                     )
                     conn.commit()

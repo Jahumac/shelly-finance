@@ -42,12 +42,12 @@ def get_user_by_username(username):
 
 
 def create_user(username, password, is_admin=False):
-    from datetime import datetime
+    from datetime import datetime, timezone
     pw_hash = generate_password_hash(password)
     with get_connection() as conn:
         cursor = conn.execute(
             "INSERT INTO users (username, password_hash, is_admin, created_at) VALUES (?, ?, ?, ?)",
-            (username, pw_hash, 1 if is_admin else 0, datetime.now().isoformat()),
+            (username, pw_hash, 1 if is_admin else 0, datetime.now(timezone.utc).isoformat()),
         )
         conn.commit()
         return cursor.lastrowid

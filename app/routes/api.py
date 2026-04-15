@@ -235,7 +235,7 @@ def update_account_balance(account_id):
     # Preserve all other fields — update_account needs a complete payload.
     update_payload = {k: account[k] for k in account.keys()}
     update_payload["current_value"] = balance
-    update_payload["last_updated"] = datetime.now().isoformat()
+    update_payload["last_updated"] = datetime.now(timezone.utc).isoformat()
     update_account(update_payload, g.api_user.id)
 
     month_key = payload.get("month") or datetime.now().strftime("%Y-%m")

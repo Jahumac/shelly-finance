@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
@@ -101,7 +101,7 @@ def monthly_review():
                         "growth_rate_override": account["growth_rate_override"],
                         "owner": account["owner"],
                         "notes": account["notes"],
-                        "last_updated": datetime.now().isoformat(),
+                        "last_updated": datetime.now(timezone.utc).isoformat(),
                     },
                     uid,
                 )

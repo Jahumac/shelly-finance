@@ -764,7 +764,7 @@ def fetch_all_active_overrides(month_key, user_id):
 
 
 def create_contribution_override(payload):
-    from datetime import datetime
+    from datetime import datetime, timezone
     with get_connection() as conn:
         cursor = conn.execute(
             """
@@ -777,7 +777,7 @@ def create_contribution_override(payload):
                 payload["to_month"],
                 payload["override_amount"],
                 payload.get("reason", ""),
-                datetime.now().isoformat(),
+                datetime.now(timezone.utc).isoformat(),
             ),
         )
         conn.commit()
