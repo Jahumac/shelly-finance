@@ -1,514 +1,66 @@
-"""Long-term planning, snapshots, and tax-allowance tracking.
+"""Planning module — constants, tags, resets, and re-exports.
 
-A grab-bag of everything that isn't account/holding/goal/budget CRUD:
-- assumptions (growth rate, retirement age, allowances)
-- monthly reviews + monthly snapshots
-- ad-hoc ISA / pension / dividend contribution records
-- contribution overrides (temporary plan changes)
-- daily portfolio snapshots + performance history
-- per-user tag management
-- whole-account/data resets
+The bulk of the logic has been split into focused submodules:
+    planning_assumptions.py  — fetch_assumptions, update_assumptions
+    planning_allowances.py   — ISA/pension/dividend/CGT/carry-forward/overrides
+    planning_reviews.py      — monthly reviews and review items
+    planning_snapshots.py    — monthly + daily snapshots, performance history
 
-Imports fetch_all_accounts from .accounts because ensure_monthly_review_items
-needs it.
+Re-exports are provided here so that app/models/__init__.py can keep a single
+import surface.
 """
 from ._conn import get_connection
-from .accounts import fetch_all_accounts
 
-
-# ── Assumptions ───────────────────────────────────────────────────────────────
-
-def fetch_assumptions(user_id):
-    with get_connection() as conn:
-        row = conn.execute(
-            "SELECT * FROM assumptions WHERE user_id = ?", (user_id,)
-        ).fetchone()
-        if row is None:
-            # Create default assumptions row for this user on first access
-            conn.execute(
-                """INSERT OR IGNORE INTO assumptions (user_id) VALUES (?)""",
-                (user_id,),
-            )
-            conn.commit()
-            row = conn.execute(
-                "SELECT * FROM assumptions WHERE user_id = ?", (user_id,)
-            ).fetchone()
-        return row
-
-
-
-def update_assumptions(payload, user_id):
-    with get_connection() as conn:
-        conn.execute(
-            """
-            UPDATE assumptions
-            SET annual_growth_rate = ?,
-                retirement_age = ?,
-                date_of_birth = ?,
-                retirement_goal_value = ?,
-                isa_allowance = ?,
-                lisa_allowance = ?,
-                dividend_allowance = ?,
-                annual_income = ?,
-                pension_annual_allowance = ?,
-                mpaa_enabled = ?,
-                mpaa_allowance = ?,
-                target_dev_pct = ?,
-                target_em_pct = ?,
-                emergency_fund_target = ?,
-                dashboard_name = ?,
-                salary_day = ?,
-                update_day = ?,
-                retirement_date_mode = ?,
-                tax_band = ?,
-                auto_update_prices = ?,
-                update_time_morning = ?,
-                update_time_evening = ?,
-                updated_at = ?
-            WHERE user_id = ?
-            """,
-            (
-                payload["annual_growth_rate"],
-                payload["retirement_age"],
-                payload.get("date_of_birth", ""),
-                payload["retirement_goal_value"],
-                payload["isa_allowance"],
-                payload["lisa_allowance"],
-                payload.get("dividend_allowance", 500),
-                payload.get("annual_income", 0),
-                payload.get("pension_annual_allowance", 60000),
-                payload.get("mpaa_enabled", 0),
-                payload.get("mpaa_allowance", 10000),
-                payload["target_dev_pct"],
-                payload["target_em_pct"],
-                payload["emergency_fund_target"],
-                payload["dashboard_name"],
-                payload.get("salary_day", 0),
-                payload.get("update_day", 0),
-                payload.get("retirement_date_mode", "birthday"),
-                payload.get("tax_band", "basic"),
-                payload.get("auto_update_prices", 1),
-                payload.get("update_time_morning", "08:30"),
-                payload.get("update_time_evening", "18:00"),
-                payload["updated_at"],
-                user_id,
-            ),
-        )
-        conn.commit()
-
-
-
-# ── Allowance tracking ────────────────────────────────────────────────────────
-
-def fetch_allowance_tracking(user_id=None):
-    """Return the most recent allowance_tracking row.
-
-    user_id is accepted for API consistency but allowance_tracking is a
-    global table (one row per tax year). It will be made per-user in a
-    future migration.
-    """
-    with get_connection() as conn:
-        return conn.execute(
-            "SELECT * FROM allowance_tracking ORDER BY id DESC LIMIT 1"
-        ).fetchone()
-
-
-
-# ── ISA / pension / dividend ad-hoc records ───────────────────────────────────
-
-def add_isa_contribution(user_id, account_id, amount, contribution_date, note=None):
-    """Record an ad-hoc contribution to an ISA account."""
-    with get_connection() as conn:
-        conn.execute(
-            """
-            INSERT INTO isa_contributions (user_id, account_id, amount, contribution_date, note)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (user_id, account_id, amount, contribution_date, note),
-        )
-        conn.commit()
-
-
-def fetch_isa_contributions(user_id, tax_year_start, tax_year_end):
-    """Return all ad-hoc ISA contributions for a user within a tax year window.
-
-    tax_year_start / tax_year_end are ISO date strings (YYYY-MM-DD),
-    e.g. '2026-04-06' / '2027-04-05'.
-    """
-    with get_connection() as conn:
-        return conn.execute(
-            """
-            SELECT c.*, a.name AS account_name, a.wrapper_type
-            FROM isa_contributions c
-            JOIN accounts a ON a.id = c.account_id
-            WHERE c.user_id = ?
-              AND c.contribution_date >= ?
-              AND c.contribution_date <= ?
-            ORDER BY c.contribution_date DESC
-            """,
-            (user_id, tax_year_start, tax_year_end),
-        ).fetchall()
-
-
-def delete_isa_contribution(contribution_id, user_id):
-    """Delete an ad-hoc ISA contribution (only if it belongs to the user)."""
-    with get_connection() as conn:
-        conn.execute(
-            "DELETE FROM isa_contributions WHERE id = ? AND user_id = ?",
-            (contribution_id, user_id),
-        )
-        conn.commit()
-
-
-def add_pension_contribution(user_id, account_id, amount, kind, contribution_date, note=None):
-    with get_connection() as conn:
-        conn.execute(
-            """
-            INSERT INTO pension_contributions (user_id, account_id, amount, kind, contribution_date, note)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (user_id, account_id, amount, kind, contribution_date, note),
-        )
-        conn.commit()
-
-
-def fetch_pension_contributions(user_id, tax_year_start, tax_year_end):
-    with get_connection() as conn:
-        return conn.execute(
-            """
-            SELECT c.*, a.name AS account_name, a.wrapper_type
-            FROM pension_contributions c
-            JOIN accounts a ON a.id = c.account_id
-            WHERE c.user_id = ?
-              AND c.contribution_date >= ?
-              AND c.contribution_date <= ?
-            ORDER BY c.contribution_date DESC
-            """,
-            (user_id, tax_year_start, tax_year_end),
-        ).fetchall()
-
-
-def delete_pension_contribution(contribution_id, user_id):
-    with get_connection() as conn:
-        conn.execute(
-            "DELETE FROM pension_contributions WHERE id = ? AND user_id = ?",
-            (contribution_id, user_id),
-        )
-        conn.commit()
-
-
-def add_dividend_record(user_id, account_id, amount, dividend_date, note=None):
-    with get_connection() as conn:
-        conn.execute(
-            """
-            INSERT INTO dividend_records (user_id, account_id, amount, dividend_date, note)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (user_id, account_id, amount, dividend_date, note),
-        )
-        conn.commit()
-
-
-def fetch_dividend_records(user_id, tax_year_start, tax_year_end):
-    with get_connection() as conn:
-        return conn.execute(
-            """
-            SELECT d.*, a.name AS account_name, a.wrapper_type
-            FROM dividend_records d
-            JOIN accounts a ON a.id = d.account_id
-            WHERE d.user_id = ?
-              AND d.dividend_date >= ?
-              AND d.dividend_date <= ?
-            ORDER BY d.dividend_date DESC
-            """,
-            (user_id, tax_year_start, tax_year_end),
-        ).fetchall()
-
-
-def delete_dividend_record(record_id, user_id):
-    with get_connection() as conn:
-        conn.execute(
-            "DELETE FROM dividend_records WHERE id = ? AND user_id = ?",
-            (record_id, user_id),
-        )
-        conn.commit()
-
-
-# ── CGT disposals ─────────────────────────────────────────────────────────────
-
-def add_cgt_disposal(user_id, disposal_date, asset_name, proceeds, cost_basis, note=None, account_id=None):
-    with get_connection() as conn:
-        conn.execute(
-            """
-            INSERT INTO cgt_disposals (user_id, disposal_date, asset_name, proceeds, cost_basis, note, account_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (user_id, disposal_date, asset_name, proceeds, cost_basis, note, account_id),
-        )
-        conn.commit()
-
-
-def fetch_cgt_disposals(user_id, tax_year_start, tax_year_end):
-    with get_connection() as conn:
-        return conn.execute(
-            """
-            SELECT c.*, a.name AS account_name
-            FROM cgt_disposals c
-            LEFT JOIN accounts a ON a.id = c.account_id
-            WHERE c.user_id = ?
-              AND c.disposal_date >= ?
-              AND c.disposal_date <= ?
-            ORDER BY c.disposal_date DESC
-            """,
-            (user_id, tax_year_start, tax_year_end),
-        ).fetchall()
-
-
-def delete_cgt_disposal(disposal_id, user_id):
-    with get_connection() as conn:
-        conn.execute(
-            "DELETE FROM cgt_disposals WHERE id = ? AND user_id = ?",
-            (disposal_id, user_id),
-        )
-        conn.commit()
-
-
-# ── Pension carry-forward ─────────────────────────────────────────────────────
-
-def fetch_pension_carry_forward(user_id):
-    with get_connection() as conn:
-        return conn.execute(
-            "SELECT * FROM pension_carry_forward WHERE user_id = ? ORDER BY tax_year DESC",
-            (user_id,),
-        ).fetchall()
-
-
-def upsert_pension_carry_forward(user_id, tax_year, unused_allowance):
-    with get_connection() as conn:
-        conn.execute(
-            """
-            INSERT INTO pension_carry_forward (user_id, tax_year, unused_allowance)
-            VALUES (?, ?, ?)
-            ON CONFLICT(user_id, tax_year) DO UPDATE SET unused_allowance = excluded.unused_allowance
-            """,
-            (user_id, tax_year, unused_allowance),
-        )
-        conn.commit()
-
-
-def delete_pension_carry_forward(entry_id, user_id):
-    with get_connection() as conn:
-        conn.execute(
-            "DELETE FROM pension_carry_forward WHERE id = ? AND user_id = ?",
-            (entry_id, user_id),
-        )
-        conn.commit()
-
-
-# ── Monthly reviews ───────────────────────────────────────────────────────────
-
-def fetch_or_create_monthly_review(month_key, user_id):
-    with get_connection() as conn:
-        review = conn.execute(
-            "SELECT * FROM monthly_reviews WHERE month_key = ? AND user_id = ?",
-            (month_key, user_id),
-        ).fetchone()
-
-        if review is None:
-            conn.execute(
-                """
-                INSERT INTO monthly_reviews (user_id, month_key, status, created_at, updated_at)
-                VALUES (?, ?, 'not_started', datetime('now'), datetime('now'))
-                """,
-                (user_id, month_key),
-            )
-            conn.commit()
-            review = conn.execute(
-                "SELECT * FROM monthly_reviews WHERE month_key = ? AND user_id = ?",
-                (month_key, user_id),
-            ).fetchone()
-
-        return review
-
-
-def fetch_monthly_review_items(review_id):
-    with get_connection() as conn:
-        return conn.execute(
-            """
-            SELECT mri.*, a.name AS account_name, a.provider, a.wrapper_type, a.valuation_mode,
-                   a.monthly_contribution AS account_monthly_contribution
-            FROM monthly_review_items mri
-            JOIN accounts a ON a.id = mri.account_id
-            WHERE mri.review_id = ?
-            ORDER BY a.id ASC
-            """,
-            (review_id,),
-        ).fetchall()
-
-
-def ensure_monthly_review_items(review_id, user_id):
-    accounts = fetch_all_accounts(user_id)
-    with get_connection() as conn:
-        existing_rows = conn.execute(
-            "SELECT account_id FROM monthly_review_items WHERE review_id = ?",
-            (review_id,),
-        ).fetchall()
-        existing_ids = {row["account_id"] for row in existing_rows}
-
-        for account in accounts:
-            if account["id"] not in existing_ids:
-                conn.execute(
-                    """
-                    INSERT INTO monthly_review_items (
-                        review_id, account_id, expected_contribution,
-                        contribution_confirmed, holdings_updated, balance_updated, notes
-                    )
-                    VALUES (?, ?, ?, 0, 0, 0, '')
-                    """,
-                    (review_id, account["id"], account["monthly_contribution"] or 0),
-                )
-        conn.commit()
-
-
-def update_monthly_review(review_id, status, notes, user_id=None):
-    user_clause = " AND user_id = ?" if user_id is not None else ""
-    with get_connection() as conn:
-        if status == "complete":
-            conn.execute(
-                f"""
-                UPDATE monthly_reviews
-                SET status = ?, notes = ?, completed_at = datetime('now'), updated_at = datetime('now')
-                WHERE id = ?{user_clause}
-                """,
-                (status, notes, review_id) if user_id is None else (status, notes, review_id, user_id),
-            )
-        else:
-            conn.execute(
-                f"""
-                UPDATE monthly_reviews
-                SET status = ?, notes = ?, completed_at = NULL, updated_at = datetime('now')
-                WHERE id = ?{user_clause}
-                """,
-                (status, notes, review_id) if user_id is None else (status, notes, review_id, user_id),
-            )
-        conn.commit()
-
-
-def update_monthly_review_item(payload):
-    with get_connection() as conn:
-        conn.execute(
-            """
-            UPDATE monthly_review_items
-            SET expected_contribution = ?,
-                contribution_confirmed = ?,
-                holdings_updated = ?,
-                balance_updated = ?,
-                notes = ?
-            WHERE id = ?
-            """,
-            (
-                payload["expected_contribution"],
-                payload["contribution_confirmed"],
-                payload["holdings_updated"],
-                payload["balance_updated"],
-                payload["notes"],
-                payload["id"],
-            ),
-        )
-        conn.commit()
-
-
-def fetch_monthly_review(month_key, user_id):
-    """Read-only fetch — returns None if no review exists (never creates one)."""
-    with get_connection() as conn:
-        return conn.execute(
-            "SELECT * FROM monthly_reviews WHERE month_key = ? AND user_id = ?",
-            (month_key, user_id),
-        ).fetchone()
-
-
-def set_contribution_confirmed(item_id, review_id, confirmed):
-    """Toggle contribution_confirmed for a single review item.
-    Scoped by review_id so cross-review updates are impossible."""
-    with get_connection() as conn:
-        conn.execute(
-            "UPDATE monthly_review_items SET contribution_confirmed = ? WHERE id = ? AND review_id = ?",
-            (1 if confirmed else 0, item_id, review_id),
-        )
-        conn.commit()
-
-
-def mark_review_item_updated(review_id, account_id, field):
-    """Mark holdings_updated or balance_updated = 1 for a review item."""
-    if field == "holdings_updated":
-        col = "holdings_updated"
-    elif field == "balance_updated":
-        col = "balance_updated"
-    else:
-        return
-    with get_connection() as conn:
-        conn.execute(
-            f"UPDATE monthly_review_items SET {col} = 1 WHERE review_id = ? AND account_id = ?",
-            (review_id, account_id),
-        )
-        conn.commit()
-
-
-# ── Whole-account / data resets ───────────────────────────────────────────────
-
-def reset_catalogue(user_id):
-    """Wipe all catalogue entries for a user. Holdings in accounts are not affected."""
-    with get_connection() as conn:
-        conn.execute("DELETE FROM holding_catalogue WHERE user_id = ?", (user_id,))
-        conn.commit()
-
-
-def reset_all_user_data(user_id):
-    """Wipe every piece of user data back to a fresh-login state.
-
-    Deletes: accounts (and their holdings), goals, assumptions,
-    holding catalogue, monthly snapshots, allowance tracking,
-    monthly reviews + items, budget items/entries/sections,
-    and contribution overrides.
-
-    The user row itself is kept so they can log straight back in.
-    """
-    with get_connection() as conn:
-        # Holdings reference accounts, so delete them first
-        conn.execute(
-            "DELETE FROM holdings WHERE account_id IN "
-            "(SELECT id FROM accounts WHERE user_id = ?)", (user_id,))
-        conn.execute(
-            "DELETE FROM contribution_overrides WHERE account_id IN "
-            "(SELECT id FROM accounts WHERE user_id = ?)", (user_id,))
-        # Snapshots FK to accounts, so delete before accounts
-        conn.execute(
-            "DELETE FROM monthly_snapshots WHERE account_id IN "
-            "(SELECT id FROM accounts WHERE user_id = ?)", (user_id,))
-        conn.execute("DELETE FROM accounts WHERE user_id = ?", (user_id,))
-
-        conn.execute("DELETE FROM goals WHERE user_id = ?", (user_id,))
-        conn.execute("DELETE FROM assumptions WHERE user_id = ?", (user_id,))
-        conn.execute("DELETE FROM holding_catalogue WHERE user_id = ?", (user_id,))
-
-        # allowance_tracking has no user_id — wipe all rows (single-user table)
-        conn.execute("DELETE FROM allowance_tracking")
-
-        # Monthly reviews + their line items
-        conn.execute(
-            "DELETE FROM monthly_review_items WHERE review_id IN "
-            "(SELECT id FROM monthly_reviews WHERE user_id = ?)", (user_id,))
-        conn.execute("DELETE FROM monthly_reviews WHERE user_id = ?", (user_id,))
-
-        # Budget (entries FK to items, so delete entries first)
-        conn.execute(
-            "DELETE FROM budget_entries WHERE budget_item_id IN "
-            "(SELECT id FROM budget_items WHERE user_id = ?)", (user_id,))
-        conn.execute("DELETE FROM budget_items WHERE user_id = ?", (user_id,))
-        conn.execute("DELETE FROM budget_sections WHERE user_id = ?", (user_id,))
-
-        conn.commit()
-
+# Re-export submodule functions so __init__.py only needs to import from here
+from .planning_assumptions import fetch_assumptions, update_assumptions
+from .planning_allowances import (
+    fetch_allowance_tracking,
+    add_isa_contribution,
+    fetch_isa_contributions,
+    delete_isa_contribution,
+    add_pension_contribution,
+    fetch_pension_contributions,
+    delete_pension_contribution,
+    add_dividend_record,
+    fetch_dividend_records,
+    delete_dividend_record,
+    add_cgt_disposal,
+    fetch_cgt_disposals,
+    delete_cgt_disposal,
+    fetch_pension_carry_forward,
+    upsert_pension_carry_forward,
+    delete_pension_carry_forward,
+    fetch_contribution_overrides,
+    fetch_all_active_overrides,
+    create_contribution_override,
+    remove_contribution_override_for_month,
+    delete_contribution_override,
+)
+from .planning_reviews import (
+    fetch_or_create_monthly_review,
+    fetch_monthly_review,
+    fetch_monthly_review_items,
+    ensure_monthly_review_items,
+    update_monthly_review,
+    update_monthly_review_item,
+    set_contribution_confirmed,
+    mark_review_item_updated,
+    fetch_tax_year_contributions,
+)
+from .planning_snapshots import (
+    upsert_monthly_snapshot,
+    fetch_net_worth_history,
+    fetch_account_snapshot_history,
+    fetch_monthly_performance_data,
+    fetch_monthly_performance_data_by_account,
+    save_daily_snapshot,
+    fetch_daily_snapshots,
+    save_account_daily_snapshots,
+    fetch_account_daily_snapshots,
+)
+
+
+# ── Constants ─────────────────────────────────────────────────────────────────
 
 WRAPPER_TYPE_OPTIONS = [
     "Stocks & Shares ISA",
@@ -538,65 +90,8 @@ DEFAULT_TAG_OPTIONS = [
     "Other",
 ]
 
-# Keep old name for backwards compat
-TAG_OPTIONS = DEFAULT_TAG_OPTIONS
+TAG_OPTIONS = DEFAULT_TAG_OPTIONS  # backwards compat alias
 
-
-
-# ── Tags ──────────────────────────────────────────────────────────────────────
-
-def fetch_user_tags(user_id):
-    """Return merged list: default tags + user's custom tags (de-duped, ordered)."""
-    with get_connection() as conn:
-        rows = conn.execute(
-            "SELECT tag FROM custom_tags WHERE user_id = ? ORDER BY tag",
-            (user_id,),
-        ).fetchall()
-    custom = [r["tag"] for r in rows]
-    # Defaults first, then any custom ones not already in defaults
-    merged = list(DEFAULT_TAG_OPTIONS)
-    for tag in custom:
-        if tag not in merged:
-            merged.append(tag)
-    return merged
-
-
-def fetch_custom_tags(user_id):
-    """Return just the user's custom tags."""
-    with get_connection() as conn:
-        rows = conn.execute(
-            "SELECT tag FROM custom_tags WHERE user_id = ? ORDER BY tag",
-            (user_id,),
-        ).fetchall()
-    return [r["tag"] for r in rows]
-
-
-def add_custom_tag(user_id, tag):
-    """Add a custom tag for a user. Returns True if added, False if duplicate."""
-    tag = tag.strip()
-    if not tag:
-        return False
-    with get_connection() as conn:
-        try:
-            conn.execute(
-                "INSERT INTO custom_tags (user_id, tag) VALUES (?, ?)",
-                (user_id, tag),
-            )
-            conn.commit()
-            return True
-        except Exception:
-            return False
-
-
-def delete_custom_tag(user_id, tag):
-    """Remove a custom tag. Returns True if deleted."""
-    with get_connection() as conn:
-        cur = conn.execute(
-            "DELETE FROM custom_tags WHERE user_id = ? AND tag = ?",
-            (user_id, tag),
-        )
-        conn.commit()
-        return cur.rowcount > 0
 
 DEFAULT_HOLDING_CATALOGUE = [  # kept for reference only — no longer auto-seeded
     # ── Global equity ETFs ─────────────────────────────────────────────────
@@ -650,281 +145,97 @@ DEFAULT_HOLDING_CATALOGUE = [  # kept for reference only — no longer auto-seed
 ]
 
 
-# ── Budget ──────────────────────────────────────────────────────────────────
+# ── Tags ──────────────────────────────────────────────────────────────────────
 
-
-# ── Snapshots + performance ───────────────────────────────────────────────────
-
-def upsert_monthly_snapshot(account_id, month_key, balance):
-    """Write or overwrite a snapshot for one account for a given month."""
-    snapshot_date = month_key + "-01"
-    with get_connection() as conn:
-        existing = conn.execute(
-            "SELECT id FROM monthly_snapshots WHERE account_id = ? AND month_key = ?",
-            (account_id, month_key),
-        ).fetchone()
-        if existing:
-            conn.execute(
-                "UPDATE monthly_snapshots SET balance = ?, snapshot_date = ? WHERE id = ?",
-                (balance, snapshot_date, existing["id"]),
-            )
-        else:
-            conn.execute(
-                """
-                INSERT INTO monthly_snapshots (snapshot_date, account_id, balance, month_key)
-                VALUES (?, ?, ?, ?)
-                """,
-                (snapshot_date, account_id, balance, month_key),
-            )
-        conn.commit()
-
-
-def fetch_net_worth_history(user_id, limit=24):
-    """Return (month_key, total_balance) pairs for the last `limit` months that have snapshots."""
+def fetch_user_tags(user_id):
+    """Return merged list: default tags + user's custom tags (de-duped, ordered)."""
     with get_connection() as conn:
         rows = conn.execute(
-            """
-            SELECT ms.month_key, SUM(ms.balance) AS total
-            FROM monthly_snapshots ms
-            JOIN accounts a ON a.id = ms.account_id
-            WHERE ms.month_key IS NOT NULL AND a.user_id = ?
-            GROUP BY ms.month_key
-            ORDER BY ms.month_key ASC
-            """,
+            "SELECT tag FROM custom_tags WHERE user_id = ? ORDER BY tag",
             (user_id,),
         ).fetchall()
-    return [(r["month_key"], r["total"]) for r in rows[-limit:]]
+    custom = [r["tag"] for r in rows]
+    merged = list(DEFAULT_TAG_OPTIONS)
+    for tag in custom:
+        if tag not in merged:
+            merged.append(tag)
+    return merged
 
 
-def fetch_account_snapshot_history(account_id, limit=24):
-    """Return (month_key, balance) pairs for one account for the last `limit` months that have snapshots."""
+def fetch_custom_tags(user_id):
+    """Return just the user's custom tags."""
     with get_connection() as conn:
         rows = conn.execute(
-            """
-            SELECT month_key, balance
-            FROM monthly_snapshots
-            WHERE account_id = ?
-              AND month_key IS NOT NULL
-            ORDER BY month_key ASC
-            """,
-            (account_id,),
+            "SELECT tag FROM custom_tags WHERE user_id = ? ORDER BY tag",
+            (user_id,),
         ).fetchall()
-    return [(r["month_key"], r["balance"]) for r in rows[-limit:]]
+    return [r["tag"] for r in rows]
 
 
-def fetch_monthly_performance_data(user_id):
-    """Return list of (month_key, total_balance, total_contribution) ordered by month."""
+def add_custom_tag(user_id, tag):
+    """Add a custom tag for a user. Returns True if added, False if duplicate."""
+    tag = tag.strip()
+    if not tag:
+        return False
     with get_connection() as conn:
-        rows = conn.execute(
-            """
-            SELECT
-                ms.month_key,
-                SUM(ms.balance) AS total_balance,
-                COALESCE(SUM(mri.expected_contribution), 0) AS total_contribution
-            FROM monthly_snapshots ms
-            JOIN accounts a ON a.id = ms.account_id
-            LEFT JOIN monthly_reviews mr ON mr.month_key = ms.month_key AND mr.user_id = ?
-            LEFT JOIN monthly_review_items mri
-                   ON mri.review_id = mr.id AND mri.account_id = ms.account_id
-            WHERE ms.month_key IS NOT NULL AND a.user_id = ?
-            GROUP BY ms.month_key
-            ORDER BY ms.month_key ASC
-            """,
-            (user_id, user_id),
-        ).fetchall()
-    return [(r["month_key"], r["total_balance"], r["total_contribution"]) for r in rows]
-
-
-def fetch_monthly_performance_data_by_account(user_id):
-    """Return per-account monthly performance data.
-
-    Returns a dict keyed by account_id:
-        {account_id: {"account_name": str, "rows": [(month_key, balance, contribution), ...]}}
-    """
-    with get_connection() as conn:
-        rows = conn.execute(
-            """
-            SELECT
-                a.id AS account_id,
-                a.name AS account_name,
-                ms.month_key,
-                ms.balance AS balance,
-                COALESCE(mri.expected_contribution, 0) AS contribution
-            FROM monthly_snapshots ms
-            JOIN accounts a ON a.id = ms.account_id
-            LEFT JOIN monthly_reviews mr ON mr.month_key = ms.month_key AND mr.user_id = ?
-            LEFT JOIN monthly_review_items mri
-                   ON mri.review_id = mr.id AND mri.account_id = ms.account_id
-            WHERE ms.month_key IS NOT NULL
-              AND a.user_id = ?
-            ORDER BY a.name ASC, ms.month_key ASC
-            """,
-            (user_id, user_id),
-        ).fetchall()
-
-    out = {}
-    for r in rows:
-        aid = int(r["account_id"])
-        if aid not in out:
-            out[aid] = {"account_name": r["account_name"], "rows": []}
-        out[aid]["rows"].append((r["month_key"], float(r["balance"] or 0), float(r["contribution"] or 0)))
-    return out
-
-
-# ── Contribution overrides ────────────────────────────────────────────────────
-
-def fetch_contribution_overrides(account_id):
-    with get_connection() as conn:
-        return conn.execute(
-            "SELECT * FROM contribution_overrides WHERE account_id = ? ORDER BY from_month ASC",
-            (account_id,),
-        ).fetchall()
-
-
-def fetch_all_active_overrides(month_key, user_id):
-    """Return overrides that are active for a given month, keyed by account_id."""
-    with get_connection() as conn:
-        rows = conn.execute(
-            """
-            SELECT co.* FROM contribution_overrides co
-            JOIN accounts a ON a.id = co.account_id
-            WHERE co.from_month <= ? AND co.to_month >= ? AND a.user_id = ?
-            """,
-            (month_key, month_key, user_id),
-        ).fetchall()
-    return {r["account_id"]: r for r in rows}
-
-
-def create_contribution_override(payload):
-    from datetime import datetime, timezone
-    with get_connection() as conn:
-        cursor = conn.execute(
-            """
-            INSERT INTO contribution_overrides (account_id, from_month, to_month, override_amount, reason, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                payload["account_id"],
-                payload["from_month"],
-                payload["to_month"],
-                payload["override_amount"],
-                payload.get("reason", ""),
-                datetime.now(timezone.utc).isoformat(),
-            ),
-        )
-        conn.commit()
-        return cursor.lastrowid
-
-
-def remove_contribution_override_for_month(account_id, month_key, user_id):
-    """Delete a single-month skip override (from_month == to_month == month_key)
-    scoped to user_id so cross-user deletes are impossible."""
-    with get_connection() as conn:
-        conn.execute(
-            """DELETE FROM contribution_overrides
-               WHERE account_id = ? AND from_month = ? AND to_month = ?
-               AND account_id IN (SELECT id FROM accounts WHERE user_id = ?)""",
-            (account_id, month_key, month_key, user_id),
-        )
-        conn.commit()
-
-
-def delete_contribution_override(override_id, user_id=None):
-    with get_connection() as conn:
-        if user_id is not None:
+        try:
             conn.execute(
-                """DELETE FROM contribution_overrides
-                   WHERE id = ? AND account_id IN (SELECT id FROM accounts WHERE user_id = ?)""",
-                (override_id, user_id),
+                "INSERT INTO custom_tags (user_id, tag) VALUES (?, ?)",
+                (user_id, tag),
             )
-        else:
-            conn.execute("DELETE FROM contribution_overrides WHERE id = ?", (override_id,))
+            conn.commit()
+            return True
+        except Exception:
+            return False
+
+
+def delete_custom_tag(user_id, tag):
+    """Remove a custom tag. Returns True if deleted."""
+    with get_connection() as conn:
+        cur = conn.execute(
+            "DELETE FROM custom_tags WHERE user_id = ? AND tag = ?",
+            (user_id, tag),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+
+
+# ── Data resets ───────────────────────────────────────────────────────────────
+
+def reset_catalogue(user_id):
+    """Wipe all catalogue entries for a user."""
+    with get_connection() as conn:
+        conn.execute("DELETE FROM holding_catalogue WHERE user_id = ?", (user_id,))
         conn.commit()
 
 
-# ── Portfolio daily snapshots ──────────────────────────────────────────────────
+def reset_all_user_data(user_id):
+    """Wipe every piece of user data back to a fresh-login state.
 
-
-# ── Daily snapshots ───────────────────────────────────────────────────────────
-
-def save_daily_snapshot(user_id, total_value, snapshot_date=None):
-    """Save or update a portfolio snapshot for a given user and date.
-
-    Uses INSERT OR REPLACE to handle the UNIQUE(user_id, snapshot_date) constraint.
-    If snapshot_date is None, uses today's date.
+    The user row itself is kept so they can log straight back in.
     """
-    from datetime import datetime
-    if snapshot_date is None:
-        snapshot_date = datetime.now().strftime("%Y-%m-%d")
-
     with get_connection() as conn:
         conn.execute(
-            """
-            INSERT OR REPLACE INTO portfolio_daily_snapshots (user_id, snapshot_date, total_value, created_at)
-            VALUES (?, ?, ?, datetime('now'))
-            """,
-            (user_id, snapshot_date, total_value),
-        )
+            "DELETE FROM holdings WHERE account_id IN "
+            "(SELECT id FROM accounts WHERE user_id = ?)", (user_id,))
+        conn.execute(
+            "DELETE FROM contribution_overrides WHERE account_id IN "
+            "(SELECT id FROM accounts WHERE user_id = ?)", (user_id,))
+        conn.execute(
+            "DELETE FROM monthly_snapshots WHERE account_id IN "
+            "(SELECT id FROM accounts WHERE user_id = ?)", (user_id,))
+        conn.execute("DELETE FROM accounts WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM goals WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM assumptions WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM holding_catalogue WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM allowance_tracking")
+        conn.execute(
+            "DELETE FROM monthly_review_items WHERE review_id IN "
+            "(SELECT id FROM monthly_reviews WHERE user_id = ?)", (user_id,))
+        conn.execute("DELETE FROM monthly_reviews WHERE user_id = ?", (user_id,))
+        conn.execute(
+            "DELETE FROM budget_entries WHERE budget_item_id IN "
+            "(SELECT id FROM budget_items WHERE user_id = ?)", (user_id,))
+        conn.execute("DELETE FROM budget_items WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM budget_sections WHERE user_id = ?", (user_id,))
         conn.commit()
-
-
-def fetch_daily_snapshots(user_id, limit=365):
-    """Fetch daily portfolio snapshots for a user, limited to the last N days.
-
-    Returns a list of (snapshot_date, total_value) tuples ordered by date ASC.
-    """
-    with get_connection() as conn:
-        rows = conn.execute(
-            """
-            SELECT snapshot_date, total_value FROM portfolio_daily_snapshots
-            WHERE user_id = ?
-            ORDER BY snapshot_date ASC
-            LIMIT ?
-            """,
-            (user_id, limit),
-        ).fetchall()
-    return [(r["snapshot_date"], float(r["total_value"])) for r in rows]
-
-
-def save_account_daily_snapshots(user_id, account_values, snapshot_date=None):
-    """Save per-account daily snapshots.
-
-    account_values: list of (account_id, value) tuples.
-    Uses INSERT OR REPLACE to handle UNIQUE(account_id, snapshot_date).
-    """
-    from datetime import datetime
-    if snapshot_date is None:
-        snapshot_date = datetime.now().strftime("%Y-%m-%d")
-
-    with get_connection() as conn:
-        conn.executemany(
-            """
-            INSERT OR REPLACE INTO account_daily_snapshots (user_id, account_id, snapshot_date, value)
-            VALUES (?, ?, ?, ?)
-            """,
-            [(user_id, acct_id, snapshot_date, value) for acct_id, value in account_values],
-        )
-        conn.commit()
-
-
-def fetch_account_daily_snapshots(account_id, limit=365):
-    """Return (snapshot_date, value) pairs for one account, ordered ASC, last N days."""
-    with get_connection() as conn:
-        rows = conn.execute(
-            """
-            SELECT snapshot_date, value FROM account_daily_snapshots
-            WHERE account_id = ?
-            ORDER BY snapshot_date DESC
-            LIMIT ?
-            """,
-            (account_id, limit),
-        ).fetchall()
-    return [(r["snapshot_date"], float(r["value"])) for r in reversed(rows)]
-
-
-# ── API tokens ────────────────────────────────────────────────────────────────
-# Bearer tokens for the JSON API. Tokens are random 32-byte hex strings
-# generated with secrets.token_hex(32). Stored in plaintext: this is a
-# self-hosted personal app where DB access already implies full compromise.
-# If you want hashed tokens, swap to secrets.compare_digest against a hash.
-

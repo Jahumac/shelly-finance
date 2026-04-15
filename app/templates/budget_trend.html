@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% from '_macros.html' import empty_state %}
+{% block title %}Budget Trend{% endblock %}
+{% block content %}
+
+<nav class="subnav">
+  <a href="/budget/">Budget Plan</a>
+  <a href="/monthly-review/">Monthly Update</a>
+  <a href="/allowance/">Allowances</a>
+  <a href="/budget/trend/" class="subnav-active">Trend</a>
+</nav>
+
+{% include '_month_strip.html' %}
+
+<section class="card highlight mb-1">
+  <div class="hero-top">
+    <div>
+      <p class="eyebrow">Budget</p>
+      <h2 class="hero-value">Spend Trend</h2>
+      <p class="hero-subtitle">Last {{ months | length }} months · average spend per category</p>
+    </div>
+  </div>
+</section>
+
+{% if not sections %}
+<section class="card">
+  {{ empty_state('No budget data yet',
+                 'Fill in a few months of budget entries and the trend view will appear here.',
+                 cta_text='Go to Budget', cta_href='/budget/') }}
+</section>
+{% else %}
+
+{% for section_name, items in sections.items() %}
+<div class="panel mb-1">
+  <h3 class="section-title-sm">{{ section_name }}</h3>
+  <div style="overflow-x:auto;">
+    <table class="data-table trend-table">
+      <thead>
+        <tr>
+          <th>Category</th>
+          {% for label in month_labels %}
+          <th class="num">{{ label }}</th>
+          {% endfor %}
+          <th class="num">Avg</th>
+          <th class="num">Budget</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item_name, data in items.items() %}
+        <tr>
+          <td>{{ item_name }}</td>
+          {% for mk in months %}
+          <td class="num">
+            {% if mk in data %}
+              £{{ '{:,.0f}'.format(data[mk]) }}
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+          <td class="num {% if data.avg > data.default and data.default > 0 %}perf-negative{% endif %}">
+            <strong>£{{ '{:,.0f}'.format(data.avg) }}</strong>
+          </td>
+          <td class="num text-muted">£{{ '{:,.0f}'.format(data.default) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endfor %}
+
+{% endif %}
+{% endblock %}

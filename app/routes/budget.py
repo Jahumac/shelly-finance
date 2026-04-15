@@ -17,6 +17,7 @@ from app.models import (
     fetch_budget_item,
     fetch_budget_items,
     fetch_budget_sections,
+    fetch_budget_trend,
     fetch_months_with_budget_entries,
     fetch_prior_month_budget_entries,
     update_budget_item,
@@ -347,6 +348,66 @@ def budget_import():
     msg += f" for {_month_label(month_key)}."
     flash(msg, "success")
     return redirect(url_for("budget.budget", month=month_key))
+
+
+@budget_bp.route("/trend/")
+@login_required
+def budget_trend():
+    uid = current_user.id
+    today = date.today()
+
+    # Last 6 months that have any entries
+    all_months = [r["month_key"] for r in [
+        {"month_key": m} for m in _last_n_months(today, 6)
+    ]]
+    months_with_data = fetch_months_with_budget_entries(uid)
+    months = [m for m in all_months if m in months_with_data]
+
+    rows = fetch_budget_trend(uid, months)
+
+    # Build structure: {section: {item: {month_key: amount}}}
+    sections = {}   # {section_name: {item_name: {mk: amount, "default": float}}}
+    for r in rows:
+        sn = r["section_name"]
+        inn = r["item_name"]
+        if sn not in sections:
+            sections[sn] = {}
+        if inn not in sections[sn]:
+            sections[sn][inn] = {"default": float(r["default_amount"] or 0)}
+        sections[sn][inn][r["month_key"]] = float(r["actual_amount"] or 0)
+
+    # Month display labels
+    month_labels = [
+        datetime.strptime(mk, "%Y-%m").strftime("%b %Y") for mk in months
+    ]
+
+    # Column averages (across months with data per item)
+    for sn, items in sections.items():
+        for inn, data in items.items():
+            month_vals = [data[mk] for mk in months if mk in data]
+            data["avg"] = sum(month_vals) / len(month_vals) if month_vals else 0
+
+    return render_template(
+        "budget_trend.html",
+        sections=sections,
+        months=months,
+        month_labels=month_labels,
+        active_page="budget",
+    )
+
+
+def _last_n_months(today, n):
+    """Return list of 'YYYY-MM' strings for the last n months (most recent last)."""
+    result = []
+    y, m = today.year, today.month
+    for _ in range(n):
+        result.append(f"{y:04d}-{m:02d}")
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+    result.reverse()
+    return result
 
 
 @budget_bp.route("/items/", methods=["GET", "POST"])

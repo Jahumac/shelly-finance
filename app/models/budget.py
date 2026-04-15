@@ -214,6 +214,38 @@ def fetch_months_with_budget_entries(user_id):
         return {r["month_key"] for r in rows}
 
 
+def fetch_budget_trend(user_id, months):
+    """Return budget vs actual data for multiple months.
+
+    months: list of 'YYYY-MM' strings.
+    Returns list of dicts: {section_name, item_name, item_id, default_amount,
+                             month_key, actual_amount}
+    Only includes items that have at least one entry in the given months.
+    """
+    if not months:
+        return []
+    placeholders = ",".join("?" * len(months))
+    with get_connection() as conn:
+        return conn.execute(
+            f"""
+            SELECT
+                bs.name AS section_name,
+                bi.name AS item_name,
+                bi.id AS item_id,
+                bi.default_amount,
+                be.month_key,
+                be.amount AS actual_amount
+            FROM budget_entries be
+            JOIN budget_items bi ON bi.id = be.budget_item_id
+            JOIN budget_sections bs ON bs.id = bi.section_id
+            WHERE bi.user_id = ?
+              AND be.month_key IN ({placeholders})
+            ORDER BY bs.sort_order ASC, bi.sort_order ASC, be.month_key ASC
+            """,
+            [user_id, *months],
+        ).fetchall()
+
+
 def upsert_budget_entry(month_key, item_id, amount, user_id=None):
     with get_connection() as conn:
         if user_id is not None:

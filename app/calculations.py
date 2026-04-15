@@ -467,9 +467,18 @@ def compute_performance_series(monthly_data, assumed_rate, assumed_monthly):
     if not monthly_data:
         return None
 
+    from datetime import datetime as _dt
     month_keys   = [m[0] for m in monthly_data]
     balances     = [m[1] for m in monthly_data]
     contribs     = [m[2] for m in monthly_data]
+
+    def _fmt(mk):
+        try:
+            return _dt.strptime(mk, "%Y-%m").strftime("%b %Y")
+        except (ValueError, TypeError):
+            return mk
+
+    display_labels = [_fmt(mk) for mk in month_keys]
 
     # ── Modified Dietz monthly returns ────────────────────────────────────
     # Assumes contributions arrive mid-month (weight = 0.5)
@@ -509,7 +518,7 @@ def compute_performance_series(monthly_data, assumed_rate, assumed_monthly):
         gain    = closing - opening - cf
         r       = monthly_returns[i - 1]
         rows.append({
-            "month_key":    month_keys[i],
+            "month_key":    display_labels[i],
             "opening":      round(opening, 2),
             "contribution": round(cf, 2),
             "market_gain":  round(gain, 2),
@@ -524,7 +533,7 @@ def compute_performance_series(monthly_data, assumed_rate, assumed_monthly):
     vs_plan = balances[-1] - projected_values[-1] if projected_values else 0
 
     return {
-        "labels":            month_keys,
+        "labels":            display_labels,
         "actual_values":     [round(b, 0) for b in balances],
         "projected_values":  projected_values,
         "benchmark_values":  None,       # slot for future benchmark data

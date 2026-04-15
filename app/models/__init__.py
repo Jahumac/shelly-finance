@@ -4,18 +4,21 @@ Every existing `from app.models import X` import keeps working because this
 file re-exports everything from the domain submodules.
 
 Layout:
-    _conn.py     — sqlite3 connection + close_db (leaf, no internal deps)
-    schema.py    — SCHEMA string + init_db with all migrations
-    users.py     — User class, user CRUD, API tokens
-    goals.py     — savings/retirement goals
-    accounts.py  — accounts, holdings, holding catalogue, prices
-    budget.py    — budget items, sections, monthly entries
-    planning.py  — assumptions, monthly reviews, snapshots, allowance
-                   tracking (ISA/pension/dividend), overrides, tags, resets
+    _conn.py                — sqlite3 connection + close_db (leaf, no internal deps)
+    schema.py               — SCHEMA string + init_db with all migrations
+    users.py                — User class, user CRUD, API tokens
+    goals.py                — savings/retirement goals
+    accounts.py             — accounts, holdings, holding catalogue, prices
+    budget.py               — budget items, sections, monthly entries
+    planning.py             — constants, tags, resets + re-exports from submodules
+    planning_assumptions.py — fetch_assumptions, update_assumptions
+    planning_allowances.py  — ISA/pension/dividend/CGT/carry-forward/overrides
+    planning_reviews.py     — monthly reviews and review items
+    planning_snapshots.py   — monthly + daily snapshots, performance history
 
 If you're adding a new model function, put it in the file that matches its
 domain. If it doesn't fit any cleanly, that's a sign you may need a new
-submodule — talk it through before spreading the surface area.
+submodule.
 """
 
 # Connection + schema
@@ -89,6 +92,7 @@ from .budget import (
     fetch_budget_item,
     fetch_budget_items,
     fetch_budget_sections,
+    fetch_budget_trend,
     fetch_months_with_budget_entries,
     fetch_prior_month_budget_entries,
     update_budget_item,
@@ -148,5 +152,6 @@ from .planning import (
     update_monthly_review_item,
     set_contribution_confirmed,
     mark_review_item_updated,
+    fetch_tax_year_contributions,
     upsert_monthly_snapshot,
 )

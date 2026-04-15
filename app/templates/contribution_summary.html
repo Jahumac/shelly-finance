@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% from '_macros.html' import empty_state %}
+{% block title %}Contributions {{ tax_year }}{% endblock %}
+{% block content %}
+
+<nav class="subnav">
+  <a href="/goals/">Goals</a>
+  <a href="/projections/">Projections</a>
+  <a href="/performance/">Performance</a>
+  <a href="/performance/contributions/" class="subnav-active">Contributions</a>
+</nav>
+
+{% include '_month_strip.html' %}
+
+<section class="card highlight mb-1">
+  <div class="hero-top">
+    <div>
+      <p class="eyebrow">Tax Year {{ tax_year }}</p>
+      <h2 class="hero-value">Contribution Summary</h2>
+      <p class="hero-subtitle">Month-by-month contributions across all accounts</p>
+    </div>
+  </div>
+</section>
+
+{% if not accounts %}
+<section class="card">
+  {{ empty_state('No contribution data yet',
+                 'Complete some monthly reviews and the contribution history will appear here.',
+                 cta_text='Go to Monthly Update', cta_href='/monthly-review/') }}
+</section>
+{% else %}
+
+<div class="panel" style="overflow-x:auto;">
+  <table class="data-table contrib-table">
+    <thead>
+      <tr>
+        <th>Account</th>
+        {% for label in month_labels %}
+        <th class="num">{{ label }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for acc in accounts %}
+      <tr>
+        <td>
+          <span class="contrib-account-name">{{ acc.name }}</span>
+          {% if acc.wrapper_type %}<span class="badge badge-meta" style="font-size:0.7rem;margin-left:4px">{{ acc.wrapper_type }}</span>{% endif %}
+        </td>
+        {% for mk in months %}
+        {% set cell = acc.months.get(mk) %}
+        <td class="num {% if cell and cell.confirmed %}contrib-confirmed{% elif cell %}contrib-pending{% else %}contrib-none{% endif %}">
+          {% if cell %}
+            £{{ '{:,.0f}'.format(cell.expected) }}
+            {% if cell.confirmed %}<span class="contrib-tick">✓</span>{% endif %}
+          {% else %}
+            <span class="text-muted">—</span>
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr class="contrib-totals">
+        <td><strong>Total</strong></td>
+        {% for mk in months %}
+        <td class="num"><strong>£{{ '{:,.0f}'.format(month_totals[mk]) }}</strong></td>
+        {% endfor %}
+      </tr>
+    </tfoot>
+  </table>
+</div>
+
+<p class="helper-text mt-1">
+  <span class="contrib-confirmed" style="padding:2px 6px;border-radius:4px">✓ confirmed</span>
+  &nbsp;= contribution marked confirmed in monthly review &nbsp;·&nbsp;
+  no tick = expected but not yet confirmed &nbsp;·&nbsp;
+  <span class="text-muted">—</span> = no review entry for that month
+</p>
+
+{% endif %}
+{% endblock %}
