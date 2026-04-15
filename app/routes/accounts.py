@@ -91,6 +91,7 @@ def _account_payload_from_form(form):
         "platform_fee_flat": _optional_float(form.get("platform_fee_flat"), 0.0),
         "platform_fee_cap": _optional_float(form.get("platform_fee_cap"), 0.0),
         "fund_fee_pct": _optional_float(form.get("fund_fee_pct"), 0.0),
+        "cash_interest_rate": _optional_float(form.get("cash_interest_rate_edit"), 0.0, divide_by_100=True),
     }
 
 
