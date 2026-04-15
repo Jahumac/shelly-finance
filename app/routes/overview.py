@@ -68,7 +68,12 @@ def overview():
     # Keep a single primary goal for the hero stat + backward compat
     goal = fetch_primary_goal(uid)
     goal_target = float(goal["target_value"]) if goal else 0
-    goal_progress = progress_to_goal(invested_total, goal_target)
+    if goal:
+        _primary_tags = [t.strip() for t in (goal["selected_tags"] or "").split(",") if t.strip()]
+        _primary_current = sum(tag_totals_map.get(t, 0.0) for t in _primary_tags) if _primary_tags else invested_total
+    else:
+        _primary_current = invested_total
+    goal_progress = progress_to_goal(_primary_current, goal_target)
 
     current_tax_year = uk_tax_year_label()
     now_date = datetime.now().date()
@@ -90,14 +95,21 @@ def overview():
     goals_data = []
     for g in all_goals:
         gt = float(g["target_value"] or 0)
-        gp = progress_to_goal(invested_total, gt)
+        # Use tag-filtered value if the goal has selected_tags, else total portfolio
+        selected_tags = [t.strip() for t in (g["selected_tags"] or "").split(",") if t.strip()]
+        if selected_tags:
+            current = sum(tag_totals_map.get(t, 0.0) for t in selected_tags)
+        else:
+            current = invested_total
+        gp = progress_to_goal(current, gt)
         goals_data.append({
             "id": g["id"],
             "name": g["name"],
             "target": gt,
+            "current": current,
             "progress": gp,
-            "remaining": max(gt - invested_total, 0),
-            "goal_year": _goal_year_estimate(gt, invested_total, monthly_total, assumptions),
+            "remaining": max(gt - current, 0),
+            "goal_year": _goal_year_estimate(gt, current, monthly_total, assumptions),
         })
 
     # Primary goal year for hero stat
