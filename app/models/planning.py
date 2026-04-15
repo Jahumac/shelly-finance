@@ -273,6 +273,38 @@ def delete_cgt_disposal(disposal_id, user_id):
         conn.commit()
 
 
+# ── Pension carry-forward ─────────────────────────────────────────────────────
+
+def fetch_pension_carry_forward(user_id):
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM pension_carry_forward WHERE user_id = ? ORDER BY tax_year DESC",
+            (user_id,),
+        ).fetchall()
+
+
+def upsert_pension_carry_forward(user_id, tax_year, unused_allowance):
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO pension_carry_forward (user_id, tax_year, unused_allowance)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id, tax_year) DO UPDATE SET unused_allowance = excluded.unused_allowance
+            """,
+            (user_id, tax_year, unused_allowance),
+        )
+        conn.commit()
+
+
+def delete_pension_carry_forward(entry_id, user_id):
+    with get_connection() as conn:
+        conn.execute(
+            "DELETE FROM pension_carry_forward WHERE id = ? AND user_id = ?",
+            (entry_id, user_id),
+        )
+        conn.commit()
+
+
 # ── Monthly reviews ───────────────────────────────────────────────────────────
 
 def fetch_or_create_monthly_review(month_key, user_id):

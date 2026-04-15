@@ -83,12 +83,17 @@ def _build_monthly_data(month_key, user_id):
             else:
                 source = "default"
 
+            linked_account_name = None
+            if item["linked_account_id"] and item["linked_account_id"] in account_map:
+                linked_account_name = account_map[item["linked_account_id"]]["name"]
+
             section_items.append({
                 "id": item["id"],
                 "name": item["name"],
                 "notes": item["notes"],
                 "amount": amount,
                 "linked": item["linked_account_id"] is not None,
+                "linked_account_name": linked_account_name,
                 "source": source,
             })
         section_total = sum(i["amount"] for i in section_items)

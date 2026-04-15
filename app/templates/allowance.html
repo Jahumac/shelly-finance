@@ -389,6 +389,62 @@
 </section>
 {% endif %}
 
+{# ── Pension carry-forward ───────────────────────────────────────────────── #}
+<section class="card mb-1">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Unused Allowance (Up to 3 Prior Years)</p>
+      <h2>Carry-Forward</h2>
+    </div>
+  </div>
+  <p class="helper-text">If you didn't use your full pension allowance in the last three tax years, you can carry it forward. Record each year's unused amount and Shelly will add it to your effective limit above.</p>
+
+  {% if carry_forward_entries %}
+  <table class="mini-table mt-075">
+    <thead>
+      <tr><th>Tax Year</th><th class="text-right">Unused Allowance</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for e in carry_forward_entries %}
+      <tr>
+        <td>{{ e.tax_year }}</td>
+        <td class="text-right">£{{ '{:,.0f}'.format(e.unused_allowance) }}</td>
+        <td class="text-right">
+          <form method="post" action="/allowance/pension/carry-forward/delete/{{ e.id }}" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="badge badge-sm badge-danger">✕</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      <tr>
+        <td><strong>Total carry-forward added</strong></td>
+        <td class="text-right"><strong>£{{ '{:,.0f}'.format(pension_limits.carry_forward_total) }}</strong></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  {% endif %}
+
+  <form method="post" action="/allowance/pension/carry-forward/add" class="settings-form mt-1">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-grid">
+      <label>
+        <span>Tax year</span>
+        <input type="text" name="tax_year" placeholder="e.g. 2023-24" pattern="\d{4}-\d{2}" required>
+        <small class="form-hint">Format: 2023-24</small>
+      </label>
+      <label>
+        <span>Unused allowance (£)</span>
+        <input type="number" name="unused_allowance" step="0.01" min="0" placeholder="e.g. 15000" required>
+      </label>
+    </div>
+    <div class="row-end mt-1">
+      <button type="submit" class="badge badge-primary-action">Add carry-forward year</button>
+    </div>
+  </form>
+</section>
+
 {# ══════════════════════════════════════════════════════════════════════════ #}
 {# TAXABLE ALLOWANCES (GIA)                                                  #}
 {# ══════════════════════════════════════════════════════════════════════════ #}

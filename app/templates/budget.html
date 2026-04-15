@@ -113,7 +113,7 @@
     <div class="budget-row">
       <div class="budget-row-left">
         <span class="budget-row-name">{{ item.name }}</span>
-        {% if item.linked %}<span class="budget-pill" title="Amount synced from your account's monthly contribution — edit the account to change it">linked</span>{% endif %}
+        {% if item.linked %}<span class="budget-pill" title="Amount synced from {{ item.linked_account_name or 'account' }}'s monthly contribution — edit the account to change it">linked · {{ item.linked_account_name or '—' }}</span>{% endif %}
         {% if item.source == 'inherited' %}<span class="budget-row-source" data-source="inherited" title="Carried forward from the last month you edited">prev month</span>{% endif %}
         {% if item.source == 'default' %}<span class="budget-row-source" data-source="default" title="Using the default amount — change it to save for this month">default</span>{% endif %}
         {% if item.notes %}<span class="budget-row-note">{{ item.notes }}</span>{% endif %}
