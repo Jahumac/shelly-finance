@@ -63,8 +63,10 @@
         </td>
         {% for mk in months %}
         {% set cell = acc.months.get(mk) %}
-        <td class="num {% if cell and cell.confirmed %}contrib-confirmed{% elif cell %}contrib-pending{% else %}contrib-none{% endif %}">
-          {% if cell %}
+        <td class="num {% if cell and cell.skipped %}contrib-skipped{% elif cell and cell.confirmed %}contrib-confirmed{% elif cell %}contrib-pending{% else %}contrib-none{% endif %}">
+          {% if cell and cell.skipped %}
+            <span class="contrib-skip-label">↷ Skipped</span>
+          {% elif cell %}
             £{{ '{:,.0f}'.format(cell.expected) }}
             {% if cell.confirmed %}<span class="contrib-tick">✓</span>{% endif %}
           {% else %}
@@ -89,11 +91,13 @@
 
 <div class="contrib-legend mt-1">
   <span class="contrib-legend-item contrib-confirmed">✓ Confirmed</span>
-  <span class="contrib-legend-sep">contribution ticked off in monthly review</span>
+  <span class="contrib-legend-sep">ticked off in monthly review</span>
   <span class="contrib-legend-item contrib-pending">~ Pending</span>
   <span class="contrib-legend-sep">expected but not yet confirmed</span>
+  <span class="contrib-legend-item contrib-skipped">↷ Skipped</span>
+  <span class="contrib-legend-sep">intentionally skipped this month</span>
   <span class="contrib-legend-item contrib-none">— None</span>
-  <span class="contrib-legend-sep">no review entry for that month</span>
+  <span class="contrib-legend-sep">no review entry</span>
 </div>
 
 {% endif %}

@@ -149,10 +149,16 @@ def fetch_tax_year_contributions(user_id, from_month, to_month):
                 a.wrapper_type,
                 mr.month_key,
                 mri.expected_contribution,
-                mri.contribution_confirmed
+                mri.contribution_confirmed,
+                CASE WHEN co.id IS NOT NULL THEN 1 ELSE 0 END AS is_skipped
             FROM monthly_review_items mri
             JOIN monthly_reviews mr ON mr.id = mri.review_id
             JOIN accounts a ON a.id = mri.account_id
+            LEFT JOIN contribution_overrides co
+                   ON co.account_id = mri.account_id
+                  AND mr.month_key >= co.from_month
+                  AND mr.month_key <= co.to_month
+                  AND co.override_amount = 0
             WHERE mr.user_id = ?
               AND mr.month_key >= ?
               AND mr.month_key <= ?

@@ -96,6 +96,7 @@ def contribution_summary():
         data[aid]["months"][r["month_key"]] = {
             "expected": float(r["expected_contribution"] or 0),
             "confirmed": bool(r["contribution_confirmed"]),
+            "skipped": bool(r["is_skipped"]),
         }
 
     # Sort accounts by name
