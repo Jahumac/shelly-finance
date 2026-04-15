@@ -21,7 +21,11 @@
         <h2 class="hero-value {% if perf.annualised_return is not none %}{% if perf.annualised_return >= assumed_rate_pct %}perf-positive{% else %}perf-negative{% endif %}{% endif %}">
           {% if perf.annualised_return is not none %}{{ '{:+.1f}'.format(perf.annualised_return) }}% annualised{% else %}—{% endif %}
         </h2>
-        <p class="hero-subtitle">vs your {{ assumed_rate_pct }}% assumption · {{ perf.n_months }} month{{ 's' if perf.n_months != 1 }} tracked</p>
+        {% if perf.annualised_return is none %}
+          <p class="hero-subtitle">Need 3+ months to calculate a meaningful annualised return · {{ perf.n_months }} month{{ 's' if perf.n_months != 1 }} tracked so far</p>
+        {% else %}
+          <p class="hero-subtitle">vs your {{ assumed_rate_pct }}% assumption · {{ perf.n_months }} month{{ 's' if perf.n_months != 1 }} tracked</p>
+        {% endif %}
       {% else %}
         <h2 class="hero-value">No data yet</h2>
         <p class="hero-subtitle">Shelly needs at least two monthly reviews before the maths kicks in</p>

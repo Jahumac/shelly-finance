@@ -487,7 +487,9 @@ def compute_performance_series(monthly_data, assumed_rate, assumed_monthly):
         cum *= (1 + r)
     total_return = cum - 1.0
     n = len(monthly_returns)
-    annualised_return = ((cum ** (12.0 / n)) - 1) if n > 0 else None
+    # Require at least 3 months before annualising — with fewer data points
+    # the figure is statistically meaningless and often alarming.
+    annualised_return = ((cum ** (12.0 / n)) - 1) if n >= 3 else None
 
     # ── Projected "on plan" series from first recorded balance ────────────
     # Shows what the portfolio would be worth at the assumed rate + assumed
