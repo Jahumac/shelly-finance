@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import empty_state %}
+{% from '_macros.html' import hero_stat, empty_state %}
 {% block title %}Budget Trend{% endblock %}
 {% block content %}
 
@@ -23,6 +23,18 @@
       <img src="{{ url_for('static', filename='icons/shelly/Budget.png') }}" alt="" class="hero-turtle">
     </div>
   </div>
+  {% if months %}
+  <div class="hero-strip">
+    {% call hero_stat('Months tracked') %}<strong>{{ months | length }}</strong>{% endcall %}
+    {% call hero_stat('Avg monthly income') %}<strong>£{{ '{:,.0f}'.format(trend_avg_income) }}</strong>{% endcall %}
+    {% call hero_stat('Avg monthly spend') %}<strong>£{{ '{:,.0f}'.format(trend_avg_spend) }}</strong>{% endcall %}
+    {% call hero_stat('Avg surplus') %}
+      <strong class="{% if trend_surplus >= 0 %}stat-positive-text{% else %}stat-negative-text{% endif %}">
+        {% if trend_surplus >= 0 %}+{% endif %}£{{ '{:,.0f}'.format(trend_surplus) }}
+      </strong>
+    {% endcall %}
+  </div>
+  {% endif %}
 </section>
 
 {% if not sections %}

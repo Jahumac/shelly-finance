@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from '_macros.html' import empty_state %}
+{% from '_macros.html' import hero_stat, empty_state %}
 {% block title %}Contributions {{ tax_year }}{% endblock %}
 {% block content %}
 
@@ -23,6 +23,16 @@
       <img src="{{ url_for('static', filename='icons/shelly/Goals.png') }}" alt="" class="hero-turtle">
     </div>
   </div>
+  {% if accounts %}
+  {% set total_contributed = month_totals.values() | sum %}
+  {% set confirmed_count = accounts | sum(attribute='months') %}
+  <div class="hero-strip">
+    {% call hero_stat('Total contributed') %}<strong>£{{ '{:,.0f}'.format(total_contributed) }}</strong>{% endcall %}
+    {% call hero_stat('Months tracked') %}<strong>{{ months | length }}</strong>{% endcall %}
+    {% call hero_stat('Avg per month') %}<strong>£{{ '{:,.0f}'.format(total_contributed / (months | length)) }}</strong>{% endcall %}
+    {% call hero_stat('Accounts') %}<strong>{{ accounts | length }}</strong>{% endcall %}
+  </div>
+  {% endif %}
 </section>
 
 {% if not accounts %}

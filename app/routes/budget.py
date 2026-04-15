@@ -426,11 +426,35 @@ def budget_trend():
         datetime.strptime(mk, "%Y-%m").strftime("%b %Y") for mk in months
     ]
 
+    # Hero stats
+    income_key = next(
+        (s["key"] for s in fetch_budget_sections(uid) if "income" in s["key"].lower()), None
+    )
+    income_section_label = next(
+        (s["label"] for s in fetch_budget_sections(uid) if s["key"] == income_key), None
+    ) if income_key else None
+
+    trend_avg_income = 0.0
+    trend_avg_spend = 0.0
+    trend_item_count = 0
+    for sn, items in sections.items():
+        is_income = (income_section_label and sn == income_section_label)
+        for inn, data in items.items():
+            trend_item_count += 1
+            if is_income:
+                trend_avg_income += data["avg"]
+            else:
+                trend_avg_spend += data["avg"]
+
     return render_template(
         "budget_trend.html",
         sections=sections,
         months=months,
         month_labels=month_labels,
+        trend_avg_income=trend_avg_income,
+        trend_avg_spend=trend_avg_spend,
+        trend_surplus=trend_avg_income - trend_avg_spend,
+        trend_item_count=trend_item_count,
         active_page="budget",
     )
 
