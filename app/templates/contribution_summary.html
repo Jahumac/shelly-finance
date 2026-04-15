@@ -56,7 +56,10 @@
     </thead>
     <tbody>
       {% for acc in accounts %}
-      <tr>
+      {% set last_mk = months[-1] if months else '' %}
+      {% set last_cell = acc.months.get(last_mk) %}
+      {% set row_state = 'skipped' if last_cell and last_cell.skipped else ('confirmed' if last_cell and last_cell.confirmed else ('pending' if last_cell else 'none')) %}
+      <tr class="contrib-row-{{ row_state }}">
         <td>
           <span class="contrib-account-name">{{ acc.name }}</span>
           {% if acc.wrapper_type %}<span class="badge badge-meta" style="font-size:0.7rem;margin-left:4px">{{ acc.wrapper_type }}</span>{% endif %}
@@ -65,12 +68,12 @@
         {% set cell = acc.months.get(mk) %}
         <td class="num {% if cell and cell.skipped %}contrib-skipped{% elif cell and cell.confirmed %}contrib-confirmed{% elif cell %}contrib-pending{% else %}contrib-none{% endif %}">
           {% if cell and cell.skipped %}
-            <span class="contrib-skip-label">↷ Skipped</span>
+            <span class="contrib-skip-amount">£{{ '{:,.0f}'.format(cell.expected) }}</span>
           {% elif cell %}
             £{{ '{:,.0f}'.format(cell.expected) }}
             {% if cell.confirmed %}<span class="contrib-tick">✓</span>{% endif %}
           {% else %}
-            <span class="text-muted">—</span>
+            —
           {% endif %}
         </td>
         {% endfor %}
@@ -92,11 +95,11 @@
 <div class="contrib-legend mt-1">
   <span class="contrib-legend-item contrib-confirmed">✓ Confirmed</span>
   <span class="contrib-legend-sep">ticked off in monthly review</span>
-  <span class="contrib-legend-item contrib-pending">~ Pending</span>
+  <span class="contrib-legend-item contrib-pending">Pending</span>
   <span class="contrib-legend-sep">expected but not yet confirmed</span>
-  <span class="contrib-legend-item contrib-skipped">↷ Skipped</span>
+  <span class="contrib-legend-item contrib-skipped"><span class="contrib-skip-amount">£123</span> Skipped</span>
   <span class="contrib-legend-sep">intentionally skipped this month</span>
-  <span class="contrib-legend-item contrib-none">— None</span>
+  <span class="contrib-legend-item contrib-none">—</span>
   <span class="contrib-legend-sep">no review entry</span>
 </div>
 

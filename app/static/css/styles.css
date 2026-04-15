@@ -4667,12 +4667,19 @@ a.link-accent:hover {
 /* ── Contribution summary table ────────────────────────────────────────────── */
 .contrib-table th, .contrib-table td { white-space: nowrap; }
 .contrib-account-name { font-weight: 500; }
+/* Cell-level coloring */
 .contrib-confirmed  { background: rgba(34,197,94,0.15); color: #4ade80; font-weight: 600; }
 .contrib-pending    { background: rgba(251,191,36,0.10); color: #fbbf24; }
 .contrib-skipped    { background: rgba(148,163,184,0.08); color: var(--muted); font-style: italic; }
 .contrib-none       { color: var(--muted); }
 .contrib-tick       { color: #4ade80; margin-left: 4px; font-size: 0.85rem; }
-.contrib-skip-label { font-size: 0.78rem; }
+.contrib-skip-amount { text-decoration: line-through; opacity: 0.55; }
+
+/* Row-level accent on account name cell */
+.contrib-row-confirmed > td:first-child { border-left: 3px solid #4ade80; }
+.contrib-row-pending   > td:first-child { border-left: 3px solid #fbbf24; }
+.contrib-row-skipped   > td:first-child { border-left: 3px solid var(--muted); }
+.contrib-row-none      > td:first-child { border-left: 3px solid transparent; }
 
 .contrib-legend {
   display: flex;
