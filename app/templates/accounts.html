@@ -169,17 +169,10 @@
               <label><span>Current Balance</span><input type="number" step="0.01" name="current_value" value="{{ selected.current_value if selected.current_value is not none else '' }}"></label>
             </div>
             <label data-custom-rate-field {% if selected.growth_mode != 'custom' %}class="hidden"{% endif %}>
-              <span>Custom Growth Rate (%)</span>
+              <span>Custom Growth / Interest Rate (%)</span>
               <input type="number" step="0.1" name="growth_rate_override" value="{{ '{:.1f}'.format(selected.growth_rate_override * 100) if selected.growth_rate_override else '' }}" placeholder="e.g. 4.5">
               <small class="form-hint">Enter as a percentage — e.g. 4.5 for 4.5%, 3.6 for 3.6%</small>
             </label>
-            {% if selected.valuation_mode != 'holdings' %}
-            <label>
-              <span>Cash Interest Rate (% p.a.)</span>
-              <input type="number" step="0.01" name="cash_interest_rate_edit" value="{{ '{:.2f}'.format((selected.cash_interest_rate or 0) * 100) }}" placeholder="e.g. 4.5">
-              <small class="form-hint">If this is a savings or cash account, enter the annual interest rate. Used to estimate daily and monthly interest earned.</small>
-            </label>
-            {% endif %}
             <label>
               <span>Your Monthly Contribution</span>
               <input type="number" step="0.01" name="monthly_contribution" value="{{ selected.monthly_contribution or 0 }}">
@@ -340,15 +333,16 @@
           <span>Valuation</span>
           <strong>{{ 'From holdings' if selected.valuation_mode == 'holdings' else 'Manual' }}</strong>
         </div>
-        {% if selected.cash_interest_rate and selected.cash_interest_rate > 0 %}
+        {% if selected.valuation_mode != 'holdings' %}
+        {% set _eff_rate = selected.growth_rate_override if selected.growth_mode == 'custom' and selected.growth_rate_override else global_growth_rate %}
         {% set _bal = effective_values[selected.id] or 0 %}
         <div class="acct-detail-stat">
           <span>Est. daily accrual</span>
-          <strong class="text-gain">£{{ '{:.2f}'.format(_bal * selected.cash_interest_rate / 365) }}</strong>
+          <strong class="text-gain">£{{ '{:.2f}'.format(_bal * _eff_rate / 365) }}</strong>
         </div>
         <div class="acct-detail-stat">
-          <span>Est. monthly interest</span>
-          <strong class="text-gain">£{{ '{:,.2f}'.format(_bal * selected.cash_interest_rate / 12) }}</strong>
+          <span>Est. monthly growth</span>
+          <strong class="text-gain">£{{ '{:,.2f}'.format(_bal * _eff_rate / 12) }}</strong>
         </div>
         {% endif %}
         {% if selected.goal_value %}

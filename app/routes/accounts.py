@@ -91,7 +91,6 @@ def _account_payload_from_form(form):
         "platform_fee_flat": _optional_float(form.get("platform_fee_flat"), 0.0),
         "platform_fee_cap": _optional_float(form.get("platform_fee_cap"), 0.0),
         "fund_fee_pct": _optional_float(form.get("fund_fee_pct"), 0.0),
-        "cash_interest_rate": _optional_float(form.get("cash_interest_rate_edit"), 0.0, divide_by_100=True),
     }
 
 
@@ -196,6 +195,7 @@ def _render_accounts_page(user_id, selected=None, detail_mode="view", position_e
         account_monthly_values=account_monthly_values,
         account_daily_labels=account_daily_labels,
         account_daily_values=account_daily_values,
+        global_growth_rate=float(assumptions["annual_growth_rate"]) if assumptions and assumptions["annual_growth_rate"] else 0.05,
         prices_stale=prices_stale,
     )
 
