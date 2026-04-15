@@ -57,7 +57,7 @@
 {% if goal_cards %}
 <section class="card-grid goal-grid">
   {% for goal in goal_cards %}
-    <a class="card goal-link-card" href="/goals/?mode=view&goal_id={{ goal.id }}">
+    <a class="card goal-link-card" href="/goals/?mode=edit&goal_id={{ goal.id }}">
       <div class="section-header mb-075 flex-start">
         <div>
           <h2 class="goal-card-title">{{ goal.name }}</h2>
@@ -178,9 +178,29 @@
 
       <div class="badge-row mt-1">
         <button type="submit">Save goal</button>
-        <a class="badge" href="/goals/?mode=view&goal_id={{ selected_goal.id }}">Cancel</a>
+        <a class="badge" id="goal-cancel-btn" href="/goals/">Cancel</a>
       </div>
     </form>
+    <script>
+    (function () {
+      var form = document.querySelector('[name="form_name"][value="update_goal"]').closest('form');
+      var cancelBtn = document.getElementById('goal-cancel-btn');
+      if (!form || !cancelBtn) return;
+      var original = new FormData(form);
+      function isDirty() {
+        var current = new FormData(form);
+        for (var pair of current.entries()) {
+          if (original.get(pair[0]) !== pair[1]) return true;
+        }
+        return false;
+      }
+      cancelBtn.addEventListener('click', function (e) {
+        if (isDirty()) {
+          if (!confirm('You have unsaved changes. Discard them?')) e.preventDefault();
+        }
+      });
+    })();
+    </script>
 
   {% elif page_mode == 'delete' %}
     <p>This will remove <strong>{{ selected_goal_card.item.name }}</strong>. Do this only if you are sure.</p>
@@ -189,7 +209,7 @@
       <input type="hidden" name="goal_id" value="{{ selected_goal.id }}">
       <div class="badge-row">
         <button type="submit" class="button-danger">Yes, delete goal</button>
-        <a class="badge" href="/goals/?mode=view&goal_id={{ selected_goal.id }}">Cancel</a>
+        <a class="badge" href="/goals/">Cancel</a>
       </div>
     </form>
 

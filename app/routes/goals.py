@@ -92,8 +92,6 @@ def goals():
         selected_goal = fetch_goal(selected_goal_id, uid)
         if selected_goal:
             selected_goal_tags = _split_tags(selected_goal["selected_tags"]) if "selected_tags" in selected_goal.keys() else []
-            if page_mode == "view":
-                page_mode = "edit"
 
     return render_template(
         "goals.html",
