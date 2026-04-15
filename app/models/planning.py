@@ -841,6 +841,42 @@ def fetch_daily_snapshots(user_id, limit=365):
     return [(r["snapshot_date"], float(r["total_value"])) for r in rows]
 
 
+def save_account_daily_snapshots(user_id, account_values, snapshot_date=None):
+    """Save per-account daily snapshots.
+
+    account_values: list of (account_id, value) tuples.
+    Uses INSERT OR REPLACE to handle UNIQUE(account_id, snapshot_date).
+    """
+    from datetime import datetime
+    if snapshot_date is None:
+        snapshot_date = datetime.now().strftime("%Y-%m-%d")
+
+    with get_connection() as conn:
+        conn.executemany(
+            """
+            INSERT OR REPLACE INTO account_daily_snapshots (user_id, account_id, snapshot_date, value)
+            VALUES (?, ?, ?, ?)
+            """,
+            [(user_id, acct_id, snapshot_date, value) for acct_id, value in account_values],
+        )
+        conn.commit()
+
+
+def fetch_account_daily_snapshots(account_id, limit=365):
+    """Return (snapshot_date, value) pairs for one account, ordered ASC, last N days."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT snapshot_date, value FROM account_daily_snapshots
+            WHERE account_id = ?
+            ORDER BY snapshot_date DESC
+            LIMIT ?
+            """,
+            (account_id, limit),
+        ).fetchall()
+    return [(r["snapshot_date"], float(r["value"])) for r in reversed(rows)]
+
+
 # ── API tokens ────────────────────────────────────────────────────────────────
 # Bearer tokens for the JSON API. Tokens are random 32-byte hex strings
 # generated with secrets.token_hex(32). Stored in plaintext: this is a

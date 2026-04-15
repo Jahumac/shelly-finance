@@ -552,16 +552,31 @@
           <a class="badge badge-meta" href="/performance/export.xlsx?account_id={{ selected.id }}">Download report</a>
         </div>
 
-        {% if account_monthly_labels and account_monthly_labels | length >= 2 %}
+        {% set has_daily = account_daily_labels | length >= 2 %}
+        {% set has_monthly = account_monthly_labels | length >= 2 %}
+        {% if has_daily or has_monthly %}
+        {% if has_daily %}
         <div class="chart-range-pills">
-          <button class="chart-range-pill" data-range="3">3M</button>
-          <button class="chart-range-pill" data-range="6">6M</button>
-          <button class="chart-range-pill chart-range-pill-active" data-range="12">1Y</button>
-          <button class="chart-range-pill" data-range="24">2Y</button>
-          <button class="chart-range-pill" data-range="0">All</button>
+          <button class="chart-range-pill chart-range-pill-active" data-range="7" data-mode="daily">1W</button>
+          <button class="chart-range-pill" data-range="30" data-mode="daily">1M</button>
+          <button class="chart-range-pill" data-range="90" data-mode="daily">3M</button>
+          <button class="chart-range-pill" data-range="180" data-mode="daily">6M</button>
+          <button class="chart-range-pill" data-range="365" data-mode="daily">1Y</button>
+          {% if has_monthly %}<button class="chart-range-pill" data-range="0" data-mode="monthly">All</button>{% endif %}
         </div>
+        {% else %}
+        <div class="chart-range-pills">
+          <button class="chart-range-pill" data-range="6" data-mode="monthly">6M</button>
+          <button class="chart-range-pill chart-range-pill-active" data-range="12" data-mode="monthly">1Y</button>
+          <button class="chart-range-pill" data-range="0" data-mode="monthly">All</button>
+        </div>
+        {% endif %}
         <div class="chart-wrap chart-wrap-sm">
-          <canvas id="acctMonthlyChart" role="img" aria-label="Monthly account value chart" data-labels='{{ account_monthly_labels | tojson | safe }}' data-values='{{ account_monthly_values | tojson | safe }}'></canvas>
+          <canvas id="acctMonthlyChart" role="img" aria-label="Account value chart"
+            data-daily-labels='{{ account_daily_labels | tojson | safe }}'
+            data-daily-values='{{ account_daily_values | tojson | safe }}'
+            data-monthly-labels='{{ account_monthly_labels | tojson | safe }}'
+            data-monthly-values='{{ account_monthly_values | tojson | safe }}'></canvas>
         </div>
         <p id="acct-chart-error" class="helper-text mt-05 hidden"></p>
 
@@ -570,20 +585,20 @@
           try {
             var canvas = document.getElementById('acctMonthlyChart');
             if (!canvas) return;
-            var allLabels = JSON.parse(canvas.dataset.labels || '[]');
-            var allValues = JSON.parse(canvas.dataset.values || '[]');
+            var dailyLabels   = JSON.parse(canvas.dataset.dailyLabels   || '[]');
+            var dailyValues   = JSON.parse(canvas.dataset.dailyValues   || '[]');
+            var monthlyLabels = JSON.parse(canvas.dataset.monthlyLabels || '[]');
+            var monthlyValues = JSON.parse(canvas.dataset.monthlyValues || '[]');
             var ctx = canvas.getContext('2d');
             var c = ChartHelpers.colors();
             var chartInstance = null;
 
-            function sliceData(range) {
-              if (!range || range <= 0 || range >= allLabels.length) {
-                return { labels: allLabels, values: allValues };
-              }
-              return {
-                labels: allLabels.slice(-range),
-                values: allValues.slice(-range),
-              };
+            function getSlice(mode, range) {
+              var src = mode === 'daily'
+                ? { labels: dailyLabels, values: dailyValues }
+                : { labels: monthlyLabels, values: monthlyValues };
+              if (!range || range <= 0 || range >= src.labels.length) return src;
+              return { labels: src.labels.slice(-range), values: src.values.slice(-range) };
             }
 
             function drawFallback(canvasCtx, values) {
@@ -597,53 +612,33 @@
               }
               canvasCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
               canvasCtx.clearRect(0, 0, w, h);
-
               var padL = 44, padR = 12, padT = 10, padB = 22;
               var innerW = Math.max(1, w - padL - padR);
               var innerH = Math.max(1, h - padT - padB);
-
               var minV = Infinity, maxV = -Infinity;
               for (var i = 0; i < values.length; i++) {
                 var v = Number(values[i]);
                 if (!isFinite(v)) continue;
-                if (v < minV) minV = v;
-                if (v > maxV) maxV = v;
+                if (v < minV) minV = v; if (v > maxV) maxV = v;
               }
               if (!isFinite(minV) || !isFinite(maxV)) return;
               if (minV === maxV) { minV = minV * 0.999; maxV = maxV * 1.001; }
-
-              function xFor(idx) {
-                return values.length <= 1 ? padL + innerW / 2 : padL + (idx / (values.length - 1)) * innerW;
-              }
-              function yFor(val) {
-                return padT + (1 - (val - minV) / (maxV - minV)) * innerH;
-              }
-
-              canvasCtx.strokeStyle = c.grid;
-              canvasCtx.lineWidth = 1;
-              canvasCtx.beginPath();
-              for (var g = 0; g <= 4; g++) {
-                var gy = padT + (g / 4) * innerH;
-                canvasCtx.moveTo(padL, gy);
-                canvasCtx.lineTo(padL + innerW, gy);
-              }
+              function xFor(idx) { return values.length <= 1 ? padL + innerW / 2 : padL + (idx / (values.length - 1)) * innerW; }
+              function yFor(val) { return padT + (1 - (val - minV) / (maxV - minV)) * innerH; }
+              canvasCtx.strokeStyle = c.grid; canvasCtx.lineWidth = 1; canvasCtx.beginPath();
+              for (var g = 0; g <= 4; g++) { var gy = padT + (g / 4) * innerH; canvasCtx.moveTo(padL, gy); canvasCtx.lineTo(padL + innerW, gy); }
               canvasCtx.stroke();
-
               canvasCtx.beginPath();
               for (var p = 0; p < values.length; p++) {
-                var pv = Number(values[p]);
-                if (!isFinite(pv)) continue;
+                var pv = Number(values[p]); if (!isFinite(pv)) continue;
                 var px = xFor(p), py = yFor(pv);
-                if (p === 0) canvasCtx.moveTo(px, py);
-                else canvasCtx.lineTo(px, py);
+                if (p === 0) canvasCtx.moveTo(px, py); else canvasCtx.lineTo(px, py);
               }
-              canvasCtx.lineWidth = 2;
-              canvasCtx.strokeStyle = c.primary;
-              canvasCtx.stroke();
+              canvasCtx.lineWidth = 2; canvasCtx.strokeStyle = c.primary; canvasCtx.stroke();
             }
 
-            function renderChart(range) {
-              var d = sliceData(range);
+            function renderChart(mode, range) {
+              var d = getSlice(mode, range);
               if (typeof window.Chart === 'function') {
                 if (chartInstance) {
                   chartInstance.data.labels = d.labels;
@@ -664,16 +659,18 @@
               }
             }
 
-            // Initial render — default to 1Y (12 months)
-            renderChart(12);
-
-            // Wire up range pills
+            // Initial render based on first active pill
             var pills = document.querySelectorAll('.chart-range-pill');
+            var activePill = document.querySelector('.chart-range-pill-active');
+            var initMode  = activePill ? (activePill.dataset.mode || 'daily') : 'daily';
+            var initRange = activePill ? (parseInt(activePill.dataset.range) || 0) : 0;
+            renderChart(initMode, initRange);
+
             pills.forEach(function(pill) {
               pill.addEventListener('click', function() {
                 pills.forEach(function(p) { p.classList.remove('chart-range-pill-active'); });
                 pill.classList.add('chart-range-pill-active');
-                renderChart(parseInt(pill.dataset.range) || 0);
+                renderChart(pill.dataset.mode || 'daily', parseInt(pill.dataset.range) || 0);
               });
             });
 
@@ -685,7 +682,7 @@
         })();
         </script>
         {% else %}
-        <p class="helper-text">Not enough monthly snapshots yet. Run a Monthly Update twice (two months) to see history.</p>
+        <p class="helper-text">No history yet. Update your account balance or run the price scheduler to start recording daily snapshots.</p>
         {% endif %}
       </section>
 

@@ -255,6 +255,15 @@ CREATE TABLE IF NOT EXISTS portfolio_daily_snapshots (
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(user_id, snapshot_date)
 );
+
+CREATE TABLE IF NOT EXISTS account_daily_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    account_id INTEGER NOT NULL REFERENCES accounts(id),
+    snapshot_date TEXT NOT NULL,
+    value REAL NOT NULL,
+    UNIQUE(account_id, snapshot_date)
+);
 """
 
 
@@ -653,6 +662,7 @@ def init_db():
             "CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id)",
             "CREATE INDEX IF NOT EXISTS idx_cgt_disposals_user ON cgt_disposals(user_id, disposal_date)",
             "CREATE INDEX IF NOT EXISTS idx_cgt_disposals_account ON cgt_disposals(account_id)",
+            "CREATE INDEX IF NOT EXISTS idx_account_daily_account_date ON account_daily_snapshots(account_id, snapshot_date)",
         ]:
             try:
                 conn.execute(stmt)
@@ -662,6 +672,21 @@ def init_db():
         # ── cgt_disposals: add optional account_id ───────────────────────────
         try:
             conn.execute("ALTER TABLE cgt_disposals ADD COLUMN account_id INTEGER REFERENCES accounts(id)")
+        except Exception:
+            pass
+
+        # ── account_daily_snapshots: per-account daily values ─────────────────
+        try:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS account_daily_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    account_id INTEGER NOT NULL REFERENCES accounts(id),
+                    snapshot_date TEXT NOT NULL,
+                    value REAL NOT NULL,
+                    UNIQUE(account_id, snapshot_date)
+                )
+            """)
         except Exception:
             pass
 

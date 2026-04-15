@@ -31,6 +31,8 @@ from app.models import (
     sync_holding_prices_from_catalogue,
     fetch_assumptions,
     fetch_latest_price_update,
+    fetch_account_daily_snapshots,
+    save_account_daily_snapshots,
     save_daily_snapshot,
     update_account,
     update_catalogue_price,
@@ -122,10 +124,15 @@ def _render_accounts_page(user_id, selected=None, detail_mode="view", position_e
     overrides = fetch_contribution_overrides(selected["id"]) if selected else []
     account_monthly_labels = []
     account_monthly_values = []
+    account_daily_labels = []
+    account_daily_values = []
     if selected:
         history = fetch_account_snapshot_history(selected["id"], limit=36)
         account_monthly_labels = [m for (m, _) in history]
         account_monthly_values = [round(float(v or 0), 2) for (_, v) in history]
+        daily_history = fetch_account_daily_snapshots(selected["id"], limit=365)
+        account_daily_labels = [d for (d, _) in daily_history]
+        account_daily_values = [round(v, 2) for (_, v) in daily_history]
 
     edit_holding = None
     if edit_holding_id and positions:
@@ -186,6 +193,8 @@ def _render_accounts_page(user_id, selected=None, detail_mode="view", position_e
         tax_band=assumptions["tax_band"] if assumptions and "tax_band" in assumptions.keys() else "basic",
         account_monthly_labels=account_monthly_labels,
         account_monthly_values=account_monthly_values,
+        account_daily_labels=account_daily_labels,
+        account_daily_values=account_daily_values,
         prices_stale=prices_stale,
     )
 
@@ -615,8 +624,9 @@ def update_cash(account_id):
     update_account(payload, uid)
     holdings_totals = fetch_holding_totals_by_account(uid)
     accounts = fetch_all_accounts(uid)
-    total_value = sum(effective_account_value(a, holdings_totals) for a in accounts)
-    save_daily_snapshot(uid, total_value)
+    acct_vals = [(a["id"], effective_account_value(a, holdings_totals)) for a in accounts]
+    save_daily_snapshot(uid, sum(v for _, v in acct_vals))
+    save_account_daily_snapshots(uid, acct_vals)
     flash("Cash balance updated.", "success")
     return redirect(url_for("accounts.account_detail", account_id=account_id))
 
@@ -681,7 +691,8 @@ def account_edit_holding(account_id, holding_id):
     uid = current_user.id
     holdings_totals = fetch_holding_totals_by_account(uid)
     accounts = fetch_all_accounts(uid)
-    total_value = sum(effective_account_value(a, holdings_totals) for a in accounts)
-    save_daily_snapshot(uid, total_value)
+    acct_vals = [(a["id"], effective_account_value(a, holdings_totals)) for a in accounts]
+    save_daily_snapshot(uid, sum(v for _, v in acct_vals))
+    save_account_daily_snapshots(uid, acct_vals)
     flash(f"Updated {existing['holding_name']}", "success")
     return redirect(url_for("accounts.account_detail", account_id=account_id))

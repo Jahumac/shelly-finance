@@ -254,7 +254,7 @@ def _run_price_update_for_user(app, user_id, slot_name=None):
     from app.models import (
         get_connection, fetch_holding_catalogue_in_use, fetch_all_accounts,
         fetch_holding_totals_by_account, save_daily_snapshot,
-        sync_holding_prices_from_catalogue
+        save_account_daily_snapshots, sync_holding_prices_from_catalogue
     )
     from app.calculations import effective_account_value
     from app.services.prices import refresh_catalogue_prices
@@ -266,11 +266,9 @@ def _run_price_update_for_user(app, user_id, slot_name=None):
             holdings_totals = fetch_holding_totals_by_account(user_id)
             _accrue_manual_accounts(user_id, accounts)
             accounts = fetch_all_accounts(user_id)
-            total_value = sum(
-                effective_account_value(account, holdings_totals)
-                for account in accounts
-            )
-            save_daily_snapshot(user_id, total_value)
+            acct_vals = [(a["id"], effective_account_value(a, holdings_totals)) for a in accounts]
+            save_daily_snapshot(user_id, sum(v for _, v in acct_vals))
+            save_account_daily_snapshots(user_id, acct_vals)
             logger.info(f"Saved portfolio snapshot for user {user_id} ({slot_name or 'manual'})")
             return
 
@@ -309,11 +307,9 @@ def _run_price_update_for_user(app, user_id, slot_name=None):
         _accrue_manual_accounts(user_id, accounts)
         accounts = fetch_all_accounts(user_id)
 
-        total_value = sum(
-            effective_account_value(account, holdings_totals)
-            for account in accounts
-        )
-        save_daily_snapshot(user_id, total_value)
+        acct_vals = [(a["id"], effective_account_value(a, holdings_totals)) for a in accounts]
+        save_daily_snapshot(user_id, sum(v for _, v in acct_vals))
+        save_account_daily_snapshots(user_id, acct_vals)
 
         successful = sum(1 for r in price_results if r.get("success"))
         logger.info(f"Updated {successful}/{len(price_results)} holdings for user {user_id} ({slot_name or 'manual'})")
