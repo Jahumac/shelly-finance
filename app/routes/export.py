@@ -251,7 +251,6 @@ def export_projections():
         acc_growth = account_growth_rate(acc, assumptions)
         acc_gross = account_gross_growth_rate(acc, assumptions)
         acc_fee_pct = effective_fee_pct(acc)
-        acc_platform_pct = to_float(_safe_get(acc, "platform_fee_pct", 0))
         acc_platform_flat = to_float(_safe_get(acc, "platform_fee_flat", 0))
         acc_platform_cap = to_float(_safe_get(acc, "platform_fee_cap", 0))
         acc_fund_pct = to_float(_safe_get(acc, "fund_fee_pct", 0))

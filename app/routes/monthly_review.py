@@ -34,6 +34,7 @@ from app.models import (
     update_monthly_review,
     upsert_monthly_snapshot,
 )
+from app.utils import optional_float, optional_int
 from app.services.csv_parsers import (
     count_csv_rows,
     detect_csv_headers,
@@ -52,11 +53,7 @@ from app.services.csv_parsers import (
 monthly_review_bp = Blueprint("monthly_review", __name__)
 
 
-def _optional_float(value, default=None):
-    try:
-        return float((value or "").strip())
-    except (ValueError, TypeError):
-        return default
+_optional_float = optional_float
 
 
 def default_month_key(uid=None, salary_day=None):
@@ -96,14 +93,19 @@ def monthly_review():
     if request.method == "POST":
         form_name = request.form.get("form_name")
         if form_name == "update_holding":
-            account_id = int(request.form.get("account_id"))
+            account_id = optional_int(request.form.get("account_id"))
+            holding_id = optional_int(request.form.get("holding_id"))
+            catalogue_id = optional_int(request.form.get("holding_catalogue_id"))
+            if not account_id or not holding_id:
+                flash("Invalid holding data.", "error")
+                return redirect(url_for("monthly_review.monthly_review", month=month_key))
             units = _optional_float(request.form.get("units"), 0.0)
             price = _optional_float(request.form.get("price"), 0.0)
             update_holding(
                 {
-                    "id": int(request.form.get("holding_id")),
+                    "id": holding_id,
                     "account_id": account_id,
-                    "holding_catalogue_id": _optional_float(request.form.get("holding_catalogue_id"), None),
+                    "holding_catalogue_id": catalogue_id,
                     "holding_name": request.form.get("holding_name", ""),
                     "ticker": request.form.get("ticker", ""),
                     "asset_type": request.form.get("asset_type", ""),
@@ -118,29 +120,12 @@ def monthly_review():
             review = fetch_or_create_monthly_review(month_key, uid)
             mark_review_item_updated(review["id"], account_id, "holdings_updated")
         elif form_name == "update_account_balance":
-            account = fetch_account(int(request.form.get("account_id")), uid)
+            account_id = optional_int(request.form.get("account_id"))
+            account = fetch_account(account_id, uid) if account_id else None
             if account:
                 new_balance = _optional_float(request.form.get("current_value"), account["current_value"])
-                update_account(
-                    {
-                        "id": account["id"],
-                        "name": account["name"],
-                        "provider": account["provider"],
-                        "wrapper_type": account["wrapper_type"],
-                        "category": account["category"],
-                        "tags": account["tags"],
-                        "current_value": new_balance,
-                        "monthly_contribution": account["monthly_contribution"],
-                        "goal_value": account["goal_value"],
-                        "valuation_mode": account["valuation_mode"],
-                        "growth_mode": account["growth_mode"],
-                        "growth_rate_override": account["growth_rate_override"],
-                        "owner": account["owner"],
-                        "notes": account["notes"],
-                        "last_updated": datetime.now(timezone.utc).isoformat(),
-                    },
-                    uid,
-                )
+                payload = {**account, "current_value": new_balance, "last_updated": datetime.now(timezone.utc).isoformat()}
+                update_account(payload, uid)
                 upsert_monthly_snapshot(account["id"], month_key, new_balance)
                 review = fetch_or_create_monthly_review(month_key, uid)
                 mark_review_item_updated(review["id"], account["id"], "balance_updated")

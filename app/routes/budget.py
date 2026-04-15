@@ -4,6 +4,8 @@ from io import BytesIO
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
+from app.utils import optional_float
+
 from app.models import (
     create_budget_item,
     create_budget_section,
@@ -35,10 +37,7 @@ def _month_label(month_key):
 
 
 def _optional_float(value, default=0.0):
-    try:
-        return float((value or "").strip())
-    except ValueError:
-        return default
+    return optional_float(value, default=default)
 
 
 def _build_monthly_data(month_key, user_id):

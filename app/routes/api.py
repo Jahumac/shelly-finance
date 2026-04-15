@@ -202,7 +202,7 @@ def get_assumptions():
     if row is None:
         return jsonify({})
     # Return as dict; Row → dict is fine since all columns are primitive.
-    return jsonify({k: row[k] for k in row.keys()})
+    return jsonify(dict(row))
 
 
 # ── Write endpoints ──────────────────────────────────────────────────────────
@@ -233,7 +233,7 @@ def update_account_balance(account_id):
         return _err("not_found", "Account not found", 404)
 
     # Preserve all other fields — update_account needs a complete payload.
-    update_payload = {k: account[k] for k in account.keys()}
+    update_payload = dict(account)
     update_payload["current_value"] = balance
     update_payload["last_updated"] = datetime.now(timezone.utc).isoformat()
     update_account(update_payload, g.api_user.id)

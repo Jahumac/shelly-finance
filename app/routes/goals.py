@@ -31,11 +31,11 @@ def _goal_payload_from_form(form):
 
 
 def _build_goal_card(goal, accounts, holdings_totals):
-    selected_tags = _split_tags(goal["selected_tags"]) if "selected_tags" in goal.keys() else []
+    selected_tags = _split_tags(goal["selected_tags"]) if "selected_tags" in goal else []
     included_accounts = []
 
     for account in accounts:
-        account_tags = _split_tags(account["tags"]) if "tags" in account.keys() else []
+        account_tags = _split_tags(account["tags"]) if "tags" in account else []
         if selected_tags and any(tag in account_tags for tag in selected_tags):
             included_accounts.append(account)
 
@@ -95,7 +95,7 @@ def goals():
     if selected_goal_id:
         selected_goal = fetch_goal(selected_goal_id, uid)
         if selected_goal:
-            selected_goal_tags = _split_tags(selected_goal["selected_tags"]) if "selected_tags" in selected_goal.keys() else []
+            selected_goal_tags = _split_tags(selected_goal["selected_tags"]) if "selected_tags" in selected_goal else []
 
     return render_template(
         "goals.html",
