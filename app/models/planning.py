@@ -224,10 +224,19 @@ def reset_all_user_data(user_id):
         conn.execute(
             "DELETE FROM monthly_snapshots WHERE account_id IN "
             "(SELECT id FROM accounts WHERE user_id = ?)", (user_id,))
+        conn.execute(
+            "DELETE FROM account_daily_snapshots WHERE account_id IN "
+            "(SELECT id FROM accounts WHERE user_id = ?)", (user_id,))
         conn.execute("DELETE FROM accounts WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM goals WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM assumptions WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM holding_catalogue WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM isa_contributions WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM pension_contributions WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM dividend_records WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM cgt_disposals WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM pension_carry_forward WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM portfolio_daily_snapshots WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM allowance_tracking")
         conn.execute(
             "DELETE FROM monthly_review_items WHERE review_id IN "

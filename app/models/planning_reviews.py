@@ -41,7 +41,7 @@ def fetch_monthly_review_items(review_id):
         return conn.execute(
             """
             SELECT mri.*, a.name AS account_name, a.provider, a.wrapper_type, a.valuation_mode,
-                   a.monthly_contribution AS account_monthly_contribution
+                   a.monthly_contribution AS account_monthly_contribution, a.current_value
             FROM monthly_review_items mri
             JOIN accounts a ON a.id = mri.account_id
             WHERE mri.review_id = ?

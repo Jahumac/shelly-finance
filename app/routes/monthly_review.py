@@ -130,6 +130,7 @@ def monthly_review():
                 upsert_monthly_snapshot(account["id"], month_key, new_balance)
                 review = fetch_or_create_monthly_review(month_key, uid)
                 mark_review_item_updated(review["id"], account["id"], "balance_updated")
+                flash(f"{account['name']} balance updated to £{new_balance:,.2f}.", "success")
         elif form_name == "mark_complete":
             review = fetch_or_create_monthly_review(month_key, uid)
             all_accounts = fetch_all_accounts(uid)
