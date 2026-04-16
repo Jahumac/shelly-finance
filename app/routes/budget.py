@@ -143,36 +143,7 @@ def budget():
     _income_sec = next((s for s in db_sections if "income" in s["key"].lower()), None)
     income_key = _income_sec["key"] if _income_sec else (db_sections[0]["key"] if db_sections else "income")
 
-    # ── 12-month strip: build tax-year range (Apr → Mar) ─────────────────
-    saved_months = fetch_months_with_budget_entries(uid)
-    mk_parts = month_key.split("-")
-    mk_year, mk_month = int(mk_parts[0]), int(mk_parts[1])
-
-    # Determine the tax year the selected month falls in (Apr 6 → Apr 5)
-    if mk_month >= 4:
-        ty_start_year = mk_year
-    else:
-        ty_start_year = mk_year - 1
-
-    month_strip = []
-    for i in range(12):
-        m = 4 + i  # Apr=4, May=5, ... Mar=15→3
-        y = ty_start_year if m <= 12 else ty_start_year + 1
-        if m > 12:
-            m -= 12
-        mk = f"{y}-{m:02d}"
-        label_short = datetime.strptime(mk, "%Y-%m").strftime("%b")
-        month_strip.append({
-            "key": mk,
-            "label": label_short,
-            "has_data": mk in saved_months,
-            "is_current": mk == month_key,
-            "is_today": mk == _default_month_key(),
-            "month_num": m,
-        })
-
-    # Is this month entirely inherited (no saved entries)?
-    is_inherited = month_key not in saved_months
+    month_strip, is_inherited = _build_budget_month_strip(month_key, uid)
 
     return render_template(
         "budget.html",
@@ -456,6 +427,32 @@ def budget_trend():
     )
 
 
+def _build_budget_month_strip(month_key, uid):
+    """Build the 12-month tax-year strip (Apr→Mar) for the budget views."""
+    saved_months = fetch_months_with_budget_entries(uid)
+    mk_year, mk_month = int(month_key[:4]), int(month_key[5:7])
+    ty_start_year = mk_year if mk_month >= 4 else mk_year - 1
+    today_key = _default_month_key()
+
+    month_strip = []
+    for i in range(12):
+        m = 4 + i
+        y = ty_start_year if m <= 12 else ty_start_year + 1
+        if m > 12:
+            m -= 12
+        mk = f"{y}-{m:02d}"
+        month_strip.append({
+            "key": mk,
+            "label": datetime.strptime(mk, "%Y-%m").strftime("%b"),
+            "has_data": mk in saved_months,
+            "is_current": mk == month_key,
+            "is_today": mk == today_key,
+            "month_num": m,
+        })
+
+    return month_strip, month_key not in saved_months  # (strip, is_inherited)
+
+
 def _last_n_months(today, n):
     """Return list of 'YYYY-MM' strings for the last n months (most recent last)."""
     result = []
@@ -545,30 +542,7 @@ def budget_items_view():
     # ── Month context (same hero + month strip as budget view) ────────────
     month_key = request.args.get("month") or _default_month_key()
     sections_data, summary = _build_monthly_data(month_key, uid)
-
-    saved_months = fetch_months_with_budget_entries(uid)
-    mk_parts = month_key.split("-")
-    mk_year, mk_month = int(mk_parts[0]), int(mk_parts[1])
-    ty_start_year = mk_year if mk_month >= 4 else mk_year - 1
-
-    month_strip = []
-    for i in range(12):
-        m = 4 + i
-        y = ty_start_year if m <= 12 else ty_start_year + 1
-        if m > 12:
-            m -= 12
-        mk = f"{y}-{m:02d}"
-        label_short = datetime.strptime(mk, "%Y-%m").strftime("%b")
-        month_strip.append({
-            "key": mk,
-            "label": label_short,
-            "has_data": mk in saved_months,
-            "is_current": mk == month_key,
-            "is_today": mk == _default_month_key(),
-            "month_num": m,
-        })
-
-    is_inherited = month_key not in saved_months
+    month_strip, is_inherited = _build_budget_month_strip(month_key, uid)
 
     return render_template(
         "budget_items.html",

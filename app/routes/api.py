@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app.calculations import effective_account_value, is_price_stale
+from app.utils import valid_month_key
 from app.models import (
     add_dividend_record,
     add_isa_contribution,
@@ -173,8 +174,7 @@ def overview():
 @api_bp.route("/budget/<month_key>")
 @api_auth_required
 def get_budget(month_key):
-    # month_key looks like "2026-04"
-    if len(month_key) != 7 or month_key[4] != "-":
+    if not valid_month_key(month_key):
         return _err("bad_request", "month_key must be YYYY-MM", 400)
     items = fetch_budget_items(g.api_user.id)
     entries = fetch_budget_entries(month_key, g.api_user.id)
@@ -312,7 +312,7 @@ def complete_monthly_review(month_key):
     """Mark a monthly review as complete and snapshot every account's
     current effective value for that month. Mirrors the web UI's
     'mark complete' button exactly."""
-    if len(month_key) != 7 or month_key[4] != "-":
+    if not valid_month_key(month_key):
         return _err("bad_request", "month_key must be YYYY-MM", 400)
 
     payload = request.get_json(silent=True) or {}

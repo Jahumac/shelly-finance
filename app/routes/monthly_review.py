@@ -8,6 +8,7 @@ from app.calculations import (
     effective_account_value,
     progress_to_goal,
     review_ready_date as calc_review_ready_date,
+    tag_totals,
     total_invested,
 )
 from app.models import (
@@ -187,13 +188,19 @@ def monthly_review():
     if goal:
         all_accounts = fetch_all_accounts(uid)
         holdings_totals = fetch_holding_totals_by_account(uid)
-        invested = total_invested(all_accounts, holdings_totals)
+        tag_totals_map = tag_totals(all_accounts, holdings_totals)
+        selected_tags = [t.strip() for t in (goal["selected_tags"] or "").split(",") if t.strip()]
+        current = (
+            sum(tag_totals_map.get(t, 0.0) for t in selected_tags)
+            if selected_tags
+            else total_invested(all_accounts, holdings_totals)
+        )
         target = float(goal["target_value"] or 0)
         goal_data = {
             "name": goal["name"],
             "target": target,
-            "current": invested,
-            "pct": progress_to_goal(invested, target) * 100,
+            "current": current,
+            "pct": progress_to_goal(current, target) * 100,
         }
 
     # Budget vs contributions comparison
