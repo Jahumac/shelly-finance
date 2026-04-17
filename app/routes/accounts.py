@@ -85,6 +85,8 @@ def _account_payload_from_form(form):
         "platform_fee_flat": _optional_float(form.get("platform_fee_flat"), 0.0, min_val=0.0),
         "platform_fee_cap": _optional_float(form.get("platform_fee_cap"), 0.0, min_val=0.0),
         "fund_fee_pct": _optional_float(form.get("fund_fee_pct"), 0.0, min_val=0.0),
+        "cash_interest_rate": _optional_float(form.get("cash_interest_rate"), None, divide_by_100=True),
+        "interest_payment_day": max(0, min(28, int(form.get("interest_payment_day", 0) or 0))),
     }
 
 
@@ -436,6 +438,9 @@ def account_detail(account_id):
         if not payload["name"].strip():
             flash("Account name is required.", "error")
             return redirect(url_for("accounts.account_detail", account_id=account_id))
+        # preserve cash interest fields if not present in this form submission
+        if payload.get("cash_interest_rate") is None:
+            payload["cash_interest_rate"] = (selected or {}).get("cash_interest_rate", 0) or 0
         update_account(payload, uid)
         return redirect(url_for("accounts.account_detail", account_id=account_id))
 
@@ -519,10 +524,12 @@ def update_cash(account_id):
 
     cash = request.form.get("uninvested_cash", "")
     rate = request.form.get("cash_interest_rate", "")
+    payment_day = request.form.get("interest_payment_day", "")
 
     payload = dict(account)
     payload["uninvested_cash"] = to_float(cash) if cash else 0.0
     payload["cash_interest_rate"] = (to_float(rate) / 100.0) if rate else 0.0
+    payload["interest_payment_day"] = max(0, min(28, int(payment_day) if payment_day else 0))
     payload["last_updated"] = datetime.now(timezone.utc).isoformat()
 
     # ensure missing fields are populated before update
@@ -535,6 +542,7 @@ def update_cash(account_id):
     payload.setdefault("fund_fee_pct", 0)
     payload.setdefault("uninvested_cash", 0)
     payload.setdefault("cash_interest_rate", 0)
+    payload.setdefault("interest_payment_day", 0)
 
     update_account(payload, uid)
     holdings_totals = fetch_holding_totals_by_account(uid)

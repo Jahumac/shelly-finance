@@ -90,7 +90,8 @@ def update_account(payload, user_id=None):
                 platform_fee_cap = ?,
                 fund_fee_pct = ?,
                 uninvested_cash = ?,
-                cash_interest_rate = ?
+                cash_interest_rate = ?,
+                interest_payment_day = ?
             {where}
             """,
             (
@@ -118,6 +119,7 @@ def update_account(payload, user_id=None):
                 payload.get("fund_fee_pct", 0),
                 payload.get("uninvested_cash", 0),
                 payload.get("cash_interest_rate", 0),
+                payload.get("interest_payment_day", 0),
                 *params_tail,
             ),
         )
@@ -153,9 +155,9 @@ def create_account(payload, user_id):
                 growth_rate_override, owner, is_active, notes, last_updated,
                 employer_contribution, contribution_method, annual_fee_pct,
                 platform_fee_pct, platform_fee_flat, platform_fee_cap, fund_fee_pct,
-                uninvested_cash, cash_interest_rate
+                uninvested_cash, cash_interest_rate, interest_payment_day
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 user_id,
@@ -184,6 +186,7 @@ def create_account(payload, user_id):
                 payload.get("fund_fee_pct", 0),
                 payload.get("uninvested_cash", 0),
                 payload.get("cash_interest_rate", 0),
+                payload.get("interest_payment_day", 0),
             ),
         )
         conn.commit()

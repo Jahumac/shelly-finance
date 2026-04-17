@@ -44,7 +44,10 @@
     <div class="acct-card-top">
       <div class="acct-type-pill" data-type="{{ pill_type }}">{{ account.wrapper_type }}</div>
       {% if account.growth_mode == 'custom' %}
-        <span class="acct-rate-chip">{{ '{:.1f}'.format(account.growth_rate_override * 100) if account.growth_rate_override else '' }}%</span>
+        {% set _pd = account.interest_payment_day %}
+        {% set _is_cash_type = 'cash' in _wt or (account.category or '') | lower in ('cash', 'savings') %}
+        {% set _rate_title = ('Interest accrues daily, paid on the ' ~ _pd ~ 'th of each month') if (_pd and _is_cash_type) else '' %}
+        <span class="acct-rate-chip" {% if _rate_title %}title="{{ _rate_title }}"{% endif %}>{{ '{:.1f}'.format(account.growth_rate_override * 100) if account.growth_rate_override else '' }}%{% if _pd and _is_cash_type %} · {{ _pd }}th{% endif %}</span>
       {% endif %}
       {% if prices_stale and account.valuation_mode == 'holdings' %}
         <span class="acct-stale-chip" title="Prices may be over 7 days old — refresh to update">⚠ stale</span>
@@ -65,7 +68,9 @@
       <span class="acct-mode-dot {% if account.valuation_mode == 'holdings' %}dot-positions{% else %}dot-manual{% endif %}"
             title="{{ 'Built from holdings' if account.valuation_mode == 'holdings' else 'Manual' }}"></span>
       {% if account.cash_interest_rate and account.cash_interest_rate > 0 %}
-        <span class="acct-rate-chip acct-rate-chip-interest" title="Auto-compounding interest">{{ '{:.2g}'.format(account.cash_interest_rate * 100) }}% p.a.</span>
+        {% set _pay_day = account.interest_payment_day %}
+        {% set _chip_title = ('Interest accrues daily, paid on the ' ~ _pay_day ~ 'th of each month') if _pay_day else 'Auto-compounding interest' %}
+        <span class="acct-rate-chip acct-rate-chip-interest" title="{{ _chip_title }}">{{ '{:.2g}'.format(account.cash_interest_rate * 100) }}% p.a.{% if _pay_day %} · {{ _pay_day }}th{% endif %}</span>
       {% endif %}
     </div>
   </a>
@@ -173,6 +178,15 @@
               <input type="number" step="0.1" name="growth_rate_override" value="{{ '{:.1f}'.format(selected.growth_rate_override * 100) if selected.growth_rate_override else '' }}" placeholder="e.g. 4.5">
               <small class="form-hint">Enter as a percentage — e.g. 4.5 for 4.5%, 3.6 for 3.6%</small>
             </label>
+            {% set _wt_lower = (selected.wrapper_type or '') | lower %}
+            {% set _cat_lower = (selected.category or '') | lower %}
+            {% if selected.growth_mode == 'custom' and ('cash isa' in _wt_lower or 'cash' in _cat_lower or 'savings' in _cat_lower) %}
+            <label data-custom-rate-field {% if selected.growth_mode != 'custom' %}class="hidden"{% endif %}>
+              <span>Interest paid on day of month</span>
+              <input type="number" name="interest_payment_day" min="0" max="28" value="{{ selected.interest_payment_day or 0 }}">
+              <small class="form-hint">Day of the month when interest is credited to your account (e.g. 3 for the 3rd). Set 0 if unknown or not applicable.</small>
+            </label>
+            {% endif %}
             <label>
               <span>Your Monthly Contribution</span>
               <input type="number" step="0.01" name="monthly_contribution" value="{{ selected.monthly_contribution or 0 }}">
