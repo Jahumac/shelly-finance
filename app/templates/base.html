@@ -438,7 +438,9 @@
     /* so all pages are available offline even if never manually visited.  */
     {% if current_user.is_authenticated %}
     (function() {
-      var CACHE_KEY = 'shelly-cache-warmed-v1.7.0';
+      /* Clear any old warming flags so this runs fresh */
+      ['shelly-cache-warmed', 'shelly-cache-warmed-v1.7.0'].forEach(function(k) { localStorage.removeItem(k); });
+      var CACHE_KEY = 'shelly-pages-warmed-v1';
       if (!navigator.onLine || localStorage.getItem(CACHE_KEY)) return;
       var pagesToWarm = ['/', '/accounts/', '/budget/', '/goals/',
                          '/projections/', '/performance/', '/allowance/', '/settings/'];
