@@ -513,6 +513,7 @@ def _run_migrations(conn):
         "platform_fee_flat REAL DEFAULT 0",
         "platform_fee_cap REAL DEFAULT 0",
         "fund_fee_pct REAL DEFAULT 0",
+        "contribution_fee_pct REAL DEFAULT 0",
         "uninvested_cash REAL DEFAULT 0",
         "cash_interest_rate REAL DEFAULT 0",
         "interest_payment_day INTEGER DEFAULT 0",

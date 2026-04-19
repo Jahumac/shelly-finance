@@ -127,13 +127,19 @@ def contribution_breakdown(account, assumptions=None):
         government_bonus = (eligible * LISA_BONUS_RATE) / 12  # monthly equivalent
         method_label = "Government bonus (25%)"
 
-    total_into_pot = personal + tax_relief + government_bonus + employer
+    gross_into_pot = personal + tax_relief + government_bonus + employer
+
+    # Contribution fee (e.g. Nest's 1.8%) — taken from each contribution before it's invested
+    contribution_fee_pct = to_float(_safe_get(account, "contribution_fee_pct", 0))
+    contribution_fee = gross_into_pot * (contribution_fee_pct / 100.0)
+    total_into_pot = gross_into_pot - contribution_fee
 
     return {
         "personal": personal,
         "tax_relief": tax_relief,
         "government_bonus": government_bonus,
         "employer": employer,
+        "contribution_fee": contribution_fee,
         "total_into_pot": total_into_pot,
         "self_assessment": self_assessment,
         "method_label": method_label,

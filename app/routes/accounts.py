@@ -81,6 +81,7 @@ def _account_payload_from_form(form):
         "platform_fee_flat": optional_float(form.get("platform_fee_flat"), 0.0, min_val=0.0),
         "platform_fee_cap": optional_float(form.get("platform_fee_cap"), 0.0, min_val=0.0),
         "fund_fee_pct": optional_float(form.get("fund_fee_pct"), 0.0, min_val=0.0),
+        "contribution_fee_pct": optional_float(form.get("contribution_fee_pct"), 0.0, min_val=0.0),
         "cash_interest_rate": optional_float(form.get("cash_interest_rate"), None, divide_by_100=True),
         "interest_payment_day": max(0, min(31, int(form.get("interest_payment_day", 0) or 0))),
     }
@@ -538,6 +539,7 @@ def update_cash(account_id):
     payload.setdefault("platform_fee_flat", 0)
     payload.setdefault("platform_fee_cap", 0)
     payload.setdefault("fund_fee_pct", 0)
+    payload.setdefault("contribution_fee_pct", 0)
     payload.setdefault("uninvested_cash", 0)
     payload.setdefault("cash_interest_rate", 0)
     payload.setdefault("interest_payment_day", 0)
