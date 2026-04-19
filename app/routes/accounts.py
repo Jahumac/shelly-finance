@@ -57,10 +57,6 @@ BUCKET_OPTIONS = [
 accounts_bp = Blueprint("accounts", __name__)
 
 
-_optional_float = optional_float
-_split_tags = split_tags
-
-
 def _account_payload_from_form(form):
     return {
         "name": form.get("name", ""),
@@ -68,24 +64,24 @@ def _account_payload_from_form(form):
         "wrapper_type": form.get("wrapper_type", ""),
         "category": form.get("category", ""),
         "tags": form.get("tags", ""),
-        "current_value": _optional_float(form.get("current_value"), 0.0, min_val=0.0),
-        "monthly_contribution": _optional_float(form.get("monthly_contribution"), 0.0, min_val=0.0),
+        "current_value": optional_float(form.get("current_value"), 0.0, min_val=0.0),
+        "monthly_contribution": optional_float(form.get("monthly_contribution"), 0.0, min_val=0.0),
         "pension_contribution_day": max(0, min(28, int(form.get("pension_contribution_day", 0) or 0))),
-        "goal_value": _optional_float(form.get("goal_value"), None, min_val=0.0),
+        "goal_value": optional_float(form.get("goal_value"), None, min_val=0.0),
         "valuation_mode": form.get("valuation_mode", "manual"),
         "growth_mode": form.get("growth_mode", "default"),
-        "growth_rate_override": _optional_float(form.get("growth_rate_override"), None, divide_by_100=True),
+        "growth_rate_override": optional_float(form.get("growth_rate_override"), None, divide_by_100=True),
         "owner": form.get("owner", ""),
         "notes": form.get("notes", ""),
         "last_updated": datetime.now(timezone.utc).isoformat(),
-        "employer_contribution": _optional_float(form.get("employer_contribution"), 0.0, min_val=0.0),
+        "employer_contribution": optional_float(form.get("employer_contribution"), 0.0, min_val=0.0),
         "contribution_method": form.get("contribution_method", "standard"),
-        "annual_fee_pct": _optional_float(form.get("annual_fee_pct"), 0.0, min_val=0.0),
-        "platform_fee_pct": _optional_float(form.get("platform_fee_pct"), 0.0, min_val=0.0),
-        "platform_fee_flat": _optional_float(form.get("platform_fee_flat"), 0.0, min_val=0.0),
-        "platform_fee_cap": _optional_float(form.get("platform_fee_cap"), 0.0, min_val=0.0),
-        "fund_fee_pct": _optional_float(form.get("fund_fee_pct"), 0.0, min_val=0.0),
-        "cash_interest_rate": _optional_float(form.get("cash_interest_rate"), None, divide_by_100=True),
+        "annual_fee_pct": optional_float(form.get("annual_fee_pct"), 0.0, min_val=0.0),
+        "platform_fee_pct": optional_float(form.get("platform_fee_pct"), 0.0, min_val=0.0),
+        "platform_fee_flat": optional_float(form.get("platform_fee_flat"), 0.0, min_val=0.0),
+        "platform_fee_cap": optional_float(form.get("platform_fee_cap"), 0.0, min_val=0.0),
+        "fund_fee_pct": optional_float(form.get("fund_fee_pct"), 0.0, min_val=0.0),
+        "cash_interest_rate": optional_float(form.get("cash_interest_rate"), None, divide_by_100=True),
         "interest_payment_day": max(0, min(28, int(form.get("interest_payment_day", 0) or 0))),
     }
 
@@ -169,7 +165,7 @@ def _render_accounts_page(user_id, selected=None, detail_mode="view", position_e
         tag_options=fetch_user_tags(user_id),
         custom_tags=fetch_custom_tags(user_id),
         default_tags=DEFAULT_TAG_OPTIONS,
-        selected_tags=_split_tags(selected['tags']) if selected and 'tags' in selected else [],
+        selected_tags=split_tags(selected['tags']) if selected and 'tags' in selected else [],
         positions=positions,
         catalogue_rows=catalogue_rows,
         asset_type_options=ASSET_TYPE_OPTIONS,
@@ -354,7 +350,7 @@ def api_add_holding(account_id):
         return jsonify({"ok": False, "error": "Account not found"}), 404
 
     ticker = (request.form.get("ticker") or "").strip().upper()
-    units = _optional_float(request.form.get("units"), None)
+    units = optional_float(request.form.get("units"), None)
 
     if not ticker or not units or units <= 0:
         return jsonify({"ok": False, "error": "Ticker and units are required"}), 400
@@ -382,8 +378,8 @@ def api_add_holding_manual(account_id):
     name = (request.form.get("name") or "").strip()
     ticker = (request.form.get("ticker") or "").strip().upper() or None
     asset_type = request.form.get("asset_type", "Fund")
-    units = _optional_float(request.form.get("units"), None)
-    price = _optional_float(request.form.get("price"), None)
+    units = optional_float(request.form.get("units"), None)
+    price = optional_float(request.form.get("price"), None)
 
     if not name or not units or not price or units <= 0 or price <= 0:
         return jsonify({"ok": False, "error": "Name, units and price are required"}), 400
@@ -438,9 +434,11 @@ def account_detail(account_id):
         if not payload["name"].strip():
             flash("Account name is required.", "error")
             return redirect(url_for("accounts.account_detail", account_id=account_id))
-        # preserve cash interest fields if not present in this form submission
+        # preserve fields managed by separate forms, not the main edit form
         if payload.get("cash_interest_rate") is None:
             payload["cash_interest_rate"] = (selected or {}).get("cash_interest_rate", 0) or 0
+        if "uninvested_cash" not in payload:
+            payload["uninvested_cash"] = (selected or {}).get("uninvested_cash") or 0
         update_account(payload, uid)
         return redirect(url_for("accounts.account_detail", account_id=account_id))
 
@@ -466,7 +464,7 @@ def account_add_holding(account_id):
         return redirect(url_for("accounts.accounts"))
 
     ticker = (request.form.get("ticker") or "").strip().upper()
-    units = _optional_float(request.form.get("units"), None)
+    units = optional_float(request.form.get("units"), None)
 
     if not ticker or not units or units <= 0:
         flash("Please enter a valid ticker and number of units.", "error")
@@ -497,8 +495,8 @@ def account_add_holding_manual(account_id):
     name = (request.form.get("name") or "").strip()
     ticker = (request.form.get("ticker") or "").strip().upper() or None
     asset_type = request.form.get("asset_type", "Fund")
-    units = _optional_float(request.form.get("units"), None)
-    price = _optional_float(request.form.get("price"), None)
+    units = optional_float(request.form.get("units"), None)
+    price = optional_float(request.form.get("price"), None)
 
     if not name or not units or not price or units <= 0 or price <= 0:
         flash("Please fill in the holding name, units, and price.", "error")
@@ -568,15 +566,15 @@ def account_edit_holding(account_id, holding_id):
     if fetch_account(account_id, current_user.id) is None:
         return redirect(url_for("accounts.accounts"))
 
-    units = _optional_float(request.form.get("units"), None)
-    price = _optional_float(request.form.get("price"), None)
-    book_cost = _optional_float(request.form.get("book_cost"), None)
+    units = optional_float(request.form.get("units"), None)
+    price = optional_float(request.form.get("price"), None)
+    book_cost = optional_float(request.form.get("book_cost"), None)
     notes = request.form.get("notes", "").strip()
 
     if units is not None and price is not None:
         value = units * price
     else:
-        value = _optional_float(request.form.get("value"), None)
+        value = optional_float(request.form.get("value"), None)
 
     existing_list = [h for h in fetch_holdings_for_account(account_id) if h["id"] == holding_id]
     if not existing_list:

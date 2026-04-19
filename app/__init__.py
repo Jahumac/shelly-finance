@@ -7,7 +7,7 @@ from .models import count_users, fetch_assumptions, get_user_by_id, init_db, clo
 from .services.scheduler import init_scheduler
 
 from .extensions import limiter
-__version__ = "1.5.0"
+__version__ = "1.7.0"
 from .routes.auth import auth_bp
 from .routes.overview import overview_bp
 from .routes.goals import goals_bp
@@ -87,7 +87,6 @@ def create_app():
     # ── Redirect to setup if no users exist ──────────────────────────────────
     @app.before_request
     def redirect_to_setup_if_needed():
-        from flask import request
         # Allow the setup page, login page, and static assets through
         if request.endpoint in ("auth.setup", "auth.login", "static", "service_worker", "api_ping", None):
             return
@@ -172,8 +171,7 @@ def create_app():
     # ── Security headers ────────────────────────────────────────────────────
     @app.after_request
     def set_security_headers(response):
-        from flask import request as req
-        if req.is_secure or req.headers.get("X-Forwarded-Proto") == "https":
+        if request.is_secure or request.headers.get("X-Forwarded-Proto") == "https":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
         response.headers["X-Content-Type-Options"] = "nosniff"
