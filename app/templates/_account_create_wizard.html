@@ -14,8 +14,6 @@
     </div>
 
     <div class="settings-form" id="create-account-form">
-      <input type="hidden" name="tags" value="" data-tags-hidden-input>
-
       {# ── Progress dots (visual only — not clickable) ────────────── #}
       <div class="cw-progress" id="cw-progress"></div>
 
@@ -688,19 +686,15 @@
     createBtn.textContent = 'Shelly\'s setting things up…';
     createBtn.disabled = true;
 
-    /* Sync tag checkboxes */
-    var tagHidden = form.querySelector('[data-tags-hidden-input]');
-    if (tagHidden) {
-      var checked = [];
-      form.querySelectorAll('[data-tag-checkbox]:checked').forEach(function(cb) { checked.push(cb.value); });
-      tagHidden.value = checked.join(',');
-    }
-
     /* Gather form fields */
     var fd = new FormData();
     var csrfMeta = document.querySelector('meta[name="csrf-token"]');
     if (csrfMeta) fd.append('csrf_token', csrfMeta.getAttribute('content'));
     form.querySelectorAll('input[name], select[name]').forEach(function(el) { fd.append(el.name, el.value); });
+    /* Append checked tags directly — no hidden input needed */
+    form.querySelectorAll('[data-tag-checkbox]:checked').forEach(function(cb) {
+      fd.append('tags', cb.value);
+    });
 
     var errorBox = document.getElementById('cw-create-error');
     if (errorBox) errorBox.style.display = 'none';
