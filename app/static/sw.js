@@ -110,7 +110,9 @@ async function networkFirstPage(request) {
     }
     return response;
   } catch (e) {
-    const cached = await caches.match(request);
+    /* ignoreVary: true bypasses Flask's Vary: Cookie header which would
+       otherwise cause a cache miss even when the same page is cached. */
+    const cached = await caches.match(request, { ignoreVary: true });
     if (cached) return cached;
 
     /* Return an offline fallback page */
