@@ -102,29 +102,50 @@
     (function() {
       var csrfToken = "{{ csrf_token() }}";
 
-      /* Add CSRF to all POST forms automatically */
-      document.addEventListener('submit', function(e) {
-        if (e.target.method && e.target.method.toUpperCase() === 'POST') {
-          if (!e.target.querySelector('input[name="csrf_token"]')) {
+      /* Inject CSRF into a single form element if it's missing */
+      function ensureCsrf(form) {
+        if (form.method && form.method.toUpperCase() === 'POST') {
+          if (!form.querySelector('input[name="csrf_token"]')) {
             var input = document.createElement('input');
             input.type = 'hidden';
             input.name = 'csrf_token';
             input.value = csrfToken;
-            e.target.appendChild(input);
+            form.insertBefore(input, form.firstChild);
           }
         }
-      });
+      }
 
-      /* Add CSRF to all AJAX fetch requests */
+      /* Scan and inject into all current POST forms on the page */
+      function injectAll() {
+        document.querySelectorAll('form').forEach(ensureCsrf);
+      }
+
+      /* Run immediately (covers all static forms in the HTML) */
+      document.addEventListener('DOMContentLoaded', injectAll);
+
+      /* Also catch any forms injected dynamically by JavaScript */
+      if (window.MutationObserver) {
+        new MutationObserver(function(mutations) {
+          mutations.forEach(function(m) {
+            m.addedNodes.forEach(function(node) {
+              if (node.nodeType !== 1) return;
+              if (node.tagName === 'FORM') { ensureCsrf(node); return; }
+              if (node.querySelectorAll) {
+                node.querySelectorAll('form').forEach(ensureCsrf);
+              }
+            });
+          });
+        }).observe(document.documentElement, { childList: true, subtree: true });
+      }
+
+      /* Belt-and-suspenders: also catch on submit in case a form was missed */
+      document.addEventListener('submit', function(e) { ensureCsrf(e.target); });
+
+      /* Add CSRF token to all AJAX fetch POST requests */
       var originalFetch = window.fetch;
       window.fetch = function() {
         var args = Array.prototype.slice.call(arguments);
         if (args.length > 1 && args[1] && args[1].method && args[1].method.toUpperCase() === 'POST') {
-          if (!navigator.onLine) {
-            var banner = document.getElementById('offline-banner');
-            if (banner) banner.classList.remove('hidden');
-            return Promise.reject(new Error('Offline'));
-          }
           args[1].headers = args[1].headers || {};
           if (args[1].headers instanceof Headers) {
             args[1].headers.set('X-CSRFToken', csrfToken);
