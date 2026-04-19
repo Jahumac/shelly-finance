@@ -431,6 +431,31 @@
         })
         .catch(function() { /* SW not supported or blocked */ });
     }
+
+    /* ── Cache warm: pre-fetch all main pages in the background ───────── */
+    /* Runs once per session after page load, only when online.            */
+    /* The service worker intercepts each fetch and stores it in cache,    */
+    /* so all pages are available offline even if never manually visited.  */
+    {% if current_user.is_authenticated %}
+    if (navigator.onLine && !sessionStorage.getItem('shelly-cache-warmed')) {
+      sessionStorage.setItem('shelly-cache-warmed', '1');
+      var pagesToWarm = ['/', '/accounts/', '/budget/', '/goals/',
+                         '/projections/', '/performance/', '/allowance/', '/settings/'];
+      /* Wait until the browser is idle so we don't compete with the current page */
+      var warmCache = function() {
+        pagesToWarm.forEach(function(url) {
+          if (url !== window.location.pathname) {
+            fetch(url, { credentials: 'same-origin' }).catch(function() {});
+          }
+        });
+      };
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(warmCache, { timeout: 5000 });
+      } else {
+        setTimeout(warmCache, 2000);
+      }
+    }
+    {% endif %}
   </script>
 </body>
 </html>
