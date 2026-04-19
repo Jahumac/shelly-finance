@@ -1,4 +1,5 @@
 """Debt tracker model — CRUD and calculations for the debts table."""
+import calendar
 import math
 from datetime import date, datetime
 
@@ -143,7 +144,14 @@ def amortisation_schedule(balance, apr, monthly_payment, max_months=360):
 
 def _auto_balance_from_schedule(original_amount, apr, monthly_payment, start_date_str):
     """Calculate current balance from amortisation schedule based on first payment date.
-    Returns (balance, payments_made) or (None, 0) if start_date not set."""
+    Returns (balance, payments_made) or (None, 0) if start_date not set.
+
+    Payment count logic: a payment is counted for a given month only if today's
+    date has reached or passed the payment day of that month. This prevents
+    counting next month's payment as already made when it hasn't gone out yet.
+    For example, start_date=2026-03-31, today=2026-04-19 → 1 payment made
+    (April's payment is due on the 30th, not yet reached).
+    """
     if not start_date_str or not original_amount:
         return None, 0
     try:
@@ -151,8 +159,19 @@ def _auto_balance_from_schedule(original_amount, apr, monthly_payment, start_dat
         today = date.today()
         if today < start:
             return float(original_amount), 0
-        # Number of payments made: start month = payment 1
-        n = (today.year - start.year) * 12 + (today.month - start.month) + 1
+        # Whole months elapsed since start
+        months_elapsed = (today.year - start.year) * 12 + (today.month - start.month)
+        # Check whether today has reached the payment day in the current month.
+        # Handle end-of-month: if start_date is the 31st and current month only
+        # has 30 days, the payment falls on the last day of that month.
+        days_in_current_month = calendar.monthrange(today.year, today.month)[1]
+        payment_day_this_month = min(start.day, days_in_current_month)
+        if today.day >= payment_day_this_month:
+            n = months_elapsed + 1
+        else:
+            n = months_elapsed
+        if n <= 0:
+            return float(original_amount), 0
         r = apr / 100.0 / 12.0
         balance = float(original_amount)
         for _ in range(n):
