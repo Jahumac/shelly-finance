@@ -195,16 +195,29 @@ data/
 
 ## Screenshots
 
-To add screenshots to the repo front page:
+**Overview** — net worth, goals, allowances and portfolio chart at a glance
 
-1. Create a folder (e.g. `docs/screenshots/`) and add PNGs
-2. Add image links here, for example:
+![Overview](Screenshots/demo/overview_desktop.png)
 
-```md
-![Overview](docs/screenshots/overview.png)
-![Accounts](docs/screenshots/accounts.png)
-![Budget](docs/screenshots/budget.png)
-```
+**Accounts** — all your accounts in one place, with live holdings tracking
+
+![Accounts](Screenshots/demo/accounts_desktop.png)
+
+**Goals** — savings targets linked to tagged accounts
+
+![Goals](Screenshots/demo/goals_desktop.png)
+
+**Projections** — retirement projections with fee impact and scenario planner
+
+![Projections](Screenshots/demo/projections_desktop.png)
+
+**Performance** — actual returns tracked with modified Dietz, vs your plan
+
+![Performance](Screenshots/demo/performance_desktop.png)
+
+**Settings** — growth rate, ages, allowances and assumptions
+
+![Settings](Screenshots/demo/settings_desktop.png)
 
 ---
 
