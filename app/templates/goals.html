@@ -23,7 +23,8 @@
 {# ── Month strip ─────────────────────────────────────────────────────────── #}
 {% include '_month_strip.html' %}
 
-{% set total_saved = goal_cards | sum(attribute='current') %}
+{# total_saved is passed from the route — deduplicated so accounts shared
+   across multiple goals are only counted once #}
 {% set total_target = goal_cards | sum(attribute='target') %}
 {% set goals_complete = goal_cards | selectattr('progress', 'ge', 1.0) | list | length %}
 <section class="card highlight mb-1 month-accent-{{ current_month_num }}">

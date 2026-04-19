@@ -2,6 +2,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.calculations import effective_account_value, progress_to_goal, remaining_to_goal
+from app.utils import split_tags as _split_tags_util
 from app.models import (
     fetch_user_tags,
     create_goal,
@@ -88,6 +89,19 @@ def goals():
 
     goal_cards = [_build_goal_card(goal, accounts, holdings_totals) for goal in goal_rows]
 
+    # Deduplicated total saved: sum each account at most once across all goals
+    included_ids = set()
+    for goal_row in goal_rows:
+        tags = _split_tags_util(goal_row["selected_tags"]) if goal_row["selected_tags"] else []
+        for account in accounts:
+            acct_tags = set(_split_tags_util(account["tags"]) if account["tags"] else [])
+            if tags and acct_tags & set(tags):
+                included_ids.add(account["id"])
+    total_saved = sum(
+        effective_account_value(a, holdings_totals)
+        for a in accounts if a["id"] in included_ids
+    )
+
     selected_goal = None
     selected_goal_tags = []
     page_mode = request.args.get("mode", "view")
@@ -100,6 +114,7 @@ def goals():
     return render_template(
         "goals.html",
         goal_cards=goal_cards,
+        total_saved=total_saved,
         selected_goal=selected_goal,
         selected_goal_tags=selected_goal_tags,
         tag_options=fetch_user_tags(current_user.id),
