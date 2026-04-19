@@ -665,76 +665,168 @@ def budget_debts():
 @budget_bp.route("/debts/export.xlsx")
 @login_required
 def budget_debts_export():
-    try:
-        import openpyxl
-        from openpyxl.styles import Font, PatternFill, Alignment
-    except ImportError:
-        return "openpyxl not installed", 500
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    # ── Shelly style constants (match projections export) ────────────────────
+    TEAL       = "0F766E"
+    TEAL_LIGHT = "CCFBF1"
+    RED_LIGHT  = "FEE2E2"
+    GREEN_LIGHT= "DCFCE7"
+    BORDER_CLR = "D1D5DB"
+
+    title_font  = Font(name="Aptos", bold=True, color=TEAL, size=14)
+    sub_font    = Font(name="Aptos", color="6B7280", size=10)
+    hdr_font    = Font(name="Aptos", bold=True, color="FFFFFF", size=11)
+    data_font   = Font(name="Aptos", color="1F2937", size=10)
+    bold_font   = Font(name="Aptos", bold=True, color="1F2937", size=10)
+    red_font    = Font(name="Aptos", color="DC2626", size=10)
+    green_font  = Font(name="Aptos", color="16A34A", size=10)
+
+    hdr_fill    = PatternFill("solid", fgColor=TEAL)
+    alt_fill    = PatternFill("solid", fgColor=TEAL_LIGHT)
+    red_fill    = PatternFill("solid", fgColor=RED_LIGHT)
+    green_fill  = PatternFill("solid", fgColor=GREEN_LIGHT)
+    no_fill     = PatternFill(fill_type=None)
+    thin_border = Border(bottom=Side(style="thin", color=BORDER_CLR))
+    GBP         = '£#,##0.00'
+    GBP0        = '£#,##0'
+
+    def col_width(ws, col, w):
+        ws.column_dimensions[get_column_letter(col)].width = w
+
+    def hdr_row(ws, row, values, widths=None):
+        for i, v in enumerate(values, 1):
+            c = ws.cell(row=row, column=i, value=v)
+            c.font = hdr_font
+            c.fill = hdr_fill
+            c.alignment = Alignment(vertical="center", horizontal="left")
+        ws.row_dimensions[row].height = 22
+        if widths:
+            for i, w in enumerate(widths, 1):
+                col_width(ws, i, w)
+
+    def data_cell(ws, row, col, value, font=None, fill=None, num_fmt=None, bold=False):
+        c = ws.cell(row=row, column=col, value=value)
+        c.font = font or (bold_font if bold else data_font)
+        c.fill = fill or (alt_fill if row % 2 == 0 else no_fill)
+        c.border = thin_border
+        c.alignment = Alignment(vertical="center")
+        if num_fmt:
+            c.number_format = num_fmt
+        return c
 
     uid = current_user.id
     raw_debts = fetch_all_debts(uid)
     debt_cards = [build_debt_card(d) for d in raw_debts]
 
-    wb = openpyxl.Workbook()
-    hdr_font = Font(bold=True)
-    red_fill = PatternFill("solid", fgColor="FFCCCC")
-    grn_fill = PatternFill("solid", fgColor="CCFFCC")
+    wb = Workbook()
 
-    # ── Summary sheet ────────────────────────────────────────────────────────
+    # ════════════════════════════════════════════════════════════════════════
+    # Sheet 1 — Summary
+    # ════════════════════════════════════════════════════════════════════════
     ws = wb.active
     ws.title = "Summary"
-    headers = ["Debt", "Balance", "Monthly Payment", "APR %", "Months Left",
-               "Payoff Date", "Total Interest", "Total Cost", "Auto-tracked"]
-    for col, h in enumerate(headers, 1):
-        c = ws.cell(row=1, column=col, value=h)
-        c.font = hdr_font
 
-    for row_i, d in enumerate(debt_cards, 2):
-        ws.cell(row=row_i, column=1, value=d["name"])
-        ws.cell(row=row_i, column=2, value=round(d["current_balance"], 2))
-        ws.cell(row=row_i, column=3, value=round(d["monthly_payment"], 2))
-        ws.cell(row=row_i, column=4, value=round(d["apr"], 2))
-        ws.cell(row=row_i, column=5, value=d["months_remaining"])
-        ws.cell(row=row_i, column=6, value=d["payoff_date"].strftime("%b %Y") if d["payoff_date"] else "—")
-        ws.cell(row=row_i, column=7, value=round(d["total_interest"], 2) if d["total_interest"] is not None else None)
-        ws.cell(row=row_i, column=8, value=round(d["total_cost"], 2) if d["total_cost"] is not None else None)
-        ws.cell(row=row_i, column=9, value="Yes" if d["auto_tracked"] else "No")
+    c = ws.cell(row=1, column=1, value="Shelly Finance — Debt Tracker")
+    c.font = title_font
+    ws.merge_cells("A1:H1")
 
-    # ── Per-debt amortisation sheets ──────────────────────────────────────────
-    overpayments = [0, 50, 100, 200]
+    c = ws.cell(row=2, column=1, value=f"Generated {datetime.now().strftime('%d %b %Y at %H:%M')}")
+    c.font = sub_font
+    ws.merge_cells("A2:H2")
+    ws.row_dimensions[1].height = 28
+
+    hdr_row(ws, 4,
+            ["Debt", "Balance", "Monthly Payment", "APR %",
+             "Months Left", "Payoff Date", "Total Interest", "Total Cost"],
+            widths=[28, 16, 18, 10, 14, 16, 18, 16])
+
+    for i, d in enumerate(debt_cards, 5):
+        fill = alt_fill if i % 2 == 0 else no_fill
+        data_cell(ws, i, 1, d["name"],        bold=True)
+        data_cell(ws, i, 2, d["current_balance"],   num_fmt=GBP)
+        data_cell(ws, i, 3, d["monthly_payment"],    num_fmt=GBP)
+        data_cell(ws, i, 4, d["apr"],                num_fmt='0.00"%"')
+        data_cell(ws, i, 5, d["months_remaining"])
+        data_cell(ws, i, 6, d["payoff_date"].strftime("%b %Y") if d["payoff_date"] else "—")
+        c = data_cell(ws, i, 7, d["total_interest"],     num_fmt=GBP0)
+        c.font = red_font
+        data_cell(ws, i, 8, d["total_cost"],         num_fmt=GBP0)
+
+    ws.freeze_panes = "A5"
+
+    # ════════════════════════════════════════════════════════════════════════
+    # Per-debt sheets — one tab per scenario
+    # ════════════════════════════════════════════════════════════════════════
     for d in debt_cards:
         if not d["months_remaining"]:
             continue
-        safe_name = d["name"][:28]
-        ws2 = wb.create_sheet(title=safe_name)
 
-        # What-if header row
-        col_offset = 0
-        for extra in overpayments:
-            label = f"Base (£{d['monthly_payment']:.0f}/mo)" if extra == 0 else f"+£{extra}/mo"
-            ws2.cell(row=1, column=col_offset + 1, value="Month").font = hdr_font
-            ws2.cell(row=1, column=col_offset + 2, value=f"{label} — Payment").font = hdr_font
-            ws2.cell(row=1, column=col_offset + 3, value="Interest").font = hdr_font
-            ws2.cell(row=1, column=col_offset + 4, value="Principal").font = hdr_font
-            ws2.cell(row=1, column=col_offset + 5, value="Balance").font = hdr_font
-            col_offset += 6  # gap column
-
-        schedules = [
-            amortisation_schedule(d["current_balance"], d["apr"], d["monthly_payment"] + extra)
-            for extra in overpayments
+        base_payment = d["monthly_payment"]
+        scenarios = [
+            ("Base",    0),
+            ("+£50",   50),
+            ("+£100", 100),
+            ("+£200", 200),
+            ("Double", base_payment),
         ]
-        max_rows = max(len(s) for s in schedules)
-        for row_i in range(max_rows):
-            col_offset = 0
-            for sched in schedules:
-                if row_i < len(sched):
-                    r = sched[row_i]
-                    ws2.cell(row=row_i + 2, column=col_offset + 1, value=r["month"])
-                    ws2.cell(row=row_i + 2, column=col_offset + 2, value=round(r["payment"], 2))
-                    ws2.cell(row=row_i + 2, column=col_offset + 3, value=round(r["interest"], 2))
-                    ws2.cell(row=row_i + 2, column=col_offset + 4, value=round(r["principal"], 2))
-                    ws2.cell(row=row_i + 2, column=col_offset + 5, value=round(r["balance"], 2))
-                col_offset += 6
+
+        for label, extra in scenarios:
+            new_payment = base_payment + extra
+            sched = amortisation_schedule(d["current_balance"], d["apr"], new_payment)
+            total_interest = sum(r["interest"] for r in sched)
+            months_saved = (d["months_remaining"] or 0) - len(sched) if extra > 0 else 0
+            interest_saved = (d["total_interest"] or 0) - total_interest if extra > 0 else 0
+
+            # Tab name: e.g. "Car Loan — Base", "Car Loan — +£50"
+            tab = f"{d['name'][:20]} — {label}"
+            ws2 = wb.create_sheet(title=tab)
+
+            # Title
+            title_str = f"{d['name']} — {label}"
+            if extra > 0:
+                title_str += f" (£{new_payment:,.2f}/mo)"
+            c = ws2.cell(row=1, column=1, value=f"Shelly Finance — {title_str}")
+            c.font = title_font
+            ws2.merge_cells("A1:E1")
+            ws2.row_dimensions[1].height = 28
+
+            # Summary box rows 2-5
+            summaries = [
+                ("Balance",        f"£{d['current_balance']:,.2f}"),
+                ("Monthly payment",f"£{new_payment:,.2f}"),
+                ("Payoff in",      f"{len(sched)} months"),
+                ("Total interest", f"£{total_interest:,.0f}"),
+            ]
+            if extra > 0:
+                summaries += [
+                    ("Months saved",   f"{months_saved}"),
+                    ("Interest saved", f"£{interest_saved:,.0f}"),
+                ]
+            for r_i, (k, v) in enumerate(summaries, 2):
+                lc = ws2.cell(row=r_i, column=1, value=k)
+                lc.font = sub_font
+                vc = ws2.cell(row=r_i, column=2, value=v)
+                vc.font = bold_font if "saved" not in k else Font(name="Aptos", bold=True, color="16A34A", size=10)
+
+            header_row = len(summaries) + 3
+            hdr_row(ws2, header_row,
+                    ["Month", "Payment", "Interest", "To Principal", "Balance"],
+                    widths=[10, 16, 16, 16, 16])
+
+            for row_i, row in enumerate(sched, header_row + 1):
+                fill = alt_fill if row_i % 2 == 0 else no_fill
+                data_cell(ws2, row_i, 1, row["month"])
+                data_cell(ws2, row_i, 2, row["payment"],   num_fmt=GBP)
+                c = data_cell(ws2, row_i, 3, row["interest"],  num_fmt=GBP)
+                c.font = red_font
+                c = data_cell(ws2, row_i, 4, row["principal"], num_fmt=GBP)
+                c.font = green_font
+                data_cell(ws2, row_i, 5, row["balance"],   num_fmt=GBP, bold=True)
+
+            ws2.freeze_panes = f"A{header_row + 1}"
 
     buf = BytesIO()
     wb.save(buf)
