@@ -593,11 +593,34 @@ def uk_tax_year_start(today=None):
     return date(start_year, 4, 6)
 
 
+def resolve_contribution_day(year, month, nominal_day):
+    """Return the actual calendar day a contribution falls on for a given month.
+
+    Handles two adjustments:
+    1. Clamps days beyond the month end (e.g. 31 in February → last day of Feb).
+       Use nominal_day=31 to mean "last day of month".
+    2. If that day falls on a Saturday or Sunday, shifts back to the preceding
+       Friday (matching UK payroll practice — salary arrives the last working day).
+
+    Returns an integer day number (1-31).
+    """
+    import calendar
+    max_day = calendar.monthrange(year, month)[1]
+    day = min(nominal_day, max_day)
+    wd = date(year, month, day).weekday()  # 0=Mon .. 6=Sun
+    if wd == 5:    # Saturday → Friday
+        day -= 1
+    elif wd == 6:  # Sunday → Friday
+        day -= 2
+    return max(1, day)
+
+
 def months_in_tax_year(today=None, salary_day=0):
     """Return the number of monthly ISA contributions that have gone through
     in the current UK tax year.
 
-    salary_day: day of month when salary/contributions go in (1-28).
+    salary_day: day of month when salary/contributions go in (1-31).
+        Use 31 to mean "last working day of the month".
         If >= 6: April's contribution falls in the new tax year.
         If < 6 (or 0/unset): April's contribution is in the OLD tax year,
         so the first new-year contribution is May.
@@ -630,8 +653,10 @@ def months_in_tax_year(today=None, salary_day=0):
             # Past month — contribution definitely happened
             count += 1
         elif y == today.year and m == today.month:
-            # Current month — only count if contribution day has passed
-            if today.day >= contribution_day:
+            # Current month — only count if contribution day has passed.
+            # resolve_contribution_day handles end-of-month clamping and
+            # weekend shift (e.g. 31 in February → last working day of Feb).
+            if today.day >= resolve_contribution_day(y, m, contribution_day):
                 count += 1
         # Advance to next month
         if m == 12:
@@ -665,21 +690,10 @@ def review_ready_date(year, month, salary_day=0):
 
     Returns a date object.
     """
-    import calendar
-
-    contribution_day = salary_day if salary_day >= 1 else 1
-    # Clamp to actual days in the month (e.g. Feb 28)
-    max_day = calendar.monthrange(year, month)[1]
-    contribution_day = min(contribution_day, max_day)
-
-    d = date(year, month, contribution_day)
-
-    # If salary day is on a weekend, shift to the preceding Friday
-    wd = d.weekday()  # 0=Mon .. 6=Sun
-    if wd == 5:       # Saturday → Friday
-        d = d - timedelta(days=1)
-    elif wd == 6:     # Sunday → Friday
-        d = d - timedelta(days=2)
+    nominal_day = salary_day if salary_day >= 1 else 1
+    # Clamp to last day of month and shift weekends to preceding Friday
+    day = resolve_contribution_day(year, month, nominal_day)
+    d = date(year, month, day)
 
     # Add 2 business days for settlement
     days_added = 0

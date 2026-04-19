@@ -38,14 +38,14 @@ def settings():
             except (ValueError, TypeError):
                 return int(default)
 
-        salary_day = max(0, min(28, _i("salary_day", 0)))
-        update_day = max(0, min(28, _i("update_day", 0)))
+        salary_day = max(0, min(31, _i("salary_day", 0)))
+        update_day = max(0, min(31, _i("update_day", 0)))
 
         # Auto-calculate update day: salary day + 5 calendar days (settlement buffer)
         if salary_day and not update_day:
             update_day = salary_day + 5
-            if update_day > 28:
-                update_day = update_day - 28  # wrap into next month (early days)
+            if update_day > 31:
+                update_day = update_day - 31  # wrap into next month (early days)
 
         new_dob = request.form.get("date_of_birth", "").strip()
 
