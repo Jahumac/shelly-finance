@@ -95,6 +95,7 @@
         {% if detail_mode != 'edit' %}<a class="badge" href="/accounts/{{ selected.id }}?mode=edit">Edit</a>{% endif %}
         {% if detail_mode != 'edit' and selected.valuation_mode == 'holdings' %}<button type="button" class="badge" id="top-add-holding">+ Add holding</button>{% endif %}
         <form method="post" class="form-reset" style="display:inline;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="form_name" value="delete_account">
           <button type="submit" class="badge badge-danger"
             data-confirm="This will permanently remove {{ selected.name }} and all its holdings. Shelly can't undo this one."
@@ -727,6 +728,7 @@
                 <span class="override-badge">Active</span>
               {% endif %}
               <form method="post" class="form-reset">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="form_name" value="delete_override">
                 <input type="hidden" name="override_id" value="{{ ov.id }}">
                 <button type="submit" class="badge badge-danger badge-meta">Remove</button>

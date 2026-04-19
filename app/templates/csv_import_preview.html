@@ -34,6 +34,7 @@
 
 {# ── Matched holdings ── #}
 <form method="post" action="/monthly-review/confirm-import">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
   <section class="card mb-1">
     <div class="section-header">

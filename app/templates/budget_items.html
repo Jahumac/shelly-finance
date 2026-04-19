@@ -66,6 +66,7 @@
     <div class="badge-row"><a class="badge" href="/budget/items/">Cancel</a></div>
   </div>
   <form method="post" class="settings-form mt-1">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="form_name" value="add_section">
     <div class="form-grid">
       <label><span>Section name</span><input type="text" name="section_label" required autofocus placeholder="e.g. Subscriptions"></label>
@@ -84,6 +85,7 @@
     <div class="badge-row"><a class="badge" href="/budget/items/">Cancel</a></div>
   </div>
   <form method="post" class="settings-form mt-1">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-grid">
       <label><span>Name</span><input type="text" name="name" required autofocus></label>
       <label>
@@ -121,6 +123,7 @@
     <div class="badge-row"><a class="badge" href="/budget/items/">Cancel</a></div>
   </div>
   <form method="post" action="/budget/items/{{ selected.id }}" class="settings-form mt-1">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="form-grid">
       <label><span>Name</span><input type="text" name="name" value="{{ selected.name }}" required autofocus></label>
       <label>
@@ -149,6 +152,7 @@
     <h2>Delete item</h2>
     <p>Removes <strong>{{ selected.name }}</strong> and all its monthly entries permanently.</p>
     <form method="post" action="/budget/items/{{ selected.id }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="form_name" value="delete">
       <div class="badge-row mt-1"><button type="submit" class="button-danger">Yes, delete</button></div>
     </form>
@@ -167,6 +171,7 @@
     <div class="badge-row"><a class="badge" href="/budget/items/">Cancel</a></div>
   </div>
   <form method="post" class="settings-form mt-1">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="form_name" value="edit_section">
     <input type="hidden" name="section_key" value="{{ edit_key }}">
     <div class="form-grid">
@@ -178,6 +183,7 @@
     <h2>Delete section</h2>
     <p>Removes <strong>{{ edit_label }}</strong> and all its items permanently.</p>
     <form method="post" class="settings-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="form_name" value="delete_section">
       <input type="hidden" name="section_key" value="{{ edit_key }}">
       <div class="badge-row mt-1"><button type="submit" class="button-danger" data-confirm="This will remove the section and everything in it. Shelly won't be able to bring it back." data-confirm-title="Delete this section?" data-confirm-ok="Yes, delete it" data-confirm-cancel="Keep it">Yes, delete section</button></div>
