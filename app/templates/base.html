@@ -46,7 +46,6 @@
   <main class="page-shell">
     <div id="offline-banner" class="offline-banner hidden">You’re offline — you can browse pages you’ve visited before, but changes won’t be saved.</div>
     <div id="online-toast" class="online-toast hidden">Back online</div>
-    <div id="offline-ready-toast" class="online-toast hidden">Pages saved — app ready to use offline</div>
     {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
     {% for category, message in messages %}
@@ -433,38 +432,6 @@
         .catch(function() { /* SW not supported or blocked */ });
     }
 
-    /* ── Cache warm: pre-fetch all main pages in the background ───────── */
-    {% if current_user.is_authenticated %}
-    /* ── Self-caching: each page stores its own HTML in the cache ─────── */
-    /* More reliable than background fetch warming — caches exactly what   */
-    /* the user sees, no SW timing or auth race conditions.                */
-    if ('caches' in window && navigator.onLine) {
-      window.addEventListener('load', function() {
-        var url = window.location.pathname;
-        var html = '<!DOCTYPE html>' + document.documentElement.outerHTML;
-        caches.open('shelly-pages').then(function(cache) {
-          cache.put(url, new Response(html, {
-            headers: { 'Content-Type': 'text/html; charset=utf-8' }
-          })).then(function() {
-            /* Show toast once all main pages are cached */
-            var mainPages = ['/', '/accounts/', '/budget/', '/goals/', '/settings/'];
-            Promise.all(mainPages.map(function(p) { return cache.match(p); }))
-              .then(function(results) {
-                var allCached = results.every(function(r) { return !!r; });
-                if (allCached && !localStorage.getItem('shelly-offline-ready')) {
-                  localStorage.setItem('shelly-offline-ready', '1');
-                  var t = document.getElementById('offline-ready-toast');
-                  if (t) {
-                    t.classList.remove('hidden');
-                    setTimeout(function() { t.classList.add('hidden'); }, 4000);
-                  }
-                }
-              });
-          });
-        }).catch(function() {});
-      });
-    }
-    {% endif %}
   </script>
 </body>
 </html>

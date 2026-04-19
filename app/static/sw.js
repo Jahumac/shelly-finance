@@ -1,22 +1,18 @@
 /**
  * Shelly — Service Worker
  *
- * Two separate caches:
- *  STATIC_CACHE — app shell (CSS, JS, icons). Versioned — bumped when
- *                 static files change. Old static caches are deleted on activate.
- *  PAGE_CACHE   — HTML pages and API responses. Never wiped, so cached
- *                 pages survive app updates and are always available offline.
+ * Single cache, never renamed so cached pages are never wiped.
+ * Static files (CSS/JS) are cache-busted via ?v=mtime in their URLs.
  *
  * Strategies:
- *  Static assets  → cache-first (serve instantly, revalidate in background)
- *  Page navigations → network-first, fall back to PAGE_CACHE, then offline HTML
- *  API calls      → network-first, fall back to PAGE_CACHE
+ *  Static assets      → cache-first (served instantly, revalidated in background)
+ *  Page navigations   → network-first, fall back to cache, then offline HTML
+ *  API /ping          → network-only (used for online/offline detection)
+ *  Other API calls    → network-first, cache for offline reads
  */
 
-const STATIC_CACHE = 'shelly-static-v1.7.0';
-const PAGE_CACHE   = 'shelly-pages';
+const CACHE = 'shelly-cache';
 
-/* App shell files to pre-cache on install */
 const APP_SHELL = [
   '/static/css/styles.css',
   '/static/js/charts.js',
@@ -26,45 +22,41 @@ const APP_SHELL = [
   '/static/icons/icon-512.png',
 ];
 
-/* ── Install: pre-cache the app shell ─────────────────────────────────── */
+/* ── Install ──────────────────────────────────────────────────────────── */
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => cache.addAll(APP_SHELL))
+    caches.open(CACHE).then((cache) => cache.addAll(APP_SHELL))
   );
   self.skipWaiting();
 });
 
-/* ── Activate: clean up old STATIC caches only, never touch PAGE_CACHE ── */
+/* ── Activate ─────────────────────────────────────────────────────────── */
 self.addEventListener('activate', (event) => {
+  /* Remove any old differently-named caches left from previous versions */
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
-        keys
-          .filter((key) => key.startsWith('shelly-static-') && key !== STATIC_CACHE)
-          .map((key) => caches.delete(key))
+        keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))
       )
     )
   );
   self.clients.claim();
 });
 
-/* ── Fetch: route requests through appropriate strategy ───────────────── */
+/* ── Fetch ────────────────────────────────────────────────────────────── */
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  /* Only handle same-origin GET requests */
-  if (request.method !== 'GET' || url.origin !== self.location.origin) {
-    return;
-  }
+  if (request.method !== 'GET' || url.origin !== self.location.origin) return;
 
-  /* Static assets: cache-first, revalidate in background */
+  /* Static assets: cache-first */
   if (url.pathname.startsWith('/static/')) {
     event.respondWith(cacheFirst(request));
     return;
   }
 
-  /* API ping: network-only, return offline JSON if unreachable */
+  /* Ping: network only — used by the banner to detect connectivity */
   if (url.pathname === '/api/ping') {
     event.respondWith(
       fetch(request).catch(() =>
@@ -77,14 +69,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  /* API calls: network-first, cache for offline reads */
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(networkFirst(request, PAGE_CACHE));
-    return;
-  }
-
-  /* Page navigations and everything else: network-first with offline fallback */
-  event.respondWith(networkFirstPage(request));
+  /* Everything else: network-first, cache on success */
+  event.respondWith(networkFirst(request));
 });
 
 /* ── Strategies ───────────────────────────────────────────────────────── */
@@ -92,56 +78,30 @@ self.addEventListener('fetch', (event) => {
 async function cacheFirst(request) {
   const cached = await caches.match(request);
   if (cached) {
-    /* Revalidate in background so next load gets fresh file */
-    fetch(request)
-      .then((response) => {
-        if (response.ok) {
-          caches.open(STATIC_CACHE).then((cache) => cache.put(request, response));
-        }
-      })
-      .catch(() => {});
+    fetch(request).then((r) => {
+      if (r.ok) caches.open(CACHE).then((c) => c.put(request, r));
+    }).catch(() => {});
     return cached;
   }
   const response = await fetch(request);
   if (response.ok) {
-    const cache = await caches.open(STATIC_CACHE);
+    const cache = await caches.open(CACHE);
     cache.put(request, response.clone());
   }
   return response;
 }
 
-async function networkFirst(request, cacheName) {
+async function networkFirst(request) {
   try {
     const response = await fetch(request);
     if (response.ok) {
-      const cache = await caches.open(cacheName);
+      const cache = await caches.open(CACHE);
       cache.put(request, response.clone());
     }
     return response;
   } catch (e) {
-    const cache = await caches.open(cacheName);
-    const cached = await cache.match(request, { ignoreVary: true });
+    const cached = await caches.match(request, { ignoreVary: true });
     if (cached) return cached;
-    return new Response(JSON.stringify({ error: 'Offline' }), {
-      status: 503,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-}
-
-async function networkFirstPage(request) {
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(PAGE_CACHE);
-      cache.put(request, response.clone());
-    }
-    return response;
-  } catch (e) {
-    const cache = await caches.open(PAGE_CACHE);
-    const cached = await cache.match(request, { ignoreVary: true });
-    if (cached) return cached;
-
     return new Response(offlineHTML(), {
       status: 503,
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
@@ -149,7 +109,7 @@ async function networkFirstPage(request) {
   }
 }
 
-/* ── Offline fallback HTML ────────────────────────────────────────────── */
+/* ── Offline fallback ─────────────────────────────────────────────────── */
 function offlineHTML() {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -160,34 +120,22 @@ function offlineHTML() {
   <title>Offline · Shelly</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: Inter, system-ui, -apple-system, sans-serif;
-      background: #0f172a;
-      color: #e2e8f0;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 2rem;
-    }
-    .offline-card { max-width: 400px; }
-    .offline-icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.6; }
+    body { font-family: Inter, system-ui, sans-serif; background: #0f172a; color: #e2e8f0;
+           min-height: 100vh; display: flex; align-items: center; justify-content: center;
+           text-align: center; padding: 2rem; }
+    .card { max-width: 380px; }
+    .icon { font-size: 3rem; margin-bottom: 1rem; opacity: 0.6; }
     h1 { font-size: 1.5rem; margin-bottom: 0.5rem; color: #38bdf8; }
     p { color: #94a3b8; line-height: 1.6; margin-bottom: 1.5rem; }
-    button {
-      background: #38bdf8; color: #0f172a; border: none;
-      padding: 0.75rem 2rem; border-radius: 999px;
-      font-size: 0.95rem; font-weight: 600; cursor: pointer;
-    }
-    button:hover { background: #7dd3fc; }
+    button { background: #38bdf8; color: #0f172a; border: none; padding: 0.75rem 2rem;
+             border-radius: 999px; font-size: 0.95rem; font-weight: 600; cursor: pointer; }
   </style>
 </head>
 <body>
-  <div class="offline-card">
-    <div class="offline-icon">🐢</div>
-    <h1>Shelly's tucked in</h1>
-    <p>You're offline and this page hasn't been cached yet. Open the app while connected first, then it'll work offline.</p>
+  <div class="card">
+    <div class="icon">🐢</div>
+    <h1>You're offline</h1>
+    <p>This page hasn't been cached yet. Connect to the internet, open the app and visit this page, then it will work offline next time.</p>
     <button onclick="location.reload()">Try Again</button>
   </div>
 </body>
