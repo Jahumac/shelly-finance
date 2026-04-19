@@ -301,6 +301,37 @@
    CREATE FORM
    ════════════════════════════════════════════════════════════════════════════ #}
 {% elif page_mode == 'create' %}
+
+{# ── 0% deal calculator ───────────────────────────────────────────────────── #}
+<section class="panel mb-1">
+  <div class="section-header mb-05">
+    <div>
+      <p class="eyebrow">0% interest deal calculator</p>
+      <h3>Work out your monthly payment</h3>
+    </div>
+  </div>
+  <p class="helper-text mb-075">Got a 0% credit card or buy-now-pay-later deal? Enter the balance and how many months you have — Shelly tells you what to pay each month to clear it before interest kicks in.</p>
+  <div class="settings-form" style="max-width:420px;">
+    <div class="form-grid">
+      <label>
+        <span>Balance (£)</span>
+        <input type="number" step="0.01" min="0" placeholder="e.g. 800" id="zero-balance">
+      </label>
+      <label>
+        <span>0% months remaining</span>
+        <input type="number" step="1" min="1" placeholder="e.g. 12" id="zero-months">
+      </label>
+    </div>
+  </div>
+  <div id="zero-result" style="display:none;" class="mt-075">
+    <p class="helper-text">
+      Pay <strong id="zero-monthly" style="color:var(--accent-3);font-size:1.1rem;"></strong> per month to clear it in time.
+      <span id="zero-note" class="text-muted"></span>
+    </p>
+    <p class="helper-text mt-025">Use that number as the monthly payment below — set APR to 0.</p>
+  </div>
+</section>
+
 <section class="card mt-1" data-focus-panel>
   <div class="section-header">
     <div>
@@ -315,16 +346,16 @@
     <div class="form-grid">
       <label>
         <span>Name</span>
-        <input type="text" name="name" required placeholder="e.g. Car loan, Credit card" autofocus>
+        <input type="text" name="name" required placeholder="e.g. Credit card, BNPL" autofocus>
       </label>
       <label>
         <span>Monthly payment (£)</span>
-        <input type="number" step="0.01" name="monthly_payment" required placeholder="e.g. 455">
+        <input type="number" step="0.01" name="monthly_payment" required placeholder="e.g. 67" id="zero-fill-payment">
       </label>
       <label>
         <span>APR (%)</span>
         <input type="number" step="0.01" name="apr" placeholder="e.g. 26.9" min="0">
-        <small class="form-hint">Annual interest rate. Leave blank for 0%.</small>
+        <small class="form-hint">Leave blank or 0 for a 0% interest deal.</small>
       </label>
       <label>
         <span>Original loan amount (£)</span>
@@ -487,6 +518,29 @@
       showAllBtn.style.display = 'none';
     });
   }
+
+  /* ── 0% deal calculator ───────────────────────────────────────── */
+  var zeroBalance = document.getElementById('zero-balance');
+  var zeroMonths  = document.getElementById('zero-months');
+  var zeroResult  = document.getElementById('zero-result');
+  var zeroMonthly = document.getElementById('zero-monthly');
+  var zeroNote    = document.getElementById('zero-note');
+  var zeroFill    = document.getElementById('zero-fill-payment');
+
+  function calcZero() {
+    if (!zeroBalance || !zeroMonths) return;
+    var bal = parseFloat(zeroBalance.value) || 0;
+    var mos = parseInt(zeroMonths.value)    || 0;
+    if (bal <= 0 || mos <= 0) { if (zeroResult) zeroResult.style.display = 'none'; return; }
+    var monthly = bal / mos;
+    zeroMonthly.textContent = '£' + monthly.toLocaleString('en-GB', {minimumFractionDigits:2, maximumFractionDigits:2});
+    zeroNote.textContent = '(£' + bal.toLocaleString('en-GB', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' ÷ ' + mos + ' months)';
+    zeroResult.style.display = '';
+    if (zeroFill) zeroFill.value = monthly.toFixed(2);
+  }
+
+  if (zeroBalance) zeroBalance.addEventListener('input', calcZero);
+  if (zeroMonths)  zeroMonths.addEventListener('input', calcZero);
 })();
 </script>
 {% endblock %}
