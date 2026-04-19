@@ -56,7 +56,7 @@
     <div class="acct-card-mid">
       <div class="acct-balance">£{{ '{:,.0f}'.format(val) }}</div>
       <div class="acct-name">{{ account.name }}</div>
-      <div class="acct-provider">{{ account.provider }}</div>
+      <div class="acct-provider">{{ account.provider }}{% if account.owner %} · {{ account.owner }}{% endif %}</div>
     </div>
     <div class="acct-card-foot">
       {% set cb = contrib_breakdowns.get(account.id, {}) %}
@@ -225,6 +225,9 @@
             </label>
             {% endif %}
             <label><span>Account Goal</span><input type="number" step="0.01" name="goal_value" value="{{ selected.goal_value or '' }}"></label>
+            <label><span>Account holder</span><input type="text" name="owner" value="{{ selected.owner or '' }}" placeholder="e.g. Samuel, Me, Joint">
+              <small class="form-hint">Optional — useful for household accounts to show whose account this is.</small>
+            </label>
             <label class="form-full-col"><span>Notes</span><input type="text" name="notes" value="{{ selected.notes or '' }}"></label>
           </div>
           {# ── Advanced: Fees (below the main form grid) ─────────── #}

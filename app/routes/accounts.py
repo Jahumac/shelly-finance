@@ -440,6 +440,8 @@ def account_detail(account_id):
             payload["cash_interest_rate"] = (selected or {}).get("cash_interest_rate", 0) or 0
         if "uninvested_cash" not in payload:
             payload["uninvested_cash"] = (selected or {}).get("uninvested_cash") or 0
+        if not payload.get("owner") and (selected or {}).get("owner"):
+            payload["owner"] = selected["owner"]
         update_account(payload, uid)
         return redirect(url_for("accounts.account_detail", account_id=account_id))
 

@@ -29,6 +29,11 @@
             <small class="form-hint">Start typing or pick from the list</small>
           </label>
           <label>
+            <span>Account holder <span style="color:var(--muted);font-weight:400;">(optional)</span></span>
+            <input type="text" name="owner" placeholder="e.g. Samuel, Me, Joint">
+            <small class="form-hint">Useful for household accounts so you know whose account this is.</small>
+          </label>
+          <label>
             <span>Wrapper type</span>
             <select name="wrapper_type" id="cw-wrapper">
               {% for option in wrapper_type_options %}
