@@ -434,39 +434,36 @@
     }
 
     /* ── Cache warm: pre-fetch all main pages in the background ───────── */
-    /* Runs once per session after page load, only when online.            */
-    /* The service worker intercepts each fetch and stores it in cache,    */
-    /* so all pages are available offline even if never manually visited.  */
     {% if current_user.is_authenticated %}
-    (function() {
-      /* Clear any old warming flags so this runs fresh */
-      ['shelly-cache-warmed', 'shelly-cache-warmed-v1.7.0'].forEach(function(k) { localStorage.removeItem(k); });
-      var CACHE_KEY = 'shelly-pages-warmed-v2';
-      if (!navigator.onLine || localStorage.getItem(CACHE_KEY)) return;
-      var pagesToWarm = ['/', '/accounts/', '/budget/', '/goals/',
-                         '/projections/', '/performance/', '/allowance/', '/settings/'];
-      var warmed = 0;
-      var total = pagesToWarm.length;
-      function warmCache() {
-        pagesToWarm.forEach(function(url) {
-          fetch(url, { credentials: 'same-origin' })
-            .then(function(r) {
-              if (r.ok) warmed++;
-              if (warmed === total) {
-                localStorage.setItem(CACHE_KEY, '1');
-                /* Show confirmation toast */
-                var t = document.getElementById('offline-ready-toast');
-                if (t) {
-                  t.classList.remove('hidden');
-                  setTimeout(function() { t.classList.add('hidden'); }, 4000);
+    /* ── Self-caching: each page stores its own HTML in the cache ─────── */
+    /* More reliable than background fetch warming — caches exactly what   */
+    /* the user sees, no SW timing or auth race conditions.                */
+    if ('caches' in window && navigator.onLine) {
+      window.addEventListener('load', function() {
+        var url = window.location.pathname;
+        var html = '<!DOCTYPE html>' + document.documentElement.outerHTML;
+        caches.open('shelly-pages').then(function(cache) {
+          cache.put(url, new Response(html, {
+            headers: { 'Content-Type': 'text/html; charset=utf-8' }
+          })).then(function() {
+            /* Show toast once all main pages are cached */
+            var mainPages = ['/', '/accounts/', '/budget/', '/goals/', '/settings/'];
+            Promise.all(mainPages.map(function(p) { return cache.match(p); }))
+              .then(function(results) {
+                var allCached = results.every(function(r) { return !!r; });
+                if (allCached && !localStorage.getItem('shelly-offline-ready')) {
+                  localStorage.setItem('shelly-offline-ready', '1');
+                  var t = document.getElementById('offline-ready-toast');
+                  if (t) {
+                    t.classList.remove('hidden');
+                    setTimeout(function() { t.classList.add('hidden'); }, 4000);
+                  }
                 }
-              }
-            })
-            .catch(function() {});
-        });
-      }
-      setTimeout(warmCache, 1000);
-    })();
+              });
+          });
+        }).catch(function() {});
+      });
+    }
     {% endif %}
   </script>
 </body>
