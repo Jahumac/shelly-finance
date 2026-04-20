@@ -451,6 +451,7 @@ def fetch_price(ticker: str):
         res = _try_twelve_data(sym)
         if res:
             res["yf_symbol"] = sym
+            res["source"] = "twelve_data"
             logger.info(f"Fetched {sym} via Source C (Twelve Data): {res['price']} {res['currency']}")
             return res
 
@@ -458,6 +459,7 @@ def fetch_price(ticker: str):
         res = _try_yahoo_quote(sym)
         if res:
             res["yf_symbol"] = sym
+            res["source"] = "yahoo_quote"
             logger.info(f"Fetched {sym} via Source B (quote): {res['price']} {res['currency']}")
             return res
 
@@ -465,6 +467,7 @@ def fetch_price(ticker: str):
         res = _try_yahoo_http(sym)
         if res:
             res["yf_symbol"] = sym
+            res["source"] = "yahoo_chart"
             logger.info(f"Fetched {sym} via Source A (chart): {res['price']} {res['currency']}")
             # Prefer LSE version for GBP-priced instruments if multiple results exist
             if sym.endswith(".L") or res.get("currency") in ("GBP", "GBp"):
@@ -478,6 +481,7 @@ def fetch_price(ticker: str):
         yf_result = _try_ticker(sym)
         if yf_result:
             yf_result["yf_symbol"] = sym
+            yf_result["source"] = "yfinance"
             return yf_result
 
     # ── Phase 3: search Yahoo Finance for the symbol ─────────────────────
@@ -488,6 +492,7 @@ def fetch_price(ticker: str):
             search_result = _try_ticker(found_symbol)
         if search_result:
             search_result["yf_symbol"] = found_symbol
+            search_result["source"] = search_result.get("source") or "search_fallback"
             return search_result
 
     return None
@@ -561,6 +566,7 @@ def refresh_catalogue_prices(catalogue_rows):
                 "price": data["price"],
                 "currency": data["currency"],
                 "change_pct": data["change_pct"],
+                "source": data.get("source"),
                 "updated_at": now,
                 "success": True,
                 "error": None,

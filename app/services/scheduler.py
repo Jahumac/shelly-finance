@@ -313,10 +313,17 @@ def _run_price_update_for_user(app, user_id, slot_name="auto"):
         else:
             logger.info(f"Price update for user {user_id} ({slot_name}): processing {len(tickers_to_update)} tickers")
             price_results = refresh_catalogue_prices(tickers_to_update)
+            by_source = {"twelve_data": 0, "yahoo_quote": 0, "yahoo_chart": 0, "yfinance": 0, "other": 0}
+            ok_count = 0
 
             with get_connection() as conn:
                 for result in price_results:
                     if result.get("success"):
+                        ok_count += 1
+                        src = result.get("source") or "other"
+                        if src not in by_source:
+                            src = "other"
+                        by_source[src] += 1
                         conn.execute(
                             """
                             UPDATE holding_catalogue
@@ -339,6 +346,17 @@ def _run_price_update_for_user(app, user_id, slot_name="auto"):
                     else:
                         current_app.logger.error(f"[Shelly] ✗ {result.get('ticker')}: {result.get('error')}")
                 conn.commit()
+            logger.info(
+                "Price provider breakdown user %s (%s): success=%s/%s, twelve_data=%s, yahoo_quote=%s, yahoo_chart=%s, yfinance=%s",
+                user_id,
+                slot_name,
+                ok_count,
+                len(price_results),
+                by_source["twelve_data"],
+                by_source["yahoo_quote"],
+                by_source["yahoo_chart"],
+                by_source["yfinance"],
+            )
 
         accounts = fetch_all_accounts(user_id)
         holdings_totals = fetch_holding_totals_by_account(user_id)

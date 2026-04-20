@@ -220,18 +220,25 @@ def overview():
             if lpu_dt_uk:
                 candidate = lpu_dt_uk + timedelta(hours=1)
             else:
-                candidate = win_start
+                candidate = now_uk.replace(hour=mh, minute=mm, second=0, microsecond=0)
 
-            if candidate < win_start:
+            # Normalize to a future slot inside the configured window
+            if now_uk < win_start:
                 candidate = win_start
-            if candidate > win_end:
-                # Next window is tomorrow morning
-                tomorrow_start = (now_uk + timedelta(days=1)).replace(hour=mh, minute=mm, second=0, microsecond=0)
-                next_update_display = "Tomorrow " + tomorrow_start.strftime("%H:%M")
-            elif candidate <= now_uk:
-                next_update_display = "Soon"
+            elif now_uk > win_end:
+                candidate = (now_uk + timedelta(days=1)).replace(hour=mh, minute=mm, second=0, microsecond=0)
             else:
+                if candidate <= now_uk:
+                    candidate = now_uk + timedelta(hours=1)
+                if candidate < win_start:
+                    candidate = win_start
+                if candidate > win_end:
+                    candidate = (now_uk + timedelta(days=1)).replace(hour=mh, minute=mm, second=0, microsecond=0)
+
+            if candidate.date() == now_uk.date():
                 next_update_display = candidate.strftime("%H:%M")
+            else:
+                next_update_display = "Tomorrow " + candidate.strftime("%H:%M")
         except (ValueError, TypeError):
             next_update_display = None
 
