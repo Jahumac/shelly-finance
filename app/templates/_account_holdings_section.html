@@ -12,7 +12,7 @@
           {% if positions %}
           <form method="post" action="/holdings/trigger-price-update" class="form-reset">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="badge badge-meta" title="Fetch latest prices from Yahoo Finance">↻ Refresh prices</button>
+            <button type="submit" class="badge badge-meta" title="Fetch latest prices from live market data providers">↻ Refresh prices</button>
           </form>
           {% endif %}
         </div>
@@ -273,7 +273,7 @@
                   status.style.color = '#86efac';
                 } else {
                   cachedPrice = null;
-                  status.innerHTML = 'Not found on Yahoo Finance. <button type="button" onclick="document.getElementById(\'ah-switch-manual\').click()" ' +
+                  status.innerHTML = 'Not found via live market data providers. <button type="button" onclick="document.getElementById(\'ah-switch-manual\').click()" ' +
                     'style="color:#93c5fd;background:none;border:none;padding:0;cursor:pointer;font-size:inherit;text-decoration:underline;">' +
                     'Add manually instead →</button>';
                   status.style.color = '#fca5a5';

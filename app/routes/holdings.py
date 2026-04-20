@@ -83,7 +83,7 @@ def api_lookup():
 
     result = lookup_instrument(q)
     if not result:
-        return jsonify({"error": f"Could not find '{q}' on Yahoo Finance"}), 404
+        return jsonify({"error": f"Could not find '{q}' via live market data providers"}), 404
 
     result["in_catalogue"] = existing is not None
     result["catalogue_id"] = existing["id"] if existing else None

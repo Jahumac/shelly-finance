@@ -261,7 +261,7 @@
     </div>
     {% if holdings_items %}
     <div class="badge-row">
-      <button type="button" class="badge badge-accent" id="update-all-prices" title="Fetch latest prices for all holdings from Yahoo Finance">↻ Update All Prices</button>
+      <button type="button" class="badge badge-accent" id="update-all-prices" title="Fetch latest prices for all holdings from live market data providers">↻ Update All Prices</button>
     </div>
     {% endif %}
   </div>
@@ -454,7 +454,7 @@ if (updateAllBtn) {
     var total = holdingForms.length;
     var done = 0;
 
-    /* Process sequentially to avoid hammering Yahoo Finance */
+    /* Process sequentially to avoid hammering market data providers */
     for (var i = 0; i < holdingForms.length; i++) {
       var hf = holdingForms[i];
       if (hf.refreshBtn) hf.refreshBtn.textContent = '…';

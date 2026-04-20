@@ -136,7 +136,7 @@
             <div class="add-holding-field">
               <label>Ticker</label>
               <input type="text" id="cw-h-ticker" class="input-standard" placeholder="e.g. VWRP" autocapitalize="characters" autocomplete="off">
-              <small class="form-hint">Shelly checks Yahoo Finance and prefers the London Stock Exchange listing. If the price looks wrong, try adding .L to the ticker (e.g. VWRP.L).</small>
+              <small class="form-hint">Shelly checks live market data providers and prefers the London Stock Exchange listing. If the price looks wrong, try adding .L to the ticker (e.g. VWRP.L).</small>
             </div>
             <div class="add-holding-field">
               <label>Units</label>
@@ -529,7 +529,7 @@
           hStatus.style.color = '#86efac';
         } else {
           hCachedPrice = null; hCachedName = null;
-          hStatus.innerHTML = 'Not found on Yahoo Finance. <button type="button" style="color:#93c5fd;background:none;border:none;padding:0;cursor:pointer;font-size:inherit;text-decoration:underline;" onclick="document.getElementById(\'cw-h-switch-manual\').click()">Add manually instead →</button>';
+          hStatus.innerHTML = 'Not found via live market data providers. <button type="button" style="color:#93c5fd;background:none;border:none;padding:0;cursor:pointer;font-size:inherit;text-decoration:underline;" onclick="document.getElementById(\'cw-h-switch-manual\').click()">Add manually instead →</button>';
           hStatus.style.color = '#fca5a5';
         }
         updateTickerPreview();

@@ -245,7 +245,7 @@ def api_create_account():
 @accounts_bp.route("/api/ticker-lookup", methods=["POST"])
 @login_required
 def api_ticker_lookup():
-    """JSON API: look up a ticker via Yahoo Finance and return name + price.
+    """JSON API: look up a ticker via live market data providers and return name + price.
 
     Used by the wizard to validate tickers and show a live price preview
     before the account is created.
@@ -261,7 +261,7 @@ def api_ticker_lookup():
         current_app.logger.warning("lookup_instrument(%s) failed: %s", ticker, e)
 
     if not instrument:
-        return jsonify({"ok": False, "error": f"Shelly couldn't find '{ticker}' on Yahoo Finance. Double-check the symbol or add manually instead."}), 404
+        return jsonify({"ok": False, "error": f"Shelly couldn't find '{ticker}' via live market data providers. Double-check the symbol or add manually instead."}), 404
 
     price_gbp = instrument["price_gbp"]
     return jsonify({
@@ -489,7 +489,7 @@ def account_add_holding(account_id):
 @accounts_bp.route("/<int:account_id>/holdings/add-manual", methods=["POST"])
 @login_required
 def account_add_holding_manual(account_id):
-    """Add a custom holding without a Yahoo Finance ticker (pensions, unlisted funds, etc.)."""
+    """Add a custom holding without a live ticker (pensions, unlisted funds, etc.)."""
     uid = current_user.id
     account = fetch_account(account_id, uid)
     if not account:
