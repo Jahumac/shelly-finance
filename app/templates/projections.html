@@ -158,7 +158,9 @@
   </div>
   <p class="helper-text">Shelly's crystal ball — how your portfolio could grow year by year, based on what you're putting in today.</p>
   <div class="chart-wrap-md">
-    <canvas id="projectionChart" role="img" aria-label="Projected portfolio growth chart"></canvas>
+    <canvas id="projectionChart" role="img" aria-label="Projected portfolio growth chart"
+      data-labels='{{ chart_labels | tojson | safe }}'
+      data-values='{{ chart_values | tojson | safe }}'></canvas>
   </div>
 </section>
 {% endif %}
@@ -178,7 +180,12 @@
   <div class="form-grid settings-form mb-1">
     <label>
       <span>Retirement age</span>
-      <input type="number" id="wi_age" value="{{ metrics.retirement_age }}" min="40" max="80" step="1">
+      <input type="number" id="wi_age" value="{{ metrics.retirement_age }}" min="{{ metrics.current_age|int }}" max="100" step="1"
+        data-current-age-frac="{{ '{:.10f}'.format(metrics.current_age_frac) }}"
+        data-base-retirement-age="{{ metrics.retirement_age }}"
+        data-base-years-remaining="{{ '{:.10f}'.format(metrics.years_remaining) }}"
+        data-base-months-remaining="{{ '{:d}'.format((metrics.years_remaining * 12)|int) }}"
+        data-default-rate-pct="{{ '{:.1f}'.format(metrics.growth_rate * 100) }}">
     </label>
     <label>
       <span>Annual growth rate (%)</span>
@@ -236,142 +243,5 @@
   </div>
 </section>
 
-<script>
-(function () {
-  // ── Projection chart ──────────────────────────────────────────────────────
-  {% if chart_labels %}
-  var chartLabels = {{ chart_labels | tojson }};
-  var chartValues = {{ chart_values | tojson }};
-  var ctx = document.getElementById('projectionChart').getContext('2d');
-  var c = ChartHelpers.colors();
-  new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: chartLabels,
-      datasets: [ChartHelpers.lineDataset({
-        values: chartValues,
-        color: c.accent2,
-        fillAlphaHex: '12',
-        pointCutoff: 20,
-        tension: 0.3,
-      })]
-    },
-    options: ChartHelpers.lineOptions({
-      tooltip: ChartHelpers.gbpTooltip(0),
-      extraScales: {
-        x: { ticks: { color: c.muted, font: { size: 11 }, maxTicksLimit: 10 } },
-        y: { ticks: { color: c.muted, font: { size: 11 }, callback: function(v) { return '£' + (v/1000).toFixed(0) + 'k'; } } }
-      }
-    })
-  });
-  {% endif %}
 
-  // ── What-if calculator ────────────────────────────────────────────────────
-  var BASE_CURRENT_AGE = {{ '{:.10f}'.format(metrics.current_age_frac) }};
-  var BASE_RETIREMENT_AGE = {{ metrics.retirement_age }};
-  var BASE_YEARS_REMAINING = {{ '{:.10f}'.format(metrics.years_remaining) }};
-  var BASE_MONTHS_REMAINING = {{ '{:d}'.format((metrics.years_remaining * 12)|int) }};
-  var DEFAULT_RATE_PCT  = {{ '{:.1f}'.format(metrics.growth_rate * 100) }};
-
-  function fv(current, monthly, annualRate, years, months) {
-    var r = annualRate / 12;
-    var n = (typeof months === 'number') ? months : Math.floor(years * 12);
-    var fc = current * Math.pow(1 + r, n);
-    var fm = r === 0 ? monthly * n : monthly * ((Math.pow(1 + r, n) - 1) / r);
-    return fc + fm;
-  }
-
-  // Mirrors the Python projected_account_value logic, including LISA cap at 50.
-  // When the retirement age matches the plan we pass the server-computed month
-  // count directly so the result is identical to the Python figure.
-  function projectAccount(current, monthly, annualRate, retAge, isLISA) {
-    var onPlan = (retAge === BASE_RETIREMENT_AGE);
-    var years  = onPlan ? BASE_YEARS_REMAINING : Math.max(retAge - BASE_CURRENT_AGE, 0);
-    var months = onPlan ? BASE_MONTHS_REMAINING : undefined;
-    if (isLISA) {
-      var contribEndAge = Math.min(50, retAge);
-      var contribYears  = Math.max(contribEndAge - BASE_CURRENT_AGE, 0);
-      var frozenYears   = Math.max(years - contribYears, 0);
-      var valAtEnd = fv(current, monthly, annualRate, contribYears);
-      return fv(valAtEnd, 0, annualRate, frozenYears);
-    }
-    return fv(current, monthly, annualRate, years, months);
-  }
-
-  function fmt(v) {
-    return '£' + Math.round(v).toLocaleString('en-GB');
-  }
-
-  var inputs  = Array.from(document.querySelectorAll('.wi-contrib-input'));
-  var labels  = Array.from(document.querySelectorAll('[data-projected-label]'));
-
-  function recalc() {
-    var retAge      = parseFloat(document.getElementById('wi_age').value)  || {{ metrics.retirement_age }};
-    var globalPct   = parseFloat(document.getElementById('wi_rate').value) || 0;
-    var years       = (retAge === BASE_RETIREMENT_AGE)
-      ? BASE_YEARS_REMAINING
-      : Math.max(retAge - BASE_CURRENT_AGE, 0);
-    // Only use the global rate as an override when the user has actually changed it
-    var rateChanged = Math.abs(globalPct - DEFAULT_RATE_PCT) > 0.0001;
-
-    var scenarioTotal = 0;
-    var planTotal     = 0;
-    var totalMonthly  = 0;
-
-    inputs.forEach(function(inp, i) {
-      var current     = parseFloat(inp.dataset.current) || 0;
-      var personal    = parseFloat(inp.value) || 0;
-      var planPersonal= parseFloat(inp.dataset.plan) || 0;
-      var planEffective = parseFloat(inp.dataset.effective) || planPersonal;
-      var employer    = parseFloat(inp.dataset.employer) || 0;
-      var acctRate    = parseFloat(inp.dataset.rate) || 0;
-      var isLISA      = inp.dataset.wrapper === 'Lifetime ISA';
-
-      // Apply the same gross-up ratio when the user changes their personal contribution
-      var ratio = planPersonal > 0 ? (planEffective / planPersonal) : 1;
-      var monthly = personal * ratio;
-
-      // Default: use each account's own growth rate (matching the server).
-      // If the user changes the global rate input, apply it as a scenario override.
-      var useRate = rateChanged ? (globalPct / 100) : acctRate;
-
-      var proj = projectAccount(current, monthly, useRate, retAge, isLISA);
-      // plan = baseline: original contributions + original rate + original retirement age
-      var plan = projectAccount(current, planEffective, acctRate, BASE_RETIREMENT_AGE, isLISA);
-
-      scenarioTotal += proj;
-      planTotal     += plan;
-      totalMonthly  += personal;
-
-      if (labels[i]) {
-        labels[i].textContent = fmt(proj);
-      }
-    });
-
-    var diff    = scenarioTotal - planTotal;
-    var diffEl  = document.getElementById('wi_diff');
-    diffEl.textContent = (diff >= 0 ? '+' : '') + fmt(diff);
-    diffEl.className   = diff >= 0 ? 'whatif-positive' : 'whatif-negative';
-
-    document.getElementById('wi_total').textContent   = fmt(scenarioTotal);
-    document.getElementById('wi_years').textContent   = Math.round(years) + ' years';
-    document.getElementById('wi_monthly').textContent = fmt(totalMonthly) + '/mo';
-  }
-
-  // Wire up all inputs
-  document.getElementById('wi_age').addEventListener('input', recalc);
-  document.getElementById('wi_rate').addEventListener('input', recalc);
-  inputs.forEach(function(inp) { inp.addEventListener('input', recalc); });
-
-  // Reset button
-  document.getElementById('wi_reset').addEventListener('click', function() {
-    document.getElementById('wi_age').value  = '{{ metrics.retirement_age }}';
-    document.getElementById('wi_rate').value = '{{ '{:.1f}'.format(metrics.growth_rate * 100) }}';
-    inputs.forEach(function(inp) { inp.value = inp.dataset.plan; });
-    recalc();
-  });
-
-  recalc();
-})();
-</script>
 {% endblock %}
