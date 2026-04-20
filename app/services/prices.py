@@ -10,6 +10,7 @@ Install dependency:  pip install yfinance>=0.2.0
 """
 import json
 import logging
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -49,6 +50,36 @@ TICKER_ALIASES = {
 logger = logging.getLogger(__name__)
 
 
+def _twelve_request_json(url: str):
+    """Make a Twelve Data API request with explicit headers and parse JSON.
+
+    Some environments return 403 for default Python user-agent requests.
+    """
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/123.0.0.0 Safari/537.36"
+            ),
+            "Accept": "application/json",
+            "Accept-Language": "en-GB,en;q=0.9",
+        },
+    )
+    try:
+        resp = urllib.request.urlopen(req, timeout=10)
+        return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        body = ""
+        try:
+            body = e.read().decode("utf-8", errors="replace")
+        except Exception:
+            pass
+        # Return a compact, useful diagnostic string for the banner.
+        raise RuntimeError(f"HTTP {e.code} {e.reason}: {body[:200]}")
+
+
 def probe_twelve_data():
     """Quick connectivity/auth probe for Twelve Data using a stable symbol."""
     api_key = current_app.config.get("TWELVE_DATA_API_KEY")
@@ -57,9 +88,7 @@ def probe_twelve_data():
     try:
         encoded = urllib.parse.quote("AAPL")
         url = f"https://api.twelvedata.com/quote?symbol={encoded}&apikey={api_key}"
-        req = urllib.request.Request(url)
-        resp = urllib.request.urlopen(req, timeout=10)
-        data = json.loads(resp.read())
+        data = _twelve_request_json(url)
         if "price" in data:
             return {"ok": True, "message": "ok"}
         msg = data.get("message") or data.get("status") or "no_price_in_response"
@@ -272,21 +301,25 @@ def _try_twelve_data(symbol: str):
         if symbol.endswith(".L"):
             base = symbol[:-2]
             symbols_to_try = [f"{base}:LSE", f"{base}.LON", symbol, base]
+        last_error = None
 
         for td_symbol in symbols_to_try:
             encoded = urllib.parse.quote(td_symbol)
             url = f"https://api.twelvedata.com/price?symbol={encoded}&apikey={api_key}"
-
-            req = urllib.request.Request(url)
-            resp = urllib.request.urlopen(req, timeout=10)
-            data = json.loads(resp.read())
+            try:
+                data = _twelve_request_json(url)
+            except Exception as e:
+                last_error = str(e)
+                continue
 
             if "price" not in data:
                 # Try a second endpoint for quote data (includes change pct)
                 url = f"https://api.twelvedata.com/quote?symbol={encoded}&apikey={api_key}"
-                req = urllib.request.Request(url)
-                resp = urllib.request.urlopen(req, timeout=10)
-                data = json.loads(resp.read())
+                try:
+                    data = _twelve_request_json(url)
+                except Exception as e:
+                    last_error = str(e)
+                    continue
 
             if "price" in data:
                 res = {
@@ -299,7 +332,10 @@ def _try_twelve_data(symbol: str):
                 logger.info(f"Fetched {symbol} via Source C (Twelve Data) [{td_symbol}]: {res['price']} {res['currency']}")
                 return res
 
-        logger.info(f"Twelve Data returned no price for {symbol} (tried: {', '.join(symbols_to_try)})")
+        if last_error:
+            logger.info(f"Twelve Data failed for {symbol}: {last_error}")
+        else:
+            logger.info(f"Twelve Data returned no price for {symbol} (tried: {', '.join(symbols_to_try)})")
         return None
     except Exception as e:
         logger.info(f"Source C (Twelve Data) failed for {symbol}: {e}")
