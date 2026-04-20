@@ -2,7 +2,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.calculations import effective_account_value, progress_to_goal, remaining_to_goal
-from app.utils import split_tags as _split_tags_util
+from app.utils import optional_float, optional_int, split_tags as _split_tags
 from app.models import (
     fetch_user_tags,
     create_goal,
@@ -13,7 +13,6 @@ from app.models import (
     fetch_holding_totals_by_account,
     update_goal,
 )
-from app.utils import split_tags as _split_tags
 
 goals_bp = Blueprint("goals", __name__)
 
@@ -24,7 +23,7 @@ def _goal_payload_from_form(form):
     tag_values = [t.strip() for t in form.getlist("selected_tags") if t.strip()]
     return {
         "name": form.get("name", "").strip(),
-        "target_value": max(0.0, float(form.get("target_value", 0) or 0)),
+        "target_value": max(0.0, optional_float(form.get("target_value"), default=0.0)),
         "goal_type": form.get("goal_type", "Tagged Goal").strip(),
         "selected_tags": ", ".join(tag_values),
         "notes": form.get("notes", "").strip(),
@@ -65,7 +64,7 @@ def goals():
         form_name = request.form.get("form_name", "create_goal")
 
         if form_name == "delete_goal":
-            goal_id = int(request.form.get("goal_id", 0))
+            goal_id = optional_int(request.form.get("goal_id"))
             if goal_id:
                 delete_goal(goal_id, uid)
             return redirect(url_for("goals.goals"))
@@ -74,9 +73,9 @@ def goals():
         if not payload["name"]:
             flash("Goal name is required.", "error")
             return redirect(url_for("goals.goals"))
-        goal_id = request.form.get("goal_id")
+        goal_id = optional_int(request.form.get("goal_id"))
         if goal_id:
-            payload["id"] = int(goal_id)
+            payload["id"] = goal_id
             if not update_goal(payload, uid):
                 flash("Goal not found.", "error")
         else:

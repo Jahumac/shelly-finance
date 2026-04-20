@@ -44,10 +44,6 @@ def _month_label(month_key):
     return datetime.strptime(month_key, "%Y-%m").strftime("%B %Y")
 
 
-def _optional_float(value, default=0.0):
-    return optional_float(value, default=default)
-
-
 def _build_monthly_data(month_key, user_id):
     db_sections = fetch_budget_sections(user_id)
     items = fetch_budget_items(user_id)
@@ -142,7 +138,7 @@ def budget():
     if request.method == "POST":
         item_id = request.form.get("item_id", type=int)
         if item_id:
-            upsert_budget_entry(month_key, item_id, _optional_float(request.form.get("amount"), 0.0), uid)
+            upsert_budget_entry(month_key, item_id, optional_float(request.form.get("amount"), 0.0), uid)
         return redirect(url_for("budget.budget", month=month_key))
 
     sections, summary = _build_monthly_data(month_key, uid)
@@ -172,7 +168,7 @@ def budget_save_entry():
     uid = current_user.id
     month_key = valid_month_key(request.form.get("month")) or _default_month_key()
     item_id = request.form.get("item_id", type=int)
-    amount = _optional_float(request.form.get("amount"), 0.0)
+    amount = optional_float(request.form.get("amount"), 0.0)
     if item_id:
         upsert_budget_entry(month_key, item_id, amount, uid)
     return jsonify({"ok": True})
@@ -345,6 +341,10 @@ def budget_trend():
             sections={},
             months=[],
             month_labels=[],
+            current_month_num=today.month,
+            trend_avg_income=0,
+            trend_avg_spend=0,
+            trend_surplus=0,
             active_page="budget",
         )
 
@@ -513,7 +513,7 @@ def budget_items_view():
         create_budget_item({
             "name": request.form.get("name", "").strip(),
             "section": section,
-            "default_amount": _optional_float(request.form.get("default_amount"), 0.0),
+            "default_amount": optional_float(request.form.get("default_amount"), 0.0),
             "linked_account_id": int(linked_raw) if linked_raw else None,
             "notes": request.form.get("notes", "").strip(),
             "sort_order": sort_order,
@@ -580,7 +580,7 @@ def budget_item_action(item_id):
         "id": item_id,
         "name": request.form.get("name", "").strip(),
         "section": request.form.get("section", ""),
-        "default_amount": max(0.0, _optional_float(request.form.get("default_amount"), 0.0)),
+        "default_amount": max(0.0, optional_float(request.form.get("default_amount"), 0.0)),
         "linked_account_id": int(linked_raw) if linked_raw else None,
         "notes": request.form.get("notes", "").strip(),
     }, uid)
@@ -603,10 +603,10 @@ def budget_debts():
         if form_name == "create_debt":
             create_debt({
                 "name": form.get("name", "").strip(),
-                "original_amount": _optional_float(form.get("original_amount"), 0.0),
-                "current_balance": _optional_float(form.get("current_balance"), 0.0),
-                "monthly_payment": _optional_float(form.get("monthly_payment"), 0.0),
-                "apr": _optional_float(form.get("apr"), 0.0),
+                "original_amount": optional_float(form.get("original_amount"), 0.0),
+                "current_balance": optional_float(form.get("current_balance"), 0.0),
+                "monthly_payment": optional_float(form.get("monthly_payment"), 0.0),
+                "apr": optional_float(form.get("apr"), 0.0),
                 "notes": form.get("notes", "").strip(),
                 "start_date": form.get("start_date", "").strip() or None,
             }, uid)
@@ -617,10 +617,10 @@ def budget_debts():
             if debt_id and fetch_debt(debt_id, uid):
                 update_debt(debt_id, {
                     "name": form.get("name", "").strip(),
-                    "original_amount": _optional_float(form.get("original_amount"), 0.0),
-                    "current_balance": _optional_float(form.get("current_balance"), 0.0),
-                    "monthly_payment": _optional_float(form.get("monthly_payment"), 0.0),
-                    "apr": _optional_float(form.get("apr"), 0.0),
+                    "original_amount": optional_float(form.get("original_amount"), 0.0),
+                    "current_balance": optional_float(form.get("current_balance"), 0.0),
+                    "monthly_payment": optional_float(form.get("monthly_payment"), 0.0),
+                    "apr": optional_float(form.get("apr"), 0.0),
                     "notes": form.get("notes", "").strip(),
                     "start_date": form.get("start_date", "").strip() or None,
                 }, uid)

@@ -66,7 +66,7 @@ def _account_payload_from_form(form):
         "tags": ", ".join(t.strip() for t in form.getlist("tags") if t.strip()),
         "current_value": optional_float(form.get("current_value"), 0.0, min_val=0.0),
         "monthly_contribution": optional_float(form.get("monthly_contribution"), 0.0, min_val=0.0),
-        "pension_contribution_day": max(0, min(31, int(form.get("pension_contribution_day", 0) or 0))),
+        "pension_contribution_day": max(0, min(31, optional_int(form.get("pension_contribution_day"), default=0))),
         "goal_value": optional_float(form.get("goal_value"), None, min_val=0.0),
         "valuation_mode": form.get("valuation_mode", "manual"),
         "growth_mode": form.get("growth_mode", "default"),
@@ -83,7 +83,7 @@ def _account_payload_from_form(form):
         "fund_fee_pct": optional_float(form.get("fund_fee_pct"), 0.0, min_val=0.0),
         "contribution_fee_pct": optional_float(form.get("contribution_fee_pct"), 0.0, min_val=0.0),
         "cash_interest_rate": optional_float(form.get("cash_interest_rate"), None, divide_by_100=True),
-        "interest_payment_day": max(0, min(31, int(form.get("interest_payment_day", 0) or 0))),
+        "interest_payment_day": max(0, min(31, optional_int(form.get("interest_payment_day"), default=0))),
     }
 
 
@@ -530,7 +530,7 @@ def update_cash(account_id):
     payload = dict(account)
     payload["uninvested_cash"] = to_float(cash) if cash else 0.0
     payload["cash_interest_rate"] = (to_float(rate) / 100.0) if rate else 0.0
-    payload["interest_payment_day"] = max(0, min(31, int(payment_day) if payment_day else 0))
+    payload["interest_payment_day"] = max(0, min(31, optional_int(payment_day, default=0)))
     payload["last_updated"] = datetime.now(timezone.utc).isoformat()
 
     # ensure missing fields are populated before update

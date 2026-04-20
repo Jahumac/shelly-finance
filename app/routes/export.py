@@ -494,7 +494,8 @@ def export_budget():
 
     GBP = '£#,##0.00'
     row = 4
-    income_key = db_sections[0]["key"] if db_sections else "income"
+    income_section = next((s for s in db_sections if "income" in s["key"].lower()), None)
+    income_key = income_section["key"] if income_section else (db_sections[0]["key"] if db_sections else "income")
     section_totals = {}
 
     for sec in db_sections:
