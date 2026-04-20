@@ -188,7 +188,12 @@ def api_trigger_price_update():
     and saves a daily snapshot.
     """
     result = trigger_manual_update(current_app, current_user.id)
-    status_code = 200 if result.get("ok") else 400
+    if result.get("ok"):
+        status_code = 200
+    elif result.get("cooldown"):
+        status_code = 429
+    else:
+        status_code = 400
     return jsonify(result), status_code
 
 
@@ -198,6 +203,8 @@ def trigger_price_update():
     result = trigger_manual_update(current_app, current_user.id)
     if result.get("ok"):
         flash(result.get("message") or "Prices updated.", "success")
+    elif result.get("cooldown"):
+        flash(result.get("message") or "Please wait a moment before refreshing again.", "warning")
     else:
         flash(result.get("message") or result.get("error") or "Price update failed.", "error")
     return redirect(request.referrer or url_for("overview.overview"))

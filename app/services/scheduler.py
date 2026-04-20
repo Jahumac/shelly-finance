@@ -394,10 +394,48 @@ def trigger_manual_update(app, user_id):
 
     Returns a dict with status and message.
     """
-    from app.models import fetch_holding_catalogue_in_use
+    from app.models import fetch_holding_catalogue_in_use, fetch_latest_price_update
+
+    def _parse_price_ts(ts_raw):
+        if not ts_raw:
+            return None
+        s = str(ts_raw).strip()
+        candidates = [
+            "%Y-%m-%d %H:%M UTC",
+            "%Y-%m-%d %H:%M:%S UTC",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d %H:%M",
+        ]
+        for fmt in candidates:
+            try:
+                return datetime.strptime(s, fmt).replace(tzinfo=timezone.utc)
+            except ValueError:
+                continue
+        try:
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+        except Exception:
+            return None
 
     with app.app_context():
         try:
+            # Cooldown to prevent accidental rapid taps from burning API credits.
+            cooldown_seconds = int(app.config.get("MANUAL_REFRESH_COOLDOWN_SECONDS", 180) or 180)
+            latest = fetch_latest_price_update(user_id)
+            latest_dt = _parse_price_ts(latest)
+            if latest_dt is not None:
+                elapsed = (datetime.now(timezone.utc) - latest_dt).total_seconds()
+                if elapsed < cooldown_seconds:
+                    wait_for = int(cooldown_seconds - elapsed)
+                    return {
+                        "ok": False,
+                        "cooldown": True,
+                        "retry_after_seconds": max(wait_for, 1),
+                        "message": f"Manual refresh is on cooldown. Try again in ~{max(wait_for, 1)}s.",
+                    }
+
             catalogue = fetch_holding_catalogue_in_use(user_id)
             if not catalogue:
                 summary = _run_price_update_for_user(app, user_id, slot_name="manual")
