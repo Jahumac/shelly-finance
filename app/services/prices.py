@@ -219,7 +219,7 @@ def _try_yahoo_quote(symbol: str):
         }
     except Exception as e:
         logger.debug(f"Source B (quote) failed for {symbol}: {e}")
-         return None
+        return None
 
 
 def _try_twelve_data(symbol: str):
