@@ -14,6 +14,8 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
+from flask import current_app
+
 YFINANCE_AVAILABLE = False
 try:
     import yfinance as yf
@@ -217,6 +219,50 @@ def _try_yahoo_quote(symbol: str):
         }
     except Exception as e:
         logger.debug(f"Source B (quote) failed for {symbol}: {e}")
+         return None
+
+
+def _try_twelve_data(symbol: str):
+    """Source C: Twelve Data API. Robust official API for live prices.
+    Requires TWELVE_DATA_API_KEY in environment.
+    """
+    api_key = current_app.config.get("TWELVE_DATA_API_KEY")
+    if not api_key:
+        return None
+
+    try:
+        # Map LSE symbols for Twelve Data (.L -> :LSE)
+        twelve_symbol = symbol
+        if symbol.endswith(".L"):
+            twelve_symbol = symbol.replace(".L", ":LSE")
+
+        encoded = urllib.parse.quote(twelve_symbol)
+        url = f"https://api.twelvedata.com/price?symbol={encoded}&apikey={api_key}"
+        
+        req = urllib.request.Request(url)
+        resp = urllib.request.urlopen(req, timeout=10)
+        data = json.loads(resp.read())
+
+        if "price" not in data:
+            # Try a second endpoint for quote data (includes change pct)
+            url = f"https://api.twelvedata.com/quote?symbol={encoded}&apikey={api_key}"
+            req = urllib.request.Request(url)
+            resp = urllib.request.urlopen(req, timeout=10)
+            data = json.loads(resp.read())
+
+        if "price" in data:
+            return {
+                "price": round(float(data["price"]), 4),
+                "currency": data.get("currency", "GBP"),
+                "change_pct": round(float(data.get("percent_change", 0)), 2),
+                "name": data.get("name"),
+                "quote_type": None,
+            }
+        
+        logger.debug(f"Twelve Data returned no price for {symbol}: {data.get('message')}")
+        return None
+    except Exception as e:
+        logger.debug(f"Source C (Twelve Data) failed for {symbol}: {e}")
         return None
 
 
@@ -384,14 +430,21 @@ def fetch_price(ticker: str):
 
     # ── Phase 1: Direct HTTP APIs (Reliable & Live) ────────────────────────
     for sym in symbols_to_try:
-        # Try Quote API first (Source B) as it's usually the most "current"
+        # Try Twelve Data (Source C) first if API key is configured
+        res = _try_twelve_data(sym)
+        if res:
+            res["yf_symbol"] = sym
+            logger.debug(f"Fetched {sym} via Source C (Twelve Data): {res['price']} {res['currency']}")
+            return res
+
+        # Try Yahoo Quote API (Source B) as the secondary live source
         res = _try_yahoo_quote(sym)
         if res:
             res["yf_symbol"] = sym
             logger.debug(f"Fetched {sym} via Source B (quote): {res['price']} {res['currency']}")
             return res
 
-        # Fallback to Chart API (Source A)
+        # Fallback to Yahoo Chart API (Source A)
         res = _try_yahoo_http(sym)
         if res:
             res["yf_symbol"] = sym

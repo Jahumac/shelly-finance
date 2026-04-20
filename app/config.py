@@ -25,3 +25,4 @@ class Config:
     DEMO_PUBLIC_LOGIN_ENABLED = os.environ.get("DEMO_PUBLIC_LOGIN_ENABLED", "0") == "1"
     WTF_CSRF_ENABLED = os.environ.get("WTF_CSRF_ENABLED", "1") != "0"
     TESTING = os.environ.get("FLASK_TESTING", "0") == "1"
+    TWELVE_DATA_API_KEY = os.environ.get("TWELVE_DATA_API_KEY")
