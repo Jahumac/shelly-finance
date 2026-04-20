@@ -4,6 +4,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.calculations import current_age_from_assumptions
+from app.utils import optional_float, optional_int
 from app.models import (
     fetch_assumptions,
     fetch_holding_catalogue_in_use,
@@ -27,16 +28,10 @@ def settings():
         had_no_dob = not (assumptions and assumptions["date_of_birth"])
 
         def _f(key, default=0.0):
-            try:
-                return float(request.form.get(key) or default)
-            except (ValueError, TypeError):
-                return float(default)
+            return optional_float(request.form.get(key), default=default)
 
         def _i(key, default=0):
-            try:
-                return int(request.form.get(key) or default)
-            except (ValueError, TypeError):
-                return int(default)
+            return optional_int(request.form.get(key), default=default)
 
         salary_day = max(0, min(31, _i("salary_day", 0)))
         update_day = max(0, min(31, _i("update_day", 0)))

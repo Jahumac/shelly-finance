@@ -7,6 +7,7 @@ from datetime import date, datetime
 from io import BytesIO
 
 from flask import Blueprint, send_file, request
+from app.utils import valid_month_key
 from flask_login import current_user, login_required
 from openpyxl import Workbook
 from openpyxl.styles import Border, Font, PatternFill, Alignment, Side, numbers
@@ -468,7 +469,7 @@ def export_projections():
 @login_required
 def export_budget():
     uid = current_user.id
-    month_key = request.args.get("month") or date.today().strftime("%Y-%m")
+    month_key = valid_month_key(request.args.get("month")) or date.today().strftime("%Y-%m")
     month_label = datetime.strptime(month_key, "%Y-%m").strftime("%B %Y")
 
     db_sections = fetch_budget_sections(uid)

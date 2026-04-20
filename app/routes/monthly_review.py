@@ -36,7 +36,7 @@ from app.models import (
     update_monthly_review,
     upsert_monthly_snapshot,
 )
-from app.utils import optional_float, optional_int
+from app.utils import optional_float, optional_int, valid_month_key
 from app.services.csv_parsers import (
     count_csv_rows,
     detect_csv_headers,
@@ -90,7 +90,7 @@ def monthly_review():
         salary_day = int(assumptions["salary_day"]) if assumptions and assumptions.get("salary_day") else 0
     except (ValueError, TypeError):
         salary_day = 0
-    month_key = request.values.get("month") or default_month_key(uid, salary_day)
+    month_key = valid_month_key(request.values.get("month")) or default_month_key(uid, salary_day)
 
     if request.method == "POST":
         form_name = request.form.get("form_name")

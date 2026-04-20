@@ -4,7 +4,7 @@ from io import BytesIO
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
 
-from app.utils import optional_float
+from app.utils import optional_float, optional_int, valid_month_key
 
 from app.models import (
     build_debt_card,
@@ -137,7 +137,7 @@ def _build_monthly_data(month_key, user_id):
 @login_required
 def budget():
     uid = current_user.id
-    month_key = request.values.get("month") or _default_month_key()
+    month_key = valid_month_key(request.values.get("month")) or _default_month_key()
 
     if request.method == "POST":
         item_id = request.form.get("item_id", type=int)
@@ -170,7 +170,7 @@ def budget():
 def budget_save_entry():
     """AJAX endpoint — save a single budget entry, return JSON."""
     uid = current_user.id
-    month_key = request.form.get("month") or _default_month_key()
+    month_key = valid_month_key(request.form.get("month")) or _default_month_key()
     item_id = request.form.get("item_id", type=int)
     amount = _optional_float(request.form.get("amount"), 0.0)
     if item_id:
@@ -219,7 +219,7 @@ def budget_import():
       Finally summary rows (Total Income, Total Expenses, Surplus)
     """
     uid = current_user.id
-    month_key = request.form.get("month") or _default_month_key()
+    month_key = valid_month_key(request.form.get("month")) or _default_month_key()
 
     f = request.files.get("file")
     if not f or not f.filename.endswith((".xlsx", ".xls")):
@@ -547,7 +547,7 @@ def budget_items_view():
     section_options = [(s["key"], s["label"]) for s in db_sections]
 
     # ── Month context (same hero + month strip as budget view) ────────────
-    month_key = request.args.get("month") or _default_month_key()
+    month_key = valid_month_key(request.args.get("month")) or _default_month_key()
     sections_data, summary = _build_monthly_data(month_key, uid)
     month_strip, is_inherited = _build_budget_month_strip(month_key, uid)
 
@@ -589,6 +589,92 @@ def budget_item_action(item_id):
     return redirect(url_for("budget.budget_items_view"))
 
 
+# ── Trend ────────────────────────────────────────────────────────────────────
+
+@budget_bp.route("/trend/")
+@login_required
+def budget_trend():
+    uid = current_user.id
+
+    # Last 12 months that have actual budget entries
+    all_months = sorted(fetch_months_with_budget_entries(uid))
+    months = all_months[-12:]
+
+    if not months:
+        return render_template(
+            "budget_trend.html",
+            months=[],
+            month_labels=[],
+            sections={},
+            trend_avg_income=0,
+            trend_avg_spend=0,
+            trend_surplus=0,
+            current_month_num=date.today().month,
+            active_page="budget",
+        )
+
+    month_labels = [datetime.strptime(mk, "%Y-%m").strftime("%b '%y") for mk in months]
+
+    rows = fetch_budget_trend(uid, months)
+
+    # Identify income section by key name convention
+    db_sections = fetch_budget_sections(uid)
+    income_sec = next((s for s in db_sections if "income" in s["key"].lower()), None)
+    income_section_name = income_sec["label"] if income_sec else None
+
+    # Build: {section_name: {item_name: {month_key: amount, "avg": float, "default": float}}}
+    sections = {}
+    for row in rows:
+        sec = row["section_name"]
+        item = row["item_name"]
+        mk = row["month_key"]
+        sections.setdefault(sec, {})
+        sections[sec].setdefault(item, {"default": float(row["default_amount"] or 0)})
+        sections[sec][item][mk] = float(row["actual_amount"] or 0)
+
+    # Average each item over the full window (missing months count as zero)
+    n = len(months)
+    for sec_items in sections.values():
+        for item_data in sec_items.values():
+            total = sum(item_data.get(mk, 0) for mk in months)
+            item_data["avg"] = total / n
+
+    # Summary hero stats
+    income_totals = []
+    spend_totals = []
+    for mk in months:
+        inc = sum(
+            data.get(mk, 0)
+            for sec_name, sec_items in sections.items()
+            for data in sec_items.values()
+            if sec_name == income_section_name
+        )
+        spend = sum(
+            data.get(mk, 0)
+            for sec_name, sec_items in sections.items()
+            for data in sec_items.values()
+            if sec_name != income_section_name
+        )
+        income_totals.append(inc)
+        spend_totals.append(spend)
+
+    trend_avg_income = sum(income_totals) / n
+    trend_avg_spend = sum(spend_totals) / n
+    trend_surplus = trend_avg_income - trend_avg_spend
+
+    return render_template(
+        "budget_trend.html",
+        months=months,
+        month_labels=month_labels,
+        sections=sections,
+        trend_avg_income=trend_avg_income,
+        trend_avg_spend=trend_avg_spend,
+        trend_surplus=trend_surplus,
+        current_month_num=date.today().month,
+        active_page="budget",
+    )
+
+
 # ── Debts ─────────────────────────────────────────────────────────────────────
 
 @budget_bp.route("/debts/", methods=["GET", "POST"])
@@ -613,8 +699,8 @@ def budget_debts():
             return redirect(url_for("budget.budget_debts"))
 
         if form_name == "update_debt":
-            debt_id = int(form.get("debt_id", 0))
-            if fetch_debt(debt_id, uid):
+            debt_id = optional_int(form.get("debt_id"))
+            if debt_id and fetch_debt(debt_id, uid):
                 update_debt(debt_id, {
                     "name": form.get("name", "").strip(),
                     "original_amount": _optional_float(form.get("original_amount"), 0.0),
@@ -627,8 +713,8 @@ def budget_debts():
             return redirect(url_for("budget.budget_debts"))
 
         if form_name == "delete_debt":
-            debt_id = int(form.get("debt_id", 0))
-            if fetch_debt(debt_id, uid):
+            debt_id = optional_int(form.get("debt_id"))
+            if debt_id and fetch_debt(debt_id, uid):
                 delete_debt(debt_id, uid)
             return redirect(url_for("budget.budget_debts"))
 
