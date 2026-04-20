@@ -251,13 +251,15 @@ def _try_twelve_data(symbol: str):
             data = json.loads(resp.read())
 
         if "price" in data:
-            return {
+            res = {
                 "price": round(float(data["price"]), 4),
                 "currency": data.get("currency", "GBP"),
                 "change_pct": round(float(data.get("percent_change", 0)), 2),
                 "name": data.get("name"),
                 "quote_type": None,
             }
+            logger.info(f"Fetched {symbol} via Source C (Twelve Data): {res['price']} {res['currency']}")
+            return res
         
         logger.debug(f"Twelve Data returned no price for {symbol}: {data.get('message')}")
         return None
