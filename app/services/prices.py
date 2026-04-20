@@ -160,22 +160,23 @@ def _try_yahoo_http(symbol: str):
             return None
 
         meta = result[0].get("meta", {})
-        # Prefer the very latest price from the chart data if available
-        price = None
+        # Strategy: Prefer regularMarketPrice if it looks recent,
+        # otherwise fall back to the last data point in the chart.
+        price = meta.get("regularMarketPrice")
         prev_close = meta.get("chartPreviousClose") or meta.get("previousClose")
         
-        # Try indicators first (most recent)
+        # Check indicators for a potentially newer price
         indicators = result[0].get("indicators", {}).get("quote", [{}])[0]
         closes = indicators.get("close", [])
         valid_closes = [c for c in closes if c is not None]
         if valid_closes:
-            price = valid_closes[-1]
+            chart_price = valid_closes[-1]
+            # If chart price is available and different from meta price,
+            # it might be newer (or older). Yahoo meta price is usually better.
+            if not price:
+                price = chart_price
             if not prev_close and len(valid_closes) >= 2:
                 prev_close = valid_closes[0]
-        
-        # Fallback to meta price
-        if not price:
-            price = meta.get("regularMarketPrice")
 
         if not price:
             return None
@@ -185,14 +186,17 @@ def _try_yahoo_http(symbol: str):
         if prev_close and prev_close > 0:
             change_pct = ((price - prev_close) / prev_close * 100)
 
-        return {
+        res = {
             "price": round(float(price), 4),
             "currency": currency,
             "change_pct": round(float(change_pct), 2) if change_pct is not None else None,
             "name": meta.get("longName") or meta.get("shortName"),
             "quote_type": meta.get("instrumentType") or meta.get("quoteType"),
         }
-    except Exception:
+        logger.debug(f"Fetched {symbol} via HTTP: {res['price']} {res['currency']}")
+        return res
+    except Exception as e:
+        logger.debug(f"HTTP fetch failed for {symbol}: {e}")
         return None
 
 

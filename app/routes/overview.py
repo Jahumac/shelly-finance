@@ -2,7 +2,7 @@ import math
 import pytz
 from datetime import date, datetime, timedelta, timezone
 
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, make_response
 from flask_login import current_user, login_required
 
 from app.calculations import (
@@ -393,7 +393,8 @@ def overview():
     allocation_labels = [a[0] for a in allocation]
     allocation_values = [round(a[1], 2) for a in allocation]
 
-    return render_template(
+    # Render the response and ensure it's not cached by the browser
+    resp = make_response(render_template(
         "overview.html",
         metrics=metrics,
         accounts=accounts,
@@ -413,4 +414,9 @@ def overview():
         allocation_labels=allocation_labels,
         allocation_values=allocation_values,
         active_page="overview",
-    )
+        current_month_num=now.month,
+    ))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
