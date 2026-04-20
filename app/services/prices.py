@@ -45,7 +45,15 @@ TICKER_ALIASES = {
     "VMID":  "VMID.L",    # Vanguard FTSE 250 UCITS ETF (Dist)
     "VAGP":  "VAGP.L",    # Vanguard Global Aggregate Bond UCITS ETF (Acc)
     "VGOV":  "VGOV.L",    # Vanguard UK Government Bond UCITS ETF (Dist)
+    # Invesco LSE-listed ETFs
+    "FWRG":  "FWRG.L",    # Invesco FTSE All-World UCITS ETF (USD Acc)
+    "FWRA":  "FWRA.L",    # Invesco FTSE All-World UCITS ETF (GBP Acc)
+    "FTSE":  "FTSE.L",    # Invesco FTSE All-World UCITS ETF (Dist)
 }
+
+# Fallback FX rates used when live fetch fails (kept deliberately conservative).
+# Updated periodically — not used if fetch_fx_rates() succeeds.
+_FALLBACK_FX = {"USD": 1.27, "EUR": 1.17}
 
 logger = logging.getLogger(__name__)
 _TWELVE_SYMBOL_CACHE = {}
@@ -481,17 +489,21 @@ def to_gbp(price: float, currency: str) -> float:
     """Convert a raw price in any currency to GBP.
 
     - GBp (pence): divide by 100
-    - USD / EUR: divide by the live GBPUSD / GBPEUR rate from fetch_fx_rates()
+    - USD / EUR: divide by the live GBPUSD / GBPEUR rate; falls back to
+      _FALLBACK_FX if the live fetch fails so we never silently return a
+      USD value as if it were GBP.
     - GBP or unknown: return as-is
     """
     if currency == "GBp":
         return price / 100.0
     if currency in ("USD", "EUR"):
         fx = fetch_fx_rates()
-        rate = fx.get(currency)
+        rate = fx.get(currency) or _FALLBACK_FX.get(currency)
         if rate and rate > 0:
+            logger.debug("to_gbp: %s %s → GBP at rate %s", price, currency, rate)
             return price / rate
-    return price  # assume GBP
+        logger.warning("to_gbp: no FX rate for %s, returning raw value", currency)
+    return price  # GBP or unknown currency
 
 
 # Global FX cache to reduce API calls
@@ -557,6 +569,15 @@ def fetch_price(ticker: str):
         symbols_to_try.append(ticker + ".L")
 
     # ── Phase 1: Direct HTTP APIs (Reliable & Live) ────────────────────────
+    # Helper: should we keep looking for a .L version instead of returning?
+    def _lse_pending(sym, res):
+        """True when a non-.L result is in a non-GBP currency and a .L symbol is still to try."""
+        if sym.endswith(".L"):
+            return False
+        if res.get("currency") in ("GBP", "GBp"):
+            return False
+        return any(s.endswith(".L") for s in symbols_to_try[symbols_to_try.index(sym) + 1:])
+
     for sym in symbols_to_try:
         # Try Twelve Data (Source C) first if API key is configured
         res = _try_twelve_data(sym)
@@ -564,7 +585,8 @@ def fetch_price(ticker: str):
             res["yf_symbol"] = sym
             res["source"] = "twelve_data"
             logger.info(f"Fetched {sym} via Source C (Twelve Data): {res['price']} {res['currency']}")
-            return res
+            if not _lse_pending(sym, res):
+                return res
 
         # Try Yahoo Quote API (Source B) as the secondary live source
         res = _try_yahoo_quote(sym)
@@ -572,7 +594,8 @@ def fetch_price(ticker: str):
             res["yf_symbol"] = sym
             res["source"] = "yahoo_quote"
             logger.info(f"Fetched {sym} via Source B (quote): {res['price']} {res['currency']}")
-            return res
+            if not _lse_pending(sym, res):
+                return res
 
         # Fallback to Yahoo Chart API (Source A)
         res = _try_yahoo_http(sym)
@@ -580,11 +603,7 @@ def fetch_price(ticker: str):
             res["yf_symbol"] = sym
             res["source"] = "yahoo_chart"
             logger.info(f"Fetched {sym} via Source A (chart): {res['price']} {res['currency']}")
-            # Prefer LSE version for GBP-priced instruments if multiple results exist
-            if sym.endswith(".L") or res.get("currency") in ("GBP", "GBp"):
-                return res
-            # If we have a non-LSE result, keep it but keep looking for an LSE one
-            if not any(s.endswith(".L") for s in symbols_to_try[symbols_to_try.index(sym)+1:]):
+            if not _lse_pending(sym, res):
                 return res
 
     # ── Phase 2: yfinance (Fallback) ─────────────────────────────────────
