@@ -1,5 +1,4 @@
 {% extends 'base.html' %}
-{% from '_macros.html' import hero_stat, empty_state %}
 {% block title %}Monthly Update · Shelly{% endblock %}
 {% block content %}
 
@@ -14,86 +13,78 @@
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
     {% for category, message in messages %}
-      <div class="flash-msg flash-{{ category }} mb-1">{{ message }}</div>
+      <div class="flash flash-{{ category }} mb-1">{{ message }}</div>
     {% endfor %}
   {% endif %}
 {% endwith %}
 
-{# ── Month strip ─────────────────────────────────────────────────────────── #}
 {% include '_month_strip.html' %}
 
-<div class="monthly-review-container" data-month-key="{{ month_key }}">
 <section class="card highlight mb-1 month-accent-{{ current_month_num }}">
   <div class="hero-top">
     <div>
       <p class="eyebrow">Monthly Update</p>
-      <div class="flex flex-center flex-wrap gap-05" style="margin-bottom:0.25rem;">
-        <h2 class="hero-value m-0">{{ month_label }}</h2>
-        <div class="flex flex-center gap-05">
-          <button type="button" class="badge badge-meta review-prev-month" aria-label="Previous month">◀</button>
-          <button type="button" class="badge badge-meta review-next-month" aria-label="Next month">▶</button>
-          {% if review.status == 'complete' %}
-            <span class="badge badge-complete">✓ Complete</span>
-            <form method="post" class="form-reset" style="display:inline;">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <input type="hidden" name="form_name" value="reopen">
-              <input type="hidden" name="month" value="{{ month_key }}">
-              <button type="submit" class="badge badge-meta"
-                      data-confirm="Reopen {{ month_label }}?"
-                      data-confirm-title="Reopen review?"
-                      data-confirm-ok="Yes, reopen it"
-                      data-confirm-cancel="Keep it complete">Reopen</button>
-            </form>
-          {% else %}
-            <form method="post" class="form-reset" id="mark-complete-form">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <input type="hidden" name="form_name" value="mark_complete">
-              <input type="hidden" name="month" value="{{ month_key }}">
-              <button type="button" class="badge badge-primary-action" id="mark-complete-btn">Mark as Complete</button>
-            </form>
-          {% endif %}
-        </div>
-      </div>
+      <h2 class="hero-value">{{ month_label }}</h2>
       <p class="hero-subtitle">Shelly's monthly check-in — update your numbers and lock in the snapshot</p>
-      {% if salary_date %}
-      <p class="hero-subtitle" style="margin-top:0.25rem; opacity:0.75; font-size:0.85rem;">
-        Based on your salary around <strong>{{ salary_date.strftime('%-d %B') }}</strong>
-        {% if review_ready_date %} · settled from <strong>{{ review_ready_date.strftime('%-d %B') }}</strong>{% endif %}
-      </p>
+    </div>
+    <div class="hero-actions-col">
+      {% if review.status == 'complete' %}
+        <span class="badge badge-complete">✓ Completed</span>
+        <form method="post" class="form-reset" style="display:inline;">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="form_name" value="reopen">
+          <input type="hidden" name="month" value="{{ month_key }}">
+          <button type="submit" class="badge badge-meta"
+                  data-confirm="Reopen {{ month_label }}?"
+                  data-confirm-title="Reopen review?"
+                  data-confirm-ok="Yes, reopen it"
+                  data-confirm-cancel="Keep it complete">Reopen</button>
+        </form>
+      {% else %}
+        <form method="post" class="form-reset" id="mark-complete-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="form_name" value="mark_complete">
+          <input type="hidden" name="month" value="{{ month_key }}">
+          <button type="button" class="badge badge-primary-action" id="mark-complete-btn">Mark as Complete</button>
+        </form>
+
+        <dialog id="confirm-complete-dialog" class="confirm-dialog">
+          <div class="confirm-dialog-content">
+            <h3>Lock in {{ month_label }}?</h3>
+            <p>Shelly will snapshot your net worth for this month. You can still tweak values afterwards — Shelly's thorough, not inflexible.</p>
+            {% if unupdated_manual_names %}
+            <p class="helper-text" style="color: var(--color-warning, #b45309);">⚠ {{ unupdated_manual_names | length }} manual account{{ 's' if unupdated_manual_names | length != 1 else '' }} haven't had their balance updated this month ({{ unupdated_manual_names | join(', ') }}).</p>
+            {% endif %}
+            <div class="confirm-dialog-actions">
+              <button type="button" class="badge badge-primary-action" id="confirm-complete-yes">Yes, mark complete</button>
+              <button type="button" class="badge" id="confirm-complete-no">Cancel</button>
+            </div>
+          </div>
+        </dialog>
       {% endif %}
+      <div class="budget-month-nav">
+        <button type="button" class="badge badge-meta review-prev-month" title="Previous month">◀</button>
+        <span class="budget-month-nav-label">{{ month_label }}</span>
+        <button type="button" class="badge badge-meta review-next-month" title="Next month">▶</button>
+      </div>
     </div>
     <div class="hero-turtle-wrap">
       <img src="{{ url_for('static', filename='icons/shelly/Budget.png') }}" alt="" class="hero-turtle">
     </div>
   </div>
-
-  {# Dialog lives outside the inline form so it can be triggered from anywhere #}
-  {% if review.status != 'complete' %}
-  <dialog id="confirm-complete-dialog" class="confirm-dialog">
-    <div class="confirm-dialog-content">
-      <h3>Lock in {{ month_label }}?</h3>
-      <p>Shelly will snapshot your net worth for this month. You can still tweak values afterwards — Shelly's thorough, not inflexible.</p>
-      {% if unconfirmed_count > 0 %}
-      <p class="helper-text" style="color: var(--color-warning, #b45309);">⚠ {{ unconfirmed_count }} contribution{{ 's' if unconfirmed_count != 1 else '' }} haven't been confirmed yet — you can still confirm them after completing.</p>
-      {% endif %}
-      {% if unupdated_manual_names %}
-      <p class="helper-text" style="color: var(--color-warning, #b45309);">⚠ {{ unupdated_manual_names | length }} manual account{{ 's' if unupdated_manual_names | length != 1 else '' }} haven't had their balance updated this month ({{ unupdated_manual_names | join(', ') }}). Completing now will snapshot their last saved value, which may skew performance history.</p>
-      {% endif %}
-      <div class="confirm-dialog-actions">
-        <button type="button" class="badge badge-primary-action" id="confirm-complete-yes">Yes, mark complete</button>
-        <button type="button" class="badge" id="confirm-complete-no">Cancel</button>
-      </div>
-    </div>
-  </dialog>
-  {% endif %}
   <div class="hero-strip">
-    {% call hero_stat('Status') %}<strong>{{ 'Complete' if review.status == 'complete' else 'In progress' }}</strong>{% endcall %}
-    {% call hero_stat('Updated') %}<strong>{{ accounts_updated }}/{{ total_accounts }}</strong>{% endcall %}
-    {% call hero_stat('Expected contributions') %}<strong>£{{ '{:,.0f}'.format(contribution_items | sum(attribute='expected_contribution')) }}</strong>{% endcall %}
-    {% if contribution_items %}
-    {% set confirmed_count = contribution_items | selectattr('contribution_confirmed') | list | length %}
-    {% call hero_stat('Confirmed') %}<strong>{{ confirmed_count }}/{{ contribution_items | length }}</strong>{% endcall %}
-    {% endif %}
+    <div class="hero-strip-stat">
+      <span>Status</span>
+      <strong>{{ 'Complete' if review.status == 'complete' else 'In progress' }}</strong>
+    </div>
+    <div class="hero-strip-stat">
+      <span>Accounts</span>
+      <strong>{{ (holdings_items | length) + (manual_items | length) }}</strong>
+    </div>
+    <div class="hero-strip-stat">
+      <span>Expected contributions</span>
+      <strong>£{{ '{:,.0f}'.format(contribution_items | sum(attribute='expected_contribution')) }}</strong>
+    </div>
   </div>
 </section>
 
@@ -101,43 +92,48 @@
 <section class="card mb-1">
   <div class="section-header">
     <div>
-      <p class="eyebrow">Preparation</p>
-      <h3>The Routine</h3>
+      <p class="eyebrow">How this works</p>
+      <h2>Monthly Update Guide</h2>
     </div>
-    <button type="button" class="badge badge-sm" id="guide-toggle">Show</button>
+    <button type="button" class="badge badge-meta" id="guide-toggle">{{ 'Hide' if not assumptions or not assumptions.salary_day else 'Show' }}</button>
   </div>
-  <div id="guide-panel" class="mt-1 hidden">
-    <p class="helper-text">Follow these steps to ensure your monthly numbers are accurate before locking them in.</p>
-    <div class="review-checklist mt-1">
-      <div class="review-checklist-item">
-        <span class="review-checklist-dot">1</span>
+  <div id="guide-panel" {% if assumptions and assumptions.salary_day %}class="hidden"{% endif %}>
+    <div class="guide-steps">
+      <div class="guide-step">
+        <div class="guide-step-num">1</div>
         <div>
-          <strong>Check your accounts</strong>
-          <p class="helper-text">Log in to your banking apps and check if your expected contributions (pension, ISA, etc.) have actually left your account.</p>
+          <strong>Wait for investments to settle</strong>
+          <p>After your contributions go in{% if assumptions and assumptions.salary_day %} (around the {{ assumptions.salary_day }}{{ 'st' if assumptions.salary_day in [1,21,31] else ('nd' if assumptions.salary_day in [2,22] else ('rd' if assumptions.salary_day in [3,23] else 'th')) }}){% endif %}, allow a couple of business days for settlement.
+          {% if review_ready_date %} <strong>This month you're good to update from {{ review_ready_date.strftime('%-d %B') }}.</strong>{% endif %}</p>
         </div>
       </div>
-      <div class="review-checklist-item">
-        <span class="review-checklist-dot">2</span>
+      <div class="guide-step">
+        <div class="guide-step-num">2</div>
         <div>
-          <strong>Confirm or Skip</strong>
-          <p class="helper-text">Use the "Confirmed contributions" section below to tick off what happened. If you didn't contribute this month, hit Skip.</p>
+          <strong>Update your holdings</strong>
+          <p>For each holdings-based account, update the <em>units</em> and <em>price</em> for every fund or ETF. You can type them in directly or use the ↻ button to fetch live prices.</p>
         </div>
       </div>
-      <div class="review-checklist-item">
-        <span class="review-checklist-dot">3</span>
+      <div class="guide-step">
+        <div class="guide-step-num">3</div>
         <div>
-          <strong>Update manual balances</strong>
-          <p class="helper-text">For accounts Shelly can't track automatically (like some pensions or savings), update their balance in the "Manual updates" section.</p>
+          <strong>Update manual accounts</strong>
+          <p>For savings accounts, workplace pensions, or anything without individual holdings — just enter the total balance shown by your provider.</p>
         </div>
       </div>
-      <div class="review-checklist-item">
-        <span class="review-checklist-dot">4</span>
+      <div class="guide-step">
+        <div class="guide-step-num">4</div>
         <div>
-          <strong>Mark as Complete</strong>
-          <p class="helper-text">Once everything is updated, hit "Mark as Complete" at the top to lock in this month's snapshot.</p>
+          <strong>Mark as complete</strong>
+          <p>Once everything's up to date, hit "Mark as Complete" and Shelly will snapshot your net worth for the month.</p>
         </div>
       </div>
     </div>
+    {% if not assumptions or not assumptions.salary_day %}
+    <p class="helper-text mt-075">
+      <strong>Tip:</strong> Tell Shelly your investment day in <a href="/settings/?mode=edit" class="link-accent">Settings</a> and he'll figure out when your investments have settled.
+    </p>
+    {% endif %}
   </div>
 </section>
 {% endif %}
@@ -145,158 +141,368 @@
 <section class="card mb-1">
   <div class="section-header">
     <div>
-      <p class="eyebrow">Contributions</p>
-      <h3>Confirmed contributions</h3>
+      <p class="eyebrow">Checklist</p>
+      <h2>Expected Contributions</h2>
     </div>
   </div>
-  <p class="helper-text mb-1">Tick off the contributions that have successfully left your bank account this month.</p>
-
   {% if contribution_items %}
-  <div class="contribution-checks">
-    {% for item in contribution_items %}
-    <div class="contribution-check-row{% if item.contribution_confirmed %} contribution-confirmed{% endif %}"
-         data-item-id="{{ item.id }}"
-         data-account-id="{{ item.account_id }}">
-      <div class="contribution-check-left">
-        <label class="checkbox-container">
-          <input type="checkbox" class="contribution-cb" {% if item.contribution_confirmed %}checked{% endif %} {% if review.status == 'complete' %}disabled{% endif %}>
-          <span class="checkmark"></span>
-        </label>
-        <div>
-          <span class="contribution-account-name">{{ item.account_name }}</span>
-          <span class="contribution-account-meta">{{ item.wrapper_type or 'Account' }} · {{ item.provider or '—' }}</span>
+    <div class="simple-list">
+      {% for item in contribution_items %}
+        <div class="simple-list-item">
+          <div>
+            <strong>{{ item.account_name }}</strong>
+            <p>{{ item.provider or '—' }} · {{ item.wrapper_type or 'Account' }}</p>
+          </div>
+          <div><strong>£{{ '{:,.2f}'.format(item.expected_contribution) }}</strong></div>
         </div>
-      </div>
-      <div class="contribution-check-right">
-        <span class="contribution-amount">£{{ '{:,.2f}'.format(item.expected_contribution) }}</span>
-        {% if review.status != 'complete' %}
-          {% if item.contribution_skipped %}
-            <button type="button" class="badge badge-meta contribution-restore-btn">Restore</button>
-          {% else %}
-            <button type="button" class="badge badge-meta contribution-skip-btn">Skip</button>
-          {% endif %}
-        {% endif %}
-      </div>
+      {% endfor %}
     </div>
-    {% endfor %}
-  </div>
   {% else %}
-  {{ empty_state("No contributions tracked for this month.", "Add a monthly contribution to an account to see it here.") }}
+    <p class="helper-text">No contributions to track this month. Set them up in <a href="/accounts/" class="link-accent">Accounts</a> and Shelly will list them here.</p>
   {% endif %}
 </section>
 
 <section class="card mb-1">
   <div class="section-header">
     <div>
-      <p class="eyebrow">Manual Updates</p>
-      <h3>Manual account balances</h3>
+      <p class="eyebrow">Holdings</p>
+      <h2>Holdings-Based Accounts</h2>
     </div>
-    {% if manual_holdings and review.status != 'complete' %}
-    <button type="button" class="badge badge-primary-action" id="update-all-prices">↻ Update All Prices</button>
+    {% if holdings_items and review.status != 'complete' %}
+    <div class="badge-row">
+      <button type="button" class="badge badge-accent" id="update-all-prices">↻ Update All Prices</button>
+    </div>
     {% endif %}
   </div>
-  <p class="helper-text mb-1">Update the current balance or price for accounts and holdings that Shelly doesn't track automatically.</p>
-
-  {% if manual_items or manual_holdings %}
-
-  {% if manual_items %}
-  <div class="balance-updates mb-1">
-    {% for item in manual_items %}
-    <form method="post" class="holding-update-row">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="form_name" value="update_account_balance">
-      <input type="hidden" name="month" value="{{ month_key }}">
-      <input type="hidden" name="account_id" value="{{ item.account_id }}">
-      <div class="hu-info">
-        <span class="hu-name">{{ item.account_name }}</span>
-        <span class="hu-meta">{{ item.wrapper_type or 'Account' }} · {{ item.provider or '—' }}{% if item.balance_updated %} · <span style="color:var(--color-success,#16a34a);">✓ Updated</span>{% endif %}</span>
-      </div>
-      <div class="hu-inputs">
-        <div class="hu-input-group">
-          <label>Balance</label>
-          <input type="number" step="0.01" name="current_value" value="{{ item.current_value or 0 }}" {% if review.status == 'complete' %}disabled{% endif %}>
-        </div>
-      </div>
-      {% if review.status != 'complete' %}
-      <button type="submit" class="badge badge-primary-action">Save</button>
-      {% endif %}
-    </form>
-    {% endfor %}
-  </div>
-  {% endif %}
-
-  {% if manual_holdings %}
-  <div class="holding-updates">
-    {% for h in manual_holdings %}
-    <div class="holding-update-row" data-ticker="{{ h.ticker or '' }}">
-      <input type="hidden" name="holding_id" value="{{ h.id }}">
-      <input type="hidden" name="account_id" value="{{ h.account_id }}">
-      <div class="hu-info">
-        <span class="hu-name">{{ h.name }}</span>
-        <span class="hu-meta">{{ h.account_name }} · {{ h.ticker or 'No ticker' }}</span>
-      </div>
-      <div class="hu-inputs">
-        <div class="hu-input-group">
-          <label>Units</label>
-          <input type="number" step="any" class="hu-units" value="{{ h.units }}" {% if review.status == 'complete' %}disabled{% endif %}>
-        </div>
-        <div class="hu-input-group">
-          <label>Price</label>
-          <div class="flex flex-center gap-025">
-            <input type="number" step="any" class="hu-price" value="{{ h.price }}" {% if review.status == 'complete' %}disabled{% endif %}>
-            {% if h.ticker and review.status != 'complete' %}
-            <button type="button" class="badge badge-meta hu-refresh" title="Fetch latest price">↻</button>
-            {% endif %}
+  {% if holdings_items %}
+    <div class="review-list">
+      {% for item in holdings_items %}
+        <section class="card position-entry-card">
+          <div class="section-header">
+            <div>
+              <h3>{{ item.account_name }}</h3>
+              <p>{{ item.provider or '—' }} · {{ item.wrapper_type or 'Account' }}</p>
+            </div>
+            <div class="badge-row">
+              <a class="badge" href="/accounts/{{ item.account_id }}">Open account</a>
+            </div>
           </div>
-        </div>
-        <div class="hu-total">
-          <label>Value</label>
-          <span class="hu-value">£{{ '{:,.2f}'.format(h.units * h.price) }}</span>
-        </div>
-      </div>
-      {% if review.status != 'complete' %}
-      <button type="button" class="badge badge-primary-action hu-submit">Save</button>
-      {% endif %}
-    </div>
-    {% endfor %}
-  </div>
-  {% endif %}
 
+          {% set account_holdings = holdings_by_account.get(item.account_id, []) %}
+          {% if account_holdings %}
+            <div class="holding-update-list">
+              {% for holding in account_holdings %}
+                <form method="post" class="holding-update-row"
+                      data-ticker="{{ holding.ticker or '' }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="form_name" value="update_holding">
+                  <input type="hidden" name="month" value="{{ month_key }}">
+                  <input type="hidden" name="holding_id" value="{{ holding.id }}">
+                  <input type="hidden" name="account_id" value="{{ holding.account_id }}">
+                  <input type="hidden" name="holding_catalogue_id" value="{{ holding.holding_catalogue_id or '' }}">
+                  <input type="hidden" name="holding_name" value="{{ holding.holding_name }}">
+                  <input type="hidden" name="ticker" value="{{ holding.ticker or '' }}">
+                  <input type="hidden" name="asset_type" value="{{ holding.asset_type or '' }}">
+                  <input type="hidden" name="bucket" value="{{ holding.bucket or '' }}">
+                  <input type="hidden" name="notes" value="{{ holding.notes or '' }}">
+
+                  <div class="holding-update-meta">
+                    <strong>{{ holding.holding_name }}</strong>
+                    <span>{{ holding.bucket or 'Other' }}{% if holding.ticker %} · {{ holding.ticker }}{% endif %}</span>
+                  </div>
+
+                  <div class="holding-update-inputs">
+                    <label class="holding-update-field">
+                      <span>Units</span>
+                      <input type="number" step="any" name="units"
+                             value="{{ '{:.4f}'.format(holding.units) if holding.units else '' }}"
+                             class="hu-units" {% if review.status == 'complete' %}disabled{% endif %}>
+                    </label>
+                    <label class="holding-update-field">
+                      <span>Price</span>
+                      <div class="holding-price-wrap">
+                        <input type="number" step="any" name="price"
+                               value="{{ '{:.4f}'.format(holding.price) if holding.price else '' }}"
+                               class="hu-price" {% if review.status == 'complete' %}disabled{% endif %}>
+                        {% if holding.ticker and review.status != 'complete' %}
+                          <button type="button" class="hu-refresh" title="Fetch latest price">↻</button>
+                        {% endif %}
+                      </div>
+                    </label>
+                    <div class="holding-update-value">
+                      <span>Value</span>
+                      <strong class="hu-value">£{{ '{:,.2f}'.format(holding.value or 0) }}</strong>
+                    </div>
+                    {% if review.status != 'complete' %}
+                    <button type="submit" class="badge badge-primary-action hu-submit">Save</button>
+                    {% endif %}
+                  </div>
+                </form>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="helper-text">No holdings here yet. Add some in <a href="/accounts/" class="link-accent">Accounts</a> and they'll show up for your next update.</p>
+          {% endif %}
+        </section>
+      {% endfor %}
+    </div>
   {% else %}
-  {{ empty_state("No manual accounts need updating.", "Accounts with automatic tracking or simple balances are handled by Shelly.") }}
+    <div class="empty-state">
+      <h3>No holdings-based accounts</h3>
+      <p>Add a holdings-based account and it'll show up ready for your monthly check-in.</p>
+      <a href="/accounts/" class="badge badge-primary-action">+ Add account</a>
+    </div>
   {% endif %}
 </section>
 
 <section class="card mb-1">
   <div class="section-header">
     <div>
-      <p class="eyebrow">Import</p>
-      <h3>CSV Import</h3>
+      <p class="eyebrow">Manual</p>
+      <h2>Manual Accounts</h2>
     </div>
-    <button type="button" class="badge badge-sm" id="csv-import-toggle">Show</button>
   </div>
-  <div id="csv-import-panel" class="mt-1 hidden">
-    <p class="helper-text mb-1">Import account balances or holding updates from a CSV file. Shelly will try to match rows to your existing accounts.</p>
-    <form action="/monthly-review/import" method="post" enctype="multipart/form-data">
+  {% if manual_items %}
+    <div class="review-list">
+      {% for item in manual_items %}
+        <form method="post" class="settings-form simple-list-item">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="form_name" value="update_account_balance">
+          <input type="hidden" name="month" value="{{ month_key }}">
+          <input type="hidden" name="account_id" value="{{ item.account_id }}">
+          <div>
+            <strong>{{ item.account_name }}</strong>
+            <p>{{ item.provider or '—' }} · {{ item.wrapper_type or 'Account' }}</p>
+          </div>
+          <label>
+            <span>Current Balance</span>
+            <input type="number" step="0.01" name="current_value"
+                   value="{{ item.current_value or '' }}"
+                   {% if review.status == 'complete' %}disabled{% endif %}>
+          </label>
+          {% if review.status != 'complete' %}
+          <button type="submit" class="badge badge-primary-action">Update</button>
+          {% endif %}
+        </form>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="helper-text">No manual accounts to review this month. If you add any manual-value accounts, Shelly will prompt you to update them here.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Shortcut</p>
+      <h2>CSV Import</h2>
+    </div>
+    <div class="badge-row">
+      <button type="button" class="badge badge-meta" id="csv-import-toggle">Show</button>
+    </div>
+  </div>
+  <p class="helper-text">Got a lot of holdings to update? Shelly can read CSV exports from most UK brokers — or you can use his own template to update everything in one go.</p>
+  <div id="csv-import-panel" class="hidden">
+    <form method="post" action="/monthly-review/import-csv" enctype="multipart/form-data" class="csv-upload-form">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="month" value="{{ month_key }}">
-      <div class="flex flex-col gap-1">
-        <input type="file" name="file" accept=".csv" required class="badge badge-meta" style="width:100%; height:auto; padding:1rem;">
-        <div class="flex gap-05">
-          <button type="submit" class="badge badge-primary-action">Upload CSV</button>
-          <button type="button" class="badge" id="csv-import-cancel">Cancel</button>
-        </div>
+      <label class="csv-upload-field">
+        <span>Platform</span>
+        <select name="platform" required>
+          <option value="" disabled selected>Select platform…</option>
+          <option value="trading212">Trading 212</option>
+          <option value="investengine">InvestEngine</option>
+          <option value="vanguard">Vanguard Investor</option>
+          <option value="hl">Hargreaves Lansdown</option>
+          <option value="ajbell">AJ Bell</option>
+          <option value="freetrade">Freetrade</option>
+          <option value="ii">Interactive Investor</option>
+          <option value="generic">Other (generic CSV)</option>
+        </select>
+      </label>
+      <label class="csv-upload-field">
+        <span>CSV File</span>
+        <input type="file" name="csv_file" accept=".csv,text/csv" required>
+      </label>
+      <div class="csv-upload-actions">
+        <button type="submit" class="badge badge-primary-action">Preview Import</button>
+        <button type="button" class="badge" id="csv-import-cancel">Cancel</button>
       </div>
     </form>
-    <div class="mt-1">
-      <p class="eyebrow">Expected Format</p>
-      <p class="helper-text" style="font-family: monospace; background: var(--bg-2); padding: 0.5rem; border-radius: 4px;">
-        Account Name, Ticker, Units, Price<br>
-        Vanguard ISA, VWRL, 150.5, 92.45
-      </p>
-    </div>
   </div>
 </section>
-</div>
 
+<script>
+/* ── Holding update logic ───────────────────────────────────────────── */
+function fmtGBP(n) {
+  return '£' + n.toLocaleString('en-GB', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+var holdingForms = [];
+
+document.querySelectorAll('.holding-update-row').forEach(function(form) {
+  var ticker    = form.dataset.ticker;
+  var unitsEl   = form.querySelector('.hu-units');
+  var priceEl   = form.querySelector('.hu-price');
+  var valueEl   = form.querySelector('.hu-value');
+  var refreshBtn = form.querySelector('.hu-refresh');
+  var submitBtn  = form.querySelector('.hu-submit');
+
+  if (!unitsEl || !priceEl) return;
+
+  function recalc() {
+    var units = parseFloat(unitsEl.value) || 0;
+    var price = parseFloat(priceEl.value) || 0;
+    if (valueEl) valueEl.textContent = fmtGBP(units * price);
+  }
+
+  function buildPayload(price, meta) {
+    meta = meta || {};
+    return {
+      holding_id: (form.querySelector('[name="holding_id"]') || {}).value,
+      account_id: (form.querySelector('[name="account_id"]') || {}).value,
+      holding_catalogue_id: (form.querySelector('[name="holding_catalogue_id"]') || {}).value || null,
+      holding_name: (form.querySelector('[name="holding_name"]') || {}).value || '',
+      ticker: (form.querySelector('[name="ticker"]') || {}).value || '',
+      asset_type: (form.querySelector('[name="asset_type"]') || {}).value || '',
+      bucket: (form.querySelector('[name="bucket"]') || {}).value || '',
+      notes: (form.querySelector('[name="notes"]') || {}).value || '',
+      units: parseFloat(unitsEl.value) || 0,
+      price: price,
+      price_source: meta.price_source,
+      price_raw: meta.price_raw,
+      currency_raw: meta.currency_raw,
+      change_pct: meta.change_pct,
+      updated_at: meta.updated_at,
+    };
+  }
+
+  async function autoSave(price, meta) {
+    try {
+      await fetch('/holdings/api/save-price', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(buildPayload(price, meta)),
+      });
+      if (submitBtn) {
+        submitBtn.textContent = 'Saved ✓';
+        setTimeout(function() { submitBtn.textContent = 'Save'; }, 1500);
+      }
+    } catch(e) {}
+  }
+
+  async function fetchLatestPrice() {
+    if (!ticker) return false;
+    if (refreshBtn) refreshBtn.textContent = '…';
+    var success = false;
+    try {
+      var resp = await fetch('/holdings/api/price?ticker=' + encodeURIComponent(ticker));
+      if (resp.ok) {
+        var data = await resp.json();
+        priceEl.value = data.price;
+        recalc();
+        await autoSave(data.price, {
+          price_source: 'live',
+          price_raw: data.price_raw,
+          currency_raw: data.currency_raw,
+          change_pct: data.change_pct,
+          updated_at: data.updated_at,
+        });
+        success = true;
+      }
+    } catch(e) {}
+    if (refreshBtn) refreshBtn.textContent = '↻';
+    return success;
+  }
+
+  unitsEl.addEventListener('input', recalc);
+  priceEl.addEventListener('input', recalc);
+  if (refreshBtn) refreshBtn.addEventListener('click', fetchLatestPrice);
+  if (submitBtn) submitBtn.addEventListener('click', async function() {
+    await autoSave(parseFloat(priceEl.value) || 0);
+  });
+
+  if (ticker) holdingForms.push({ ticker: ticker, fetchLatestPrice: fetchLatestPrice });
+});
+
+/* ── Update All Prices ─────────────────────────────────────────────── */
+var updateAllBtn = document.getElementById('update-all-prices');
+if (updateAllBtn) {
+  updateAllBtn.addEventListener('click', async function() {
+    updateAllBtn.disabled = true;
+    updateAllBtn.textContent = '↻ Updating…';
+    var total = holdingForms.length;
+    var done = 0;
+    for (var i = 0; i < holdingForms.length; i++) {
+      await holdingForms[i].fetchLatestPrice();
+      done++;
+      updateAllBtn.textContent = '↻ ' + done + '/' + total;
+    }
+    updateAllBtn.textContent = '✓ All updated';
+    updateAllBtn.disabled = false;
+    setTimeout(function() { updateAllBtn.textContent = '↻ Update All Prices'; }, 2500);
+  });
+}
+
+/* ── Guide toggle ──────────────────────────────────────────────────── */
+(function() {
+  var guideToggle = document.getElementById('guide-toggle');
+  var guidePanel  = document.getElementById('guide-panel');
+  if (guideToggle && guidePanel) {
+    guideToggle.addEventListener('click', function() {
+      var open = !guidePanel.classList.contains('hidden');
+      guidePanel.classList.toggle('hidden', open);
+      guideToggle.textContent = open ? 'Show' : 'Hide';
+    });
+  }
+}());
+
+/* ── Month navigation ──────────────────────────────────────────────── */
+(function() {
+  var MONTH = '{{ month_key }}';
+  function changeMonth(delta) {
+    var parts = MONTH.split('-');
+    var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1 + delta, 1);
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    window.location.href = '/monthly-review/?month=' + y + '-' + m;
+  }
+  var prevBtn = document.querySelector('.review-prev-month');
+  var nextBtn = document.querySelector('.review-next-month');
+  if (prevBtn) prevBtn.addEventListener('click', function() { changeMonth(-1); });
+  if (nextBtn) nextBtn.addEventListener('click', function() { changeMonth(1); });
+}());
+
+/* ── Mark as Complete dialog ───────────────────────────────────────── */
+(function() {
+  var btn    = document.getElementById('mark-complete-btn');
+  var dialog = document.getElementById('confirm-complete-dialog');
+  var form   = document.getElementById('mark-complete-form');
+  var yes    = document.getElementById('confirm-complete-yes');
+  var no     = document.getElementById('confirm-complete-no');
+  if (!btn || !dialog || !form) return;
+  btn.addEventListener('click', function() { dialog.showModal(); });
+  yes.addEventListener('click', function() { dialog.close(); form.submit(); });
+  no.addEventListener('click', function() { dialog.close(); });
+  dialog.addEventListener('click', function(e) { if (e.target === dialog) dialog.close(); });
+}());
+
+/* ── CSV import toggle ─────────────────────────────────────────────── */
+(function() {
+  var toggleBtn = document.getElementById('csv-import-toggle');
+  var cancelBtn = document.getElementById('csv-import-cancel');
+  var panel     = document.getElementById('csv-import-panel');
+  if (toggleBtn && panel) {
+    toggleBtn.addEventListener('click', function() {
+      var isHidden = panel.classList.toggle('hidden');
+      toggleBtn.textContent = isHidden ? 'Show' : 'Hide';
+    });
+  }
+  if (cancelBtn && panel) {
+    cancelBtn.addEventListener('click', function() {
+      panel.classList.add('hidden');
+      if (toggleBtn) toggleBtn.textContent = 'Show';
+    });
+  }
+}());
+</script>
 {% endblock %}
