@@ -493,20 +493,33 @@
           if (valueEl) valueEl.textContent = fmtGBP(units * price);
         }
 
-        async function autoSave(price, meta) {
+        function buildPayload(price, meta) {
           meta = meta || {};
-          var payload = {
-            holding_id: form.querySelector('[name="holding_id"]').value,
-            account_id: form.querySelector('[name="account_id"]').value,
+          return {
+            holding_id: (form.querySelector('[name="holding_id"]') || {}).value,
+            account_id: (form.querySelector('[name="account_id"]') || {}).value,
+            holding_catalogue_id: (form.querySelector('[name="holding_catalogue_id"]') || {}).value || null,
+            holding_name: (form.querySelector('[name="holding_name"]') || {}).value || '',
+            ticker: (form.querySelector('[name="ticker"]') || {}).value || '',
+            asset_type: (form.querySelector('[name="asset_type"]') || {}).value || '',
+            bucket: (form.querySelector('[name="bucket"]') || {}).value || '',
+            notes: (form.querySelector('[name="notes"]') || {}).value || '',
             units: parseFloat(unitsEl.value) || 0,
             price: price,
-            price_source: meta.price_source || 'manual',
+            price_source: meta.price_source,
+            price_raw: meta.price_raw,
+            currency_raw: meta.currency_raw,
+            change_pct: meta.change_pct,
+            updated_at: meta.updated_at,
           };
+        }
+
+        async function autoSave(price, meta) {
           try {
             await fetch('/holdings/api/save-price', {
               method: 'POST',
               headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify(payload),
+              body: JSON.stringify(buildPayload(price, meta)),
             });
             if (submitBtn) {
               submitBtn.textContent = 'Saved ✓';
@@ -524,7 +537,13 @@
                 var data = await resp.json();
                 priceEl.value = data.price;
                 recalc();
-                await autoSave(data.price, { price_source: 'live' });
+                await autoSave(data.price, {
+                  price_source: 'live',
+                  price_raw: data.price_raw,
+                  currency_raw: data.currency_raw,
+                  change_pct: data.change_pct,
+                  updated_at: data.updated_at,
+                });
               }
             } catch(e) {}
             refreshBtn.textContent = '↻';
@@ -546,17 +565,19 @@
       if (updateAllBtn) {
         updateAllBtn.addEventListener('click', async function() {
           updateAllBtn.disabled = true;
-          updateAllBtn.textContent = 'Updating…';
+          updateAllBtn.textContent = '↻ Updating…';
           var rows = document.querySelectorAll('.holding-update-row[data-ticker]');
+          var total = rows.length;
+          var done = 0;
           for (var i = 0; i < rows.length; i++) {
             var btn = rows[i].querySelector('.hu-refresh');
-            if (btn) {
-              btn.click();
-              await new Promise(r => setTimeout(r, 500)); // rate limiting
-            }
+            if (btn) btn.click();
+            done++;
+            updateAllBtn.textContent = '↻ ' + done + '/' + total;
+            await new Promise(function(r) { setTimeout(r, 500); });
           }
-          updateAllBtn.textContent = 'Done';
-          setTimeout(() => { updateAllBtn.disabled = false; updateAllBtn.textContent = '↻ Update All Prices'; }, 2000);
+          updateAllBtn.textContent = '✓ All updated';
+          setTimeout(function() { updateAllBtn.disabled = false; updateAllBtn.textContent = '↻ Update All Prices'; }, 2500);
         });
       }
 
