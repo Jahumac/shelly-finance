@@ -132,9 +132,9 @@
 
   <div class="chart-wrap chart-wrap-md">
     <canvas id="dailyPortfolioChart" height="220" role="img" aria-label="Portfolio history chart"
-      data-labels='{{ portfolio_history.labels | tojson | safe }}'
-      data-values='{{ portfolio_history.values | tojson | safe }}'
-      data-fallback='{{ net_worth }}'></canvas>
+      data-labels='{{ daily_labels | tojson | safe }}'
+      data-values='{{ daily_values | tojson | safe }}'
+      data-fallback='{{ metrics.invested_total }}'></canvas>
   </div>
   <p id="portfolio-chart-error" class="helper-text mt-05 hidden"></p>
   <div id="chartStats" class="flex flex-between mt-075" style="font-size:0.9rem;">
@@ -158,8 +158,8 @@
     <p class="chart-label">Net worth history</p>
     <div class="chart-wrap chart-wrap-sm">
       <canvas id="netWorthChart" height="120" role="img" aria-label="Net worth growth chart"
-        data-labels='{{ net_worth_history.labels | tojson | safe }}'
-        data-values='{{ net_worth_history.values | tojson | safe }}'></canvas>
+        data-labels='{{ history_labels | tojson | safe }}'
+        data-values='{{ history_values | tojson | safe }}'></canvas>
     </div>
   </div>
   {% elif daily_labels | length < 2 and history_labels | length == 1 %}
