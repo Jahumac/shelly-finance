@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS accounts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     provider TEXT,
     wrapper_type TEXT,
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS accounts (
 
 CREATE TABLE IF NOT EXISTS goals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     target_value REAL NOT NULL,
     goal_type TEXT,
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS goals (
 
 CREATE TABLE IF NOT EXISTS assumptions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id),
+    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     annual_growth_rate REAL DEFAULT 0.07,
     retirement_age INTEGER DEFAULT 60,
     current_age INTEGER DEFAULT 43,
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS assumptions (
 
 CREATE TABLE IF NOT EXISTS holding_catalogue (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     holding_name TEXT NOT NULL,
     ticker TEXT,
     asset_type TEXT,
@@ -94,8 +94,8 @@ CREATE TABLE IF NOT EXISTS holdings (
     price REAL,
     book_cost REAL,
     notes TEXT,
-    FOREIGN KEY(account_id) REFERENCES accounts(id),
-    FOREIGN KEY(holding_catalogue_id) REFERENCES holding_catalogue(id)
+    FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+    FOREIGN KEY(holding_catalogue_id) REFERENCES holding_catalogue(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS monthly_snapshots (
@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS monthly_snapshots (
     balance REAL DEFAULT 0,
     contribution REAL DEFAULT 0,
     note TEXT,
-    FOREIGN KEY(account_id) REFERENCES accounts(id)
+    FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS allowance_tracking (
@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS allowance_tracking (
 
 CREATE TABLE IF NOT EXISTS monthly_reviews (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     month_key TEXT NOT NULL,
     status TEXT DEFAULT 'not_started',
     notes TEXT,
@@ -137,13 +137,13 @@ CREATE TABLE IF NOT EXISTS monthly_review_items (
     holdings_updated INTEGER DEFAULT 0,
     balance_updated INTEGER DEFAULT 0,
     notes TEXT,
-    FOREIGN KEY(review_id) REFERENCES monthly_reviews(id),
-    FOREIGN KEY(account_id) REFERENCES accounts(id)
+    FOREIGN KEY(review_id) REFERENCES monthly_reviews(id) ON DELETE CASCADE,
+    FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS budget_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     section TEXT NOT NULL,
     default_amount REAL DEFAULT 0,
@@ -151,7 +151,7 @@ CREATE TABLE IF NOT EXISTS budget_items (
     notes TEXT,
     sort_order INTEGER DEFAULT 0,
     is_active INTEGER DEFAULT 1,
-    FOREIGN KEY(linked_account_id) REFERENCES accounts(id)
+    FOREIGN KEY(linked_account_id) REFERENCES accounts(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS budget_entries (
@@ -159,13 +159,13 @@ CREATE TABLE IF NOT EXISTS budget_entries (
     month_key TEXT NOT NULL,
     budget_item_id INTEGER NOT NULL,
     amount REAL DEFAULT 0,
-    FOREIGN KEY(budget_item_id) REFERENCES budget_items(id),
+    FOREIGN KEY(budget_item_id) REFERENCES budget_items(id) ON DELETE CASCADE,
     UNIQUE(month_key, budget_item_id)
 );
 
 CREATE TABLE IF NOT EXISTS budget_sections (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     key TEXT NOT NULL,
     label TEXT NOT NULL,
     sort_order INTEGER DEFAULT 0,
@@ -180,13 +180,13 @@ CREATE TABLE IF NOT EXISTS contribution_overrides (
     override_amount REAL NOT NULL,
     reason TEXT,
     created_at TEXT,
-    FOREIGN KEY(account_id) REFERENCES accounts(id)
+    FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS isa_contributions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id),
-    account_id INTEGER NOT NULL REFERENCES accounts(id),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     amount REAL NOT NULL,
     contribution_date TEXT NOT NULL,
     note TEXT,
@@ -195,8 +195,8 @@ CREATE TABLE IF NOT EXISTS isa_contributions (
 
 CREATE TABLE IF NOT EXISTS pension_contributions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id),
-    account_id INTEGER NOT NULL REFERENCES accounts(id),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     amount REAL NOT NULL,
     kind TEXT NOT NULL DEFAULT 'personal',
     contribution_date TEXT NOT NULL,
@@ -206,8 +206,8 @@ CREATE TABLE IF NOT EXISTS pension_contributions (
 
 CREATE TABLE IF NOT EXISTS dividend_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id),
-    account_id INTEGER NOT NULL REFERENCES accounts(id),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     amount REAL NOT NULL,
     dividend_date TEXT NOT NULL,
     note TEXT,
@@ -216,7 +216,7 @@ CREATE TABLE IF NOT EXISTS dividend_records (
 
 CREATE TABLE IF NOT EXISTS cgt_disposals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     disposal_date TEXT NOT NULL,
     asset_name TEXT NOT NULL,
     proceeds REAL NOT NULL,
@@ -227,7 +227,7 @@ CREATE TABLE IF NOT EXISTS cgt_disposals (
 
 CREATE TABLE IF NOT EXISTS pension_carry_forward (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     tax_year TEXT NOT NULL,
     unused_allowance REAL NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -241,7 +241,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 CREATE TABLE IF NOT EXISTS scheduler_runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     run_date TEXT NOT NULL,
     slot TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -249,7 +249,7 @@ CREATE TABLE IF NOT EXISTS scheduler_runs (
 
 CREATE TABLE IF NOT EXISTS portfolio_daily_snapshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     snapshot_date TEXT NOT NULL,
     total_value REAL NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -258,11 +258,40 @@ CREATE TABLE IF NOT EXISTS portfolio_daily_snapshots (
 
 CREATE TABLE IF NOT EXISTS account_daily_snapshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id),
-    account_id INTEGER NOT NULL REFERENCES accounts(id),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     snapshot_date TEXT NOT NULL,
     value REAL NOT NULL,
     UNIQUE(account_id, snapshot_date)
+);
+
+CREATE TABLE IF NOT EXISTS custom_tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tag TEXT NOT NULL,
+    UNIQUE(user_id, tag)
+);
+
+CREATE TABLE IF NOT EXISTS api_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token TEXT NOT NULL UNIQUE,
+    label TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    last_used_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS debts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    original_amount REAL DEFAULT 0,
+    current_balance REAL NOT NULL DEFAULT 0,
+    monthly_payment REAL NOT NULL DEFAULT 0,
+    apr REAL DEFAULT 0,
+    notes TEXT,
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 """
 
@@ -681,6 +710,102 @@ def _run_migrations(conn):
         """)
     except Exception:
         pass
+
+
+    # ── ON DELETE CASCADE migrations ──────────────────────────────────────
+    if not conn.execute(
+        "SELECT 1 FROM schema_migrations WHERE name = 'v7_cascading_deletes'"
+    ).fetchone():
+        # List of tables to recreate with ON DELETE CASCADE
+        # This is a bit heavy but ensures the schema is clean and matches SCHEMA string
+        tables_to_cascade = [
+            ("accounts", """
+                CREATE TABLE accounts_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    name TEXT NOT NULL,
+                    provider TEXT,
+                    wrapper_type TEXT,
+                    category TEXT,
+                    tags TEXT DEFAULT '',
+                    current_value REAL DEFAULT 0,
+                    monthly_contribution REAL DEFAULT 0,
+                    pension_contribution_day INTEGER DEFAULT 0,
+                    goal_value REAL,
+                    valuation_mode TEXT DEFAULT 'manual',
+                    growth_mode TEXT DEFAULT 'default',
+                    growth_rate_override REAL,
+                    owner TEXT,
+                    is_active INTEGER DEFAULT 1,
+                    notes TEXT,
+                    last_updated TEXT,
+                    employer_contribution REAL DEFAULT 0,
+                    contribution_method TEXT DEFAULT 'standard',
+                    annual_fee_pct REAL DEFAULT 0,
+                    platform_fee_pct REAL DEFAULT 0,
+                    platform_fee_flat REAL DEFAULT 0,
+                    platform_fee_cap REAL DEFAULT 0,
+                    fund_fee_pct REAL DEFAULT 0,
+                    contribution_fee_pct REAL DEFAULT 0,
+                    uninvested_cash REAL DEFAULT 0,
+                    cash_interest_rate REAL DEFAULT 0,
+                    interest_payment_day INTEGER DEFAULT 0
+                )
+            """),
+            ("holding_catalogue", """
+                CREATE TABLE holding_catalogue_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    holding_name TEXT NOT NULL,
+                    ticker TEXT,
+                    asset_type TEXT,
+                    bucket TEXT,
+                    notes TEXT,
+                    is_active INTEGER DEFAULT 1,
+                    last_price REAL,
+                    price_currency TEXT,
+                    price_change_pct REAL,
+                    price_updated_at TEXT
+                )
+            """),
+            ("holdings", """
+                CREATE TABLE holdings_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    account_id INTEGER NOT NULL,
+                    holding_catalogue_id INTEGER,
+                    holding_name TEXT NOT NULL,
+                    ticker TEXT,
+                    asset_type TEXT,
+                    bucket TEXT,
+                    value REAL DEFAULT 0,
+                    units REAL,
+                    price REAL,
+                    book_cost REAL,
+                    notes TEXT,
+                    FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+                    FOREIGN KEY(holding_catalogue_id) REFERENCES holding_catalogue(id) ON DELETE CASCADE
+                )
+            """),
+        ]
+
+        for table_name, create_sql in tables_to_cascade:
+            try:
+                # 1. Create new table
+                conn.execute(create_sql)
+                # 2. Copy data (only columns that exist in both)
+                old_cols = [r['name'] for r in conn.execute(f"PRAGMA table_info({table_name})").fetchall()]
+                new_cols = [r['name'] for r in conn.execute(f"PRAGMA table_info({table_name}_new)").fetchall()]
+                common_cols = [c for c in old_cols if c in new_cols]
+                cols_str = ", ".join(common_cols)
+                conn.execute(f"INSERT INTO {table_name}_new ({cols_str}) SELECT {cols_str} FROM {table_name}")
+                # 3. Swap tables
+                conn.execute(f"DROP TABLE {table_name}")
+                conn.execute(f"ALTER TABLE {table_name}_new RENAME TO {table_name}")
+            except Exception as e:
+                current_app.logger.error(f"Migration error (cascade {table_name}): {e}")
+
+        conn.execute("INSERT INTO schema_migrations (name) VALUES ('v7_cascading_deletes')")
+        conn.commit()
 
 
 def _ensure_indexes(conn):

@@ -98,7 +98,7 @@ def update_user(user_id, username=None, password=None, is_admin=None):
 
 
 def delete_user(user_id):
-    """Delete a user and all their data. Returns (ok, error_message)."""
+    """Delete a user and all their data across all tables."""
     with get_connection() as conn:
         # Safety: must not be the last admin
         admin_count = conn.execute(
@@ -109,30 +109,47 @@ def delete_user(user_id):
             return False, "User not found."
         if target["is_admin"] and admin_count <= 1:
             return False, "Cannot delete the only admin account."
-        # Delete user data across all tables
-        conn.execute("DELETE FROM assumptions WHERE user_id = ?", (user_id,))
-        conn.execute("DELETE FROM goals WHERE user_id = ?", (user_id,))
-        conn.execute("DELETE FROM holding_catalogue WHERE user_id = ?", (user_id,))
-        conn.execute("DELETE FROM budget_items WHERE user_id = ?", (user_id,))
-        conn.execute("DELETE FROM budget_sections WHERE user_id = ?", (user_id,))
-        # Monthly reviews cascade — delete items first
-        review_ids = [r["id"] for r in conn.execute(
-            "SELECT id FROM monthly_reviews WHERE user_id = ?", (user_id,)
-        ).fetchall()]
-        for rid in review_ids:
-            conn.execute("DELETE FROM monthly_review_items WHERE review_id = ?", (rid,))
-        conn.execute("DELETE FROM monthly_reviews WHERE user_id = ?", (user_id,))
-        # Accounts — clean up holdings first, then soft-delete the accounts
+
+        # 1. Delete by user_id directly (most tables)
+        tables_with_user_id = [
+            "assumptions", "goals", "holding_catalogue", "monthly_reviews",
+            "budget_items", "budget_sections", "isa_contributions",
+            "pension_contributions", "dividend_records", "cgt_disposals",
+            "pension_carry_forward", "scheduler_runs", "portfolio_daily_snapshots",
+            "account_daily_snapshots", "custom_tags", "api_tokens", "debts"
+        ]
+        for table in tables_with_user_id:
+            conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
+
+        # 2. Delete by account_id (tables linked to accounts)
+        # Fetch account IDs for this user
         account_ids = [r["id"] for r in conn.execute(
             "SELECT id FROM accounts WHERE user_id = ?", (user_id,)
         ).fetchall()]
-        for aid in account_ids:
-            conn.execute("DELETE FROM holdings WHERE account_id = ?", (aid,))
-            conn.execute("DELETE FROM monthly_snapshots WHERE account_id = ?", (aid,))
-            conn.execute("DELETE FROM monthly_review_items WHERE account_id = ?", (aid,))
-            conn.execute("DELETE FROM contribution_overrides WHERE account_id = ?", (aid,))
-        conn.execute("UPDATE accounts SET is_active = 0 WHERE user_id = ?", (user_id,))
+        
+        if account_ids:
+            placeholders = ",".join(["?"] * len(account_ids))
+            tables_with_account_id = [
+                "holdings", "monthly_snapshots", "monthly_review_items",
+                "contribution_overrides"
+            ]
+            for table in tables_with_account_id:
+                conn.execute(
+                    f"DELETE FROM {table} WHERE account_id IN ({placeholders})",
+                    account_ids
+                )
+
+        # 3. Special cases (nested links)
+        # budget_entries are linked to budget_items (already deleted above by user_id)
+        # but we should be thorough.
+        conn.execute("""
+            DELETE FROM budget_entries WHERE budget_item_id NOT IN (SELECT id FROM budget_items)
+        """)
+
+        # 4. Finally delete the accounts and the user
+        conn.execute("DELETE FROM accounts WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        
         conn.commit()
     return True, None
 

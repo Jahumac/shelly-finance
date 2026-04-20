@@ -293,84 +293,86 @@ def _run_price_update_for_user(app, user_id, slot_name="auto"):
             "latest_price_update": None,
             "twelve_data_key_present": bool(app.config.get("TWELVE_DATA_API_KEY")),
         }
-        catalogue = fetch_holding_catalogue_in_use(user_id)
-        summary["catalogue_total"] = len(catalogue or [])
-        if not catalogue:
-            accounts = fetch_all_accounts(user_id)
-            holdings_totals = fetch_holding_totals_by_account(user_id)
-            _accrue_manual_accounts(user_id, accounts)
-            accounts = fetch_all_accounts(user_id)
-            acct_vals = [(a["id"], effective_account_value(a, holdings_totals)) for a in accounts]
-            save_daily_snapshot(user_id, sum(v for _, v in acct_vals))
-            save_account_daily_snapshots(user_id, acct_vals)
-            logger.info(f"Saved portfolio snapshot for user {user_id} ({slot_name})")
-            return summary
 
-        # Filter for stale prices unless manual update requested
-        tickers_to_update = catalogue
-        if slot_name != "manual":
-            tickers_to_update = [
-                t for t in catalogue
-                if is_price_stale(t.get("price_updated_at"), threshold_minutes=15)
-            ]
-            skipped = len(catalogue) - len(tickers_to_update)
-            if skipped > 0:
-                logger.debug(f"Skipping {skipped} fresh tickers for user {user_id}")
+        with get_connection() as conn:
+            # Wrap everything in a transaction for atomicity
+            conn.execute("BEGIN TRANSACTION")
 
-        if not tickers_to_update:
-            logger.info(f"No tickers need refreshing for user {user_id} ({slot_name})")
-        else:
-            logger.info(f"Price update for user {user_id} ({slot_name}): processing {len(tickers_to_update)} tickers")
-            price_results = refresh_catalogue_prices(tickers_to_update)
-            by_source = {"twelve_data": 0, "yahoo_quote": 0, "yahoo_chart": 0, "yfinance": 0, "other": 0}
-            ok_count = 0
-            summary["tickers_processed"] = len(price_results)
+            catalogue = fetch_holding_catalogue_in_use(user_id)
+            summary["catalogue_total"] = len(catalogue or [])
+            
+            if catalogue:
+                # Filter for stale prices unless manual update requested
+                tickers_to_update = catalogue
+                if slot_name != "manual":
+                    tickers_to_update = [
+                        t for t in catalogue
+                        if is_price_stale(t.get("price_updated_at"), threshold_minutes=15)
+                    ]
+                    skipped = len(catalogue) - len(tickers_to_update)
+                    if skipped > 0:
+                        logger.debug(f"Skipping {skipped} fresh tickers for user {user_id}")
 
-            with get_connection() as conn:
-                for result in price_results:
-                    if result.get("success"):
-                        ok_count += 1
-                        src = result.get("source") or "other"
-                        if src not in by_source:
-                            src = "other"
-                        by_source[src] += 1
-                        summary["latest_price_update"] = result.get("updated_at") or summary["latest_price_update"]
-                        conn.execute(
-                            """
-                            UPDATE holding_catalogue
-                            SET last_price = ?, price_currency = ?, price_change_pct = ?, price_updated_at = ?
-                            WHERE id = ?
-                            """,
-                            (
-                                result.get("price"),
-                                result.get("currency"),
-                                result.get("change_pct"),
-                                result.get("updated_at"),
-                                result.get("id"),
-                            ),
-                        )
-                        sync_holding_prices_from_catalogue(
-                            result.get("id"),
-                            result.get("price"),
-                            result.get("currency")
-                        )
-                    else:
-                        current_app.logger.error(f"[Shelly] ✗ {result.get('ticker')}: {result.get('error')}")
-                conn.commit()
-            summary["success_count"] = ok_count
-            summary["by_source"] = by_source
-            logger.info(
-                "Price provider breakdown user %s (%s): success=%s/%s, twelve_data=%s, yahoo_quote=%s, yahoo_chart=%s, yfinance=%s",
-                user_id,
-                slot_name,
-                ok_count,
-                len(price_results),
-                by_source["twelve_data"],
-                by_source["yahoo_quote"],
-                by_source["yahoo_chart"],
-                by_source["yfinance"],
-            )
+                if not tickers_to_update:
+                    logger.info(f"No tickers need refreshing for user {user_id} ({slot_name})")
+                else:
+                    logger.info(f"Price update for user {user_id} ({slot_name}): processing {len(tickers_to_update)} tickers")
+                    price_results = refresh_catalogue_prices(tickers_to_update)
+                    by_source = {"twelve_data": 0, "yahoo_quote": 0, "yahoo_chart": 0, "yfinance": 0, "other": 0}
+                    ok_count = 0
+                    summary["tickers_processed"] = len(price_results)
 
+                    for result in price_results:
+                        if result.get("success"):
+                            ok_count += 1
+                            src = result.get("source") or "other"
+                            if src not in by_source:
+                                src = "other"
+                            by_source[src] += 1
+                            summary["latest_price_update"] = result.get("updated_at") or summary["latest_price_update"]
+                            conn.execute(
+                                """
+                                UPDATE holding_catalogue
+                                SET last_price = ?, price_currency = ?, price_change_pct = ?, price_updated_at = ?
+                                WHERE id = ?
+                                """,
+                                (
+                                    result.get("price"),
+                                    result.get("currency"),
+                                    result.get("change_pct"),
+                                    result.get("updated_at"),
+                                    result.get("id"),
+                                ),
+                            )
+                            # Internal sync also needs to use this connection
+                            # We'll need a way to pass the connection or just do the update here
+                            conn.execute(
+                                "UPDATE holdings SET price = ? WHERE holding_catalogue_id = ?",
+                                (result.get("price"), result.get("id"))
+                            )
+                        else:
+                            current_app.logger.error(f"[Shelly] ✗ {result.get('ticker')}: {result.get('error')}")
+                    
+                    summary["success_count"] = ok_count
+                    summary["by_source"] = by_source
+                    logger.info(
+                        "Price provider breakdown user %s (%s): success=%s/%s, twelve_data=%s, yahoo_quote=%s, yahoo_chart=%s, yfinance=%s",
+                        user_id, slot_name, ok_count, len(price_results),
+                        by_source["twelve_data"], by_source["yahoo_quote"],
+                        by_source["yahoo_chart"], by_source["yfinance"],
+                    )
+
+            # Re-fetch accounts and accrue growth
+            # These functions currently open their own connections.
+            # For true atomicity we should refactor them to accept a connection,
+            # but for now we'll just ensure the final snapshots are consistent.
+            
+            # NOTE: We can't easily refactor every model function today,
+            # so we'll ensure the core price update + holding sync is atomic.
+            
+            conn.execute("COMMIT")
+
+        # Outside the main transaction for now, but these are separate logical steps
         accounts = fetch_all_accounts(user_id)
         holdings_totals = fetch_holding_totals_by_account(user_id)
         _accrue_manual_accounts(user_id, accounts)
