@@ -436,21 +436,21 @@ def fetch_price(ticker: str):
         res = _try_twelve_data(sym)
         if res:
             res["yf_symbol"] = sym
-            logger.debug(f"Fetched {sym} via Source C (Twelve Data): {res['price']} {res['currency']}")
+            logger.info(f"Fetched {sym} via Source C (Twelve Data): {res['price']} {res['currency']}")
             return res
 
         # Try Yahoo Quote API (Source B) as the secondary live source
         res = _try_yahoo_quote(sym)
         if res:
             res["yf_symbol"] = sym
-            logger.debug(f"Fetched {sym} via Source B (quote): {res['price']} {res['currency']}")
+            logger.info(f"Fetched {sym} via Source B (quote): {res['price']} {res['currency']}")
             return res
 
         # Fallback to Yahoo Chart API (Source A)
         res = _try_yahoo_http(sym)
         if res:
             res["yf_symbol"] = sym
-            logger.debug(f"Fetched {sym} via Source A (chart): {res['price']} {res['currency']}")
+            logger.info(f"Fetched {sym} via Source A (chart): {res['price']} {res['currency']}")
             # Prefer LSE version for GBP-priced instruments if multiple results exist
             if sym.endswith(".L") or res.get("currency") in ("GBP", "GBp"):
                 return res
