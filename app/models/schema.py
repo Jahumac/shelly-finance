@@ -716,96 +716,110 @@ def _run_migrations(conn):
     if not conn.execute(
         "SELECT 1 FROM schema_migrations WHERE name = 'v7_cascading_deletes'"
     ).fetchone():
-        # List of tables to recreate with ON DELETE CASCADE
-        # This is a bit heavy but ensures the schema is clean and matches SCHEMA string
-        tables_to_cascade = [
-            ("accounts", """
-                CREATE TABLE accounts_new (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    name TEXT NOT NULL,
-                    provider TEXT,
-                    wrapper_type TEXT,
-                    category TEXT,
-                    tags TEXT DEFAULT '',
-                    current_value REAL DEFAULT 0,
-                    monthly_contribution REAL DEFAULT 0,
-                    pension_contribution_day INTEGER DEFAULT 0,
-                    goal_value REAL,
-                    valuation_mode TEXT DEFAULT 'manual',
-                    growth_mode TEXT DEFAULT 'default',
-                    growth_rate_override REAL,
-                    owner TEXT,
-                    is_active INTEGER DEFAULT 1,
-                    notes TEXT,
-                    last_updated TEXT,
-                    employer_contribution REAL DEFAULT 0,
-                    contribution_method TEXT DEFAULT 'standard',
-                    annual_fee_pct REAL DEFAULT 0,
-                    platform_fee_pct REAL DEFAULT 0,
-                    platform_fee_flat REAL DEFAULT 0,
-                    platform_fee_cap REAL DEFAULT 0,
-                    fund_fee_pct REAL DEFAULT 0,
-                    contribution_fee_pct REAL DEFAULT 0,
-                    uninvested_cash REAL DEFAULT 0,
-                    cash_interest_rate REAL DEFAULT 0,
-                    interest_payment_day INTEGER DEFAULT 0
-                )
-            """),
-            ("holding_catalogue", """
-                CREATE TABLE holding_catalogue_new (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    holding_name TEXT NOT NULL,
-                    ticker TEXT,
-                    asset_type TEXT,
-                    bucket TEXT,
-                    notes TEXT,
-                    is_active INTEGER DEFAULT 1,
-                    last_price REAL,
-                    price_currency TEXT,
-                    price_change_pct REAL,
-                    price_updated_at TEXT
-                )
-            """),
-            ("holdings", """
-                CREATE TABLE holdings_new (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    account_id INTEGER NOT NULL,
-                    holding_catalogue_id INTEGER,
-                    holding_name TEXT NOT NULL,
-                    ticker TEXT,
-                    asset_type TEXT,
-                    bucket TEXT,
-                    value REAL DEFAULT 0,
-                    units REAL,
-                    price REAL,
-                    book_cost REAL,
-                    notes TEXT,
-                    FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE CASCADE,
-                    FOREIGN KEY(holding_catalogue_id) REFERENCES holding_catalogue(id) ON DELETE CASCADE
-                )
-            """),
-        ]
+        # Disable foreign keys temporarily to allow dropping/recreating tables
+        # that are part of a relationship.
+        conn.execute("PRAGMA foreign_keys=OFF")
+        
+        try:
+            # List of tables to recreate with ON DELETE CASCADE
+            tables_to_cascade = [
+                ("accounts", """
+                    CREATE TABLE accounts_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        name TEXT NOT NULL,
+                        provider TEXT,
+                        wrapper_type TEXT,
+                        category TEXT,
+                        tags TEXT DEFAULT '',
+                        current_value REAL DEFAULT 0,
+                        monthly_contribution REAL DEFAULT 0,
+                        pension_contribution_day INTEGER DEFAULT 0,
+                        goal_value REAL,
+                        valuation_mode TEXT DEFAULT 'manual',
+                        growth_mode TEXT DEFAULT 'default',
+                        growth_rate_override REAL,
+                        owner TEXT,
+                        is_active INTEGER DEFAULT 1,
+                        notes TEXT,
+                        last_updated TEXT,
+                        employer_contribution REAL DEFAULT 0,
+                        contribution_method TEXT DEFAULT 'standard',
+                        annual_fee_pct REAL DEFAULT 0,
+                        platform_fee_pct REAL DEFAULT 0,
+                        platform_fee_flat REAL DEFAULT 0,
+                        platform_fee_cap REAL DEFAULT 0,
+                        fund_fee_pct REAL DEFAULT 0,
+                        contribution_fee_pct REAL DEFAULT 0,
+                        uninvested_cash REAL DEFAULT 0,
+                        cash_interest_rate REAL DEFAULT 0,
+                        interest_payment_day INTEGER DEFAULT 0
+                    )
+                """),
+                ("holding_catalogue", """
+                    CREATE TABLE holding_catalogue_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        holding_name TEXT NOT NULL,
+                        ticker TEXT,
+                        asset_type TEXT,
+                        bucket TEXT,
+                        notes TEXT,
+                        is_active INTEGER DEFAULT 1,
+                        last_price REAL,
+                        price_currency TEXT,
+                        price_change_pct REAL,
+                        price_updated_at TEXT
+                    )
+                """),
+                ("holdings", """
+                    CREATE TABLE holdings_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        account_id INTEGER NOT NULL,
+                        holding_catalogue_id INTEGER,
+                        holding_name TEXT NOT NULL,
+                        ticker TEXT,
+                        asset_type TEXT,
+                        bucket TEXT,
+                        value REAL DEFAULT 0,
+                        units REAL,
+                        price REAL,
+                        book_cost REAL,
+                        notes TEXT,
+                        FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+                        FOREIGN KEY(holding_catalogue_id) REFERENCES holding_catalogue(id) ON DELETE CASCADE
+                    )
+                """),
+            ]
 
-        for table_name, create_sql in tables_to_cascade:
-            try:
+            for table_name, create_sql in tables_to_cascade:
+                # Clean up from any previous failed attempt
+                conn.execute(f"DROP TABLE IF EXISTS {table_name}_new")
+                
                 # 1. Create new table
                 conn.execute(create_sql)
+                
                 # 2. Copy data (only columns that exist in both)
                 old_cols = [r['name'] for r in conn.execute(f"PRAGMA table_info({table_name})").fetchall()]
                 new_cols = [r['name'] for r in conn.execute(f"PRAGMA table_info({table_name}_new)").fetchall()]
                 common_cols = [c for c in old_cols if c in new_cols]
                 cols_str = ", ".join(common_cols)
                 conn.execute(f"INSERT INTO {table_name}_new ({cols_str}) SELECT {cols_str} FROM {table_name}")
+                
                 # 3. Swap tables
                 conn.execute(f"DROP TABLE {table_name}")
                 conn.execute(f"ALTER TABLE {table_name}_new RENAME TO {table_name}")
-            except Exception as e:
-                current_app.logger.error(f"Migration error (cascade {table_name}): {e}")
 
-        conn.execute("INSERT INTO schema_migrations (name) VALUES ('v7_cascading_deletes')")
-        conn.commit()
+            # Mark as finished — use OR IGNORE to handle multi-worker races
+            conn.execute("INSERT OR IGNORE INTO schema_migrations (name) VALUES ('v7_cascading_deletes')")
+            conn.commit()
+            
+        except Exception as e:
+            current_app.logger.error(f"Migration error (v7_cascading_deletes): {e}")
+            conn.rollback()
+        finally:
+            # Always re-enable foreign keys
+            conn.execute("PRAGMA foreign_keys=ON")
 
 
 def _ensure_indexes(conn):
