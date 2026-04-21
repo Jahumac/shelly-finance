@@ -91,9 +91,9 @@ def goals():
     # Deduplicated total saved: sum each account at most once across all goals
     included_ids = set()
     for goal_row in goal_rows:
-        tags = _split_tags_util(goal_row["selected_tags"]) if goal_row["selected_tags"] else []
+        tags = _split_tags(goal_row["selected_tags"]) if goal_row["selected_tags"] else []
         for account in accounts:
-            acct_tags = set(_split_tags_util(account["tags"]) if account["tags"] else [])
+            acct_tags = set(_split_tags(account["tags"]) if account["tags"] else [])
             if tags and acct_tags & set(tags):
                 included_ids.add(account["id"])
     total_saved = sum(
