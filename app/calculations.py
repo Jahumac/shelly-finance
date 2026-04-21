@@ -172,12 +172,16 @@ def convert_to_gbp(amount, from_currency, fx_rates=None):
     fx_rates should be a dict like {'USD': 1.25, 'EUR': 1.17} (how many per 1 GBP).
     If rates are missing, returns the amount unchanged (legacy behavior).
     """
-    if not amount or not from_currency or from_currency.upper() == "GBP":
+    if not amount or not from_currency:
+        return to_float(amount)
+
+    if from_currency == "GBp":  # Pence to Pounds (must check before upper-casing)
+        return to_float(amount) / 100.0
+
+    if from_currency.upper() == "GBP":
         return to_float(amount)
 
     currency = from_currency.upper()
-    if from_currency == "GBp":  # Pence to Pounds
-        return to_float(amount) / 100.0
 
     if not fx_rates or currency not in fx_rates:
         return to_float(amount)

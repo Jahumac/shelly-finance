@@ -294,15 +294,15 @@ def _run_price_update_for_user(app, user_id, slot_name="auto"):
             "twelve_data_key_present": bool(app.config.get("TWELVE_DATA_API_KEY")),
         }
 
+        price_results = []
+
         with get_connection() as conn:
-            # Wrap everything in a transaction for atomicity
             conn.execute("BEGIN TRANSACTION")
 
             catalogue = fetch_holding_catalogue_in_use(user_id)
             summary["catalogue_total"] = len(catalogue or [])
-            
+
             if catalogue:
-                # Filter for stale prices unless manual update requested
                 tickers_to_update = catalogue
                 if slot_name != "manual":
                     tickers_to_update = [
@@ -330,6 +330,7 @@ def _run_price_update_for_user(app, user_id, slot_name="auto"):
                                 src = "other"
                             by_source[src] += 1
                             summary["latest_price_update"] = result.get("updated_at") or summary["latest_price_update"]
+                            # Update holding_catalogue with the raw price + currency (raw is correct here)
                             conn.execute(
                                 """
                                 UPDATE holding_catalogue
@@ -344,15 +345,11 @@ def _run_price_update_for_user(app, user_id, slot_name="auto"):
                                     result.get("id"),
                                 ),
                             )
-                            # Internal sync also needs to use this connection
-                            # We'll need a way to pass the connection or just do the update here
-                            conn.execute(
-                                "UPDATE holdings SET price = ? WHERE holding_catalogue_id = ?",
-                                (result.get("price"), result.get("id"))
-                            )
+                            # NOTE: holdings.price sync is done AFTER this transaction via
+                            # sync_holding_prices_from_catalogue which handles GBp/USD/EUR conversion.
                         else:
                             current_app.logger.error(f"[Shelly] ✗ {result.get('ticker')}: {result.get('error')}")
-                    
+
                     summary["success_count"] = ok_count
                     summary["by_source"] = by_source
                     logger.info(
@@ -362,17 +359,16 @@ def _run_price_update_for_user(app, user_id, slot_name="auto"):
                         by_source["yahoo_chart"], by_source["yfinance"],
                     )
 
-            # Re-fetch accounts and accrue growth
-            # These functions currently open their own connections.
-            # For true atomicity we should refactor them to accept a connection,
-            # but for now we'll just ensure the final snapshots are consistent.
-            
-            # NOTE: We can't easily refactor every model function today,
-            # so we'll ensure the core price update + holding sync is atomic.
-            
             conn.execute("COMMIT")
 
-        # Outside the main transaction for now, but these are separate logical steps
+        # Sync holdings.price with proper currency conversion (GBp÷100, USD÷rate, etc.)
+        for result in price_results:
+            if result.get("success") and result.get("price") is not None:
+                try:
+                    sync_holding_prices_from_catalogue(result["id"], result["price"], result["currency"])
+                except Exception as e:
+                    logger.warning(f"sync_holding_prices_from_catalogue failed for {result.get('ticker')}: {e}")
+
         accounts = fetch_all_accounts(user_id)
         holdings_totals = fetch_holding_totals_by_account(user_id)
         _accrue_manual_accounts(user_id, accounts)

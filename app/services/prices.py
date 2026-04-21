@@ -329,7 +329,7 @@ def _try_twelve_data(symbol: str):
 
             # quote endpoint usually returns "close"; some plans/markets expose "price".
             raw_price = data.get("price") or data.get("close")
-            if raw_price is not None:
+            if raw_price is not None and float(raw_price) > 0:
                 _TWELVE_SYMBOL_CACHE[symbol] = td_symbol
                 res = {
                     "price": round(float(raw_price), 4),
@@ -561,14 +561,16 @@ def fetch_price(ticker: str):
 
     # ── Phase 0: prefer known alias up-front ────
     alias = TICKER_ALIASES.get(ticker)
+    _seen = set()
     symbols_to_try = []
-    if alias:
-        symbols_to_try.append(alias)
-    symbols_to_try.append(ticker)
-    if not ticker.endswith(".L"):
-        symbols_to_try.append(ticker + ".L")
+    for s in ([alias] if alias else []) + [ticker] + ([] if ticker.endswith(".L") else [ticker + ".L"]):
+        if s and s not in _seen:
+            _seen.add(s)
+            symbols_to_try.append(s)
 
     # ── Phase 1: Direct HTTP APIs (Reliable & Live) ────────────────────────
+    _chart_fallback = None  # best non-LSE Source A result seen so far
+
     for sym in symbols_to_try:
         # Try Twelve Data (Source C) first if API key is configured
         res = _try_twelve_data(sym)
@@ -592,12 +594,17 @@ def fetch_price(ticker: str):
             res["yf_symbol"] = sym
             res["source"] = "yahoo_chart"
             logger.info(f"Fetched {sym} via Source A (chart): {res['price']} {res['currency']}")
-            # Prefer LSE version for GBP-priced instruments if multiple results exist
+            # Prefer LSE / GBP-priced result; return immediately
             if sym.endswith(".L") or res.get("currency") in ("GBP", "GBp"):
                 return res
-            # If we have a non-LSE result, keep it but keep looking for an LSE one
-            if not any(s.endswith(".L") for s in symbols_to_try[symbols_to_try.index(sym)+1:]):
-                return res
+            # Non-LSE result — save as fallback and keep looking for a .L version
+            if _chart_fallback is None:
+                _chart_fallback = res
+
+    # If Phase 1 found a non-LSE chart result but no .L version, use it
+    if _chart_fallback:
+        logger.info(f"Using Source A non-LSE fallback: {_chart_fallback['yf_symbol']} {_chart_fallback['price']} {_chart_fallback['currency']}")
+        return _chart_fallback
 
     # ── Phase 2: yfinance (Fallback) ─────────────────────────────────────
     for sym in symbols_to_try:
