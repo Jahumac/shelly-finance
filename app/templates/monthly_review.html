@@ -150,12 +150,33 @@
   {% if contribution_items %}
     <div class="simple-list">
       {% for item in contribution_items %}
-        <div class="simple-list-item">
-          <div>
-            <strong>{{ item.account_name }}</strong>
-            <p>{{ item.provider or '—' }} · {{ item.wrapper_type or 'Account' }}</p>
+        {% set is_skipped = item.account_id in skipped_account_ids %}
+        <div class="contribution-check-row simple-list-item{% if item.contribution_confirmed %} contribution-confirmed{% endif %}"
+             data-item-id="{{ item.id }}"
+             data-account-id="{{ item.account_id }}">
+          <div style="display:flex;align-items:center;gap:0.6rem;flex:1;min-width:0;">
+            {% if review.status != 'complete' and not is_skipped %}
+            <input type="checkbox" class="contribution-cb"
+                   {% if item.contribution_confirmed %}checked{% endif %}
+                   title="Mark as confirmed"
+                   style="flex-shrink:0;width:1.1rem;height:1.1rem;cursor:pointer;">
+            {% endif %}
+            <div style="min-width:0;">
+              <strong>{{ item.account_name }}</strong>
+              {% if is_skipped %}<span class="budget-pill" style="margin-left:0.4rem;">skipped</span>{% endif %}
+              <p>{{ item.provider or '—' }} · {{ item.wrapper_type or 'Account' }}</p>
+            </div>
           </div>
-          <div><strong>£{{ '{:,.2f}'.format(item.expected_contribution) }}</strong></div>
+          <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
+            <strong>£{{ '{:,.2f}'.format(item.expected_contribution) }}</strong>
+            {% if review.status != 'complete' %}
+              {% if is_skipped %}
+                <button type="button" class="badge badge-meta contribution-restore-btn">Restore</button>
+              {% else %}
+                <button type="button" class="badge badge-sm contribution-skip-btn">Skip</button>
+              {% endif %}
+            {% endif %}
+          </div>
         </div>
       {% endfor %}
     </div>

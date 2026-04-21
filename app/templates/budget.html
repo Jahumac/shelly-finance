@@ -67,7 +67,7 @@
       <form method="post" action="/budget/import" enctype="multipart/form-data" id="import-form" style="display:none">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="month" value="{{ month_key }}">
-        <input type="file" name="file" accept=".xlsx,.xls" onchange="this.form.submit()">
+        <input type="file" name="file" accept=".xlsx,.xls" id="budget-import-file">
       </form>
     </label>
   </div>

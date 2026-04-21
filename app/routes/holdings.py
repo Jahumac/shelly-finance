@@ -1,4 +1,4 @@
-"""Holdings blueprint — API-only routes (page removed; see accounts for add-holding flow)."""
+"""Holdings blueprint — instruments catalogue page + API routes."""
 from flask import Blueprint, jsonify, request, current_app, flash, redirect, url_for, render_template
 from flask_login import current_user, login_required
 
@@ -6,21 +6,134 @@ from datetime import datetime, timezone
 
 from app.calculations import effective_account_value
 from app.models import (
+    add_holding,
+    add_holding_catalogue_item,
+    delete_holding_catalogue_item,
     fetch_all_accounts,
     fetch_catalogue_holding,
     fetch_first_position_for_catalogue_holding,
     fetch_holding_catalogue,
     fetch_holding_totals_by_account,
+    fetch_instruments_in_use,
+    fetch_or_create_monthly_review,
+    mark_review_item_updated,
     save_account_daily_snapshots,
     save_daily_snapshot,
     sync_holding_prices_from_catalogue,
     update_catalogue_price,
     update_holding,
+    update_holding_catalogue_item,
 )
-from app.services.prices import fetch_price, fetch_history, lookup_instrument, to_gbp
+from app.services.prices import fetch_price, fetch_history, lookup_instrument, to_gbp, YFINANCE_AVAILABLE
 from app.services.scheduler import trigger_manual_update
 
 holdings_bp = Blueprint("holdings", __name__)
+
+ASSET_TYPE_OPTIONS = ["ETF", "Fund", "Share", "Pension Fund", "Cash", "Bond", "Other"]
+BUCKET_OPTIONS = ["Global Equity", "UK Equity", "US Equity", "Bonds", "Property", "Cash", "Commodities", "Other"]
+
+
+@holdings_bp.route("/", methods=["GET", "POST"])
+@login_required
+def holdings_list():
+    """Instruments catalogue list and search page."""
+    uid = current_user.id
+
+    if request.method == "POST":
+        form_name = request.form.get("form_name", "")
+
+        if form_name == "catalogue":
+            name = request.form.get("catalogue_holding_name", "").strip()
+            ticker = request.form.get("catalogue_ticker", "").strip()
+            asset_type = request.form.get("catalogue_asset_type", "ETF")
+            bucket = request.form.get("catalogue_bucket", "Global Equity")
+            notes = request.form.get("catalogue_notes", "")
+            cat_id = request.form.get("catalogue_id", "").strip()
+            if name:
+                if cat_id:
+                    update_holding_catalogue_item({
+                        "id": int(cat_id), "holding_name": name, "ticker": ticker,
+                        "asset_type": asset_type, "bucket": bucket, "notes": notes,
+                    })
+                    flash(f"{name} updated.", "success")
+                    return redirect(f"/holdings/{cat_id}")
+                else:
+                    new_id = add_holding_catalogue_item({
+                        "holding_name": name, "ticker": ticker,
+                        "asset_type": asset_type, "bucket": bucket, "notes": notes,
+                    }, uid)
+                    flash(f"{name} saved to instruments.", "success")
+                    return redirect(f"/holdings/{new_id}")
+
+        elif form_name == "delete_catalogue_holding":
+            cat_id = request.form.get("catalogue_id", "").strip()
+            if cat_id:
+                item = fetch_catalogue_holding(int(cat_id))
+                if item and item.get("user_id") == uid:
+                    delete_holding_catalogue_item(int(cat_id))
+                    flash("Instrument removed.", "success")
+            return redirect("/holdings/")
+
+        elif form_name == "refresh_all":
+            trigger_manual_update(current_app, uid)
+            flash("Price refresh triggered.", "success")
+
+        return redirect("/holdings/")
+
+    instruments = fetch_instruments_in_use(uid)
+    all_accounts = fetch_all_accounts(uid)
+    return render_template(
+        "holdings.html",
+        instruments_in_use=instruments,
+        all_accounts=all_accounts,
+        selected=None,
+        asset_type_options=ASSET_TYPE_OPTIONS,
+        bucket_options=BUCKET_OPTIONS,
+        yfinance_available=YFINANCE_AVAILABLE,
+        active_page="accounts",
+    )
+
+
+@holdings_bp.route("/<int:catalogue_id>/add-to-account", methods=["POST"])
+@login_required
+def add_to_account(catalogue_id):
+    """Add a catalogue instrument to a specific account."""
+    uid = current_user.id
+    item = fetch_catalogue_holding(catalogue_id)
+    if not item or item.get("user_id") != uid:
+        flash("Instrument not found.", "error")
+        return redirect("/holdings/")
+
+    account_id = request.form.get("account_id", type=int)
+    units = request.form.get("units", type=float) or 0.0
+    price_input = (request.form.get("price") or "").strip()
+    notes = request.form.get("notes", "")
+
+    if not account_id or units <= 0:
+        flash("Please select an account and enter a valid unit count.", "error")
+        return redirect(f"/holdings/{catalogue_id}")
+
+    last_price = float(item.get("last_price") or 0)
+    currency = item.get("price_currency") or "GBP"
+    catalogue_price_gbp = last_price / 100 if currency == "GBp" else last_price
+
+    price = float(price_input) if price_input else catalogue_price_gbp
+    value = units * price
+
+    add_holding({
+        "account_id": account_id,
+        "holding_catalogue_id": catalogue_id,
+        "holding_name": item["holding_name"],
+        "ticker": item.get("ticker") or "",
+        "asset_type": item.get("asset_type") or "",
+        "bucket": item.get("bucket") or "",
+        "value": value,
+        "units": units,
+        "price": price,
+        "notes": notes,
+    })
+    flash(f"{item['holding_name']} added to account.", "success")
+    return redirect(f"/accounts/{account_id}")
 
 
 @holdings_bp.route("/<int:catalogue_id>")
@@ -175,6 +288,17 @@ def api_save_price():
             save_account_daily_snapshots(uid, acct_vals)
         except Exception as e:
             current_app.logger.warning("Failed to update catalogue price or snapshot: %s", e)
+
+    # Mark the monthly review item as updated so the review progress is accurate
+    month_key = (data.get("month_key") or "").strip()
+    account_id = data.get("account_id")
+    if month_key and account_id:
+        try:
+            uid = current_user.id
+            review = fetch_or_create_monthly_review(month_key, uid)
+            mark_review_item_updated(review["id"], int(account_id), "holdings_updated")
+        except Exception as e:
+            current_app.logger.warning("Failed to mark review item updated: %s", e)
 
     return jsonify({"ok": True, "value": round(units * price, 2)})
 

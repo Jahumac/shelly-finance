@@ -115,6 +115,11 @@
 
   /* ── Initialization Registry ──────────────────────────────────────── */
   document.addEventListener('DOMContentLoaded', function () {
+    // 0. Flash dismiss buttons (CSP-safe — replaces onclick attribute)
+    document.querySelectorAll('.flash-dismiss').forEach(function(btn) {
+      btn.addEventListener('click', function() { btn.parentElement.remove(); });
+    });
+
     // 1. All [data-confirm] elements
     document.querySelectorAll('[data-confirm]').forEach(function (el) {
       el.addEventListener('click', function (e) {
@@ -399,6 +404,14 @@
         });
       }
 
+      // File import auto-submit (CSP-safe — replaces onchange attribute on file input)
+      var importFileInput = document.getElementById('budget-import-file');
+      if (importFileInput) {
+        importFileInput.addEventListener('change', function() {
+          this.closest('form').submit();
+        });
+      }
+
       document.querySelectorAll('.budget-amount-input').forEach(function(input) {
         var debounceTimer = null;
         var ind = document.getElementById('ind-' + input.dataset.itemId);
@@ -496,6 +509,7 @@
         function buildPayload(price, meta) {
           meta = meta || {};
           return {
+            month_key: MONTH_KEY,
             holding_id: (form.querySelector('[name="holding_id"]') || {}).value,
             account_id: (form.querySelector('[name="account_id"]') || {}).value,
             holding_catalogue_id: (form.querySelector('[name="holding_catalogue_id"]') || {}).value || null,
@@ -908,36 +922,6 @@
 
       if (zeroBalance) zeroBalance.addEventListener('input', calcZero);
       if (zeroMonths)  zeroMonths.addEventListener('input', calcZero);
-    })();
-
-    // 14. Goal Cancel Confirmation
-    (function initGoalCancel() {
-      var cancelBtn = document.getElementById('goal-cancel-btn');
-      if (!cancelBtn) return;
-      var form = cancelBtn.closest('form');
-      if (!form) return;
-      var original = new FormData(form);
-      function isDirty() {
-        var current = new FormData(form);
-        for (var pair of current.entries()) {
-          if (original.get(pair[0]) !== pair[1]) return true;
-        }
-        return false;
-      }
-      cancelBtn.addEventListener('click', async function (e) {
-        if (isDirty()) {
-          e.preventDefault();
-          var ok = await window.shellyConfirm({
-            title: 'Discard changes?',
-            message: 'You have unsaved changes. Discard them?',
-            confirmText: 'Yes, discard',
-            cancelText: 'Keep editing'
-          });
-          if (ok) {
-            window.location.href = cancelBtn.getAttribute('href');
-          }
-        }
-      });
     })();
 
     // 15. Settings Logic
@@ -1605,7 +1589,7 @@
           if (!tagName) return;
           var fd = new FormData();
           fd.append('tag', tagName);
-          fetch('/accounts/api/tags/add', { method: 'POST', body: fd })
+          fetch('/accounts/api/tags', { method: 'POST', body: fd })
             .then(r => r.json())
             .then(data => { if (data.ok) window.location.reload(); });
         });
@@ -1776,109 +1760,6 @@
       }
       btn.addEventListener('click', doSearch);
       input.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
-    })();
-
-    // 20. Debt Payoff Logic
-    (function initDebtPayoff() {
-      function monthsToPayoff(balance, payment, apr) {
-        if (balance <= 0) return 0;
-        if (payment <= 0) return null;
-        var r = apr / 100 / 12;
-        if (r === 0) return Math.ceil(balance / payment);
-        if (payment <= balance * r) return null;
-        return Math.ceil(-Math.log(1 - balance * r / payment) / Math.log(1 + r));
-      }
-
-      function totalInterest(balance, payment, apr, months) {
-        if (apr === 0) return 0;
-        if (months === null) return null;
-        return Math.max(payment * months - balance, 0);
-      }
-
-      function addMonths(months) {
-        var d = new Date();
-        d.setMonth(d.getMonth() + months);
-        return d.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
-      }
-
-      function fmt(v) { return '£' + Math.round(v).toLocaleString('en-GB'); }
-
-      /* Quick-fill buttons */
-      document.querySelectorAll('.debt-quick-btn').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          var input = document.getElementById(btn.dataset.target);
-          if (input) {
-            input.value = parseFloat(btn.dataset.amount) || '';
-            input.dispatchEvent(new Event('input'));
-          }
-        });
-      });
-
-      /* Live what-if calculator */
-      document.querySelectorAll('.debt-whatif-input').forEach(function (input) {
-        input.addEventListener('input', function () {
-          var id = input.id.replace('extra-', '');
-          var balance      = parseFloat(input.dataset.balance)   || 0;
-          var payment      = parseFloat(input.dataset.payment)   || 0;
-          var apr          = parseFloat(input.dataset.apr)       || 0;
-          var origMonths   = parseInt(input.dataset.months)      || 0;
-          var origInterest = parseFloat(input.dataset.interest)  || 0;
-          var extra        = parseFloat(input.value)             || 0;
-          var result       = document.getElementById('result-' + id);
-
-          if (extra <= 0) { if (result) result.style.display = 'none'; return; }
-
-          var newPayment  = payment + extra;
-          var newMonths   = monthsToPayoff(balance, newPayment, apr);
-          var newInterest = newMonths !== null ? totalInterest(balance, newPayment, apr, newMonths) : null;
-
-          if (result) result.style.display = '';
-
-          var monthsSaved = newMonths !== null ? Math.max(origMonths - newMonths, 0) : null;
-          var intSaved    = (newInterest !== null) ? Math.max(origInterest - newInterest, 0) : null;
-
-          var dateEl   = document.getElementById('wi-date-' + id);
-          var mSavedEl = document.getElementById('wi-months-saved-' + id);
-          var iSavedEl = document.getElementById('wi-int-saved-' + id);
-          var iNewEl   = document.getElementById('wi-int-new-' + id);
-
-          if (dateEl)   dateEl.textContent   = newMonths !== null ? addMonths(newMonths) : 'Cannot pay off';
-          if (mSavedEl) mSavedEl.textContent = monthsSaved !== null ? monthsSaved + ' month' + (monthsSaved === 1 ? '' : 's') : '—';
-          if (iSavedEl) iSavedEl.textContent = intSaved !== null ? fmt(intSaved) : '—';
-          if (iNewEl)   iNewEl.textContent   = newInterest !== null ? fmt(newInterest) : '—';
-        });
-      });
-
-      /* Show all schedule rows */
-      var showAllBtn = document.getElementById('sched-show-all');
-      if (showAllBtn) {
-        showAllBtn.addEventListener('click', function () {
-          document.querySelectorAll('.sched-extra').forEach(function (r) { r.style.display = ''; });
-          showAllBtn.style.display = 'none';
-        });
-      }
-
-      /* 0% deal calculator */
-      var zeroBalance = document.getElementById('zero-balance');
-      var zeroMonths  = document.getElementById('zero-months');
-      var zeroResult  = document.getElementById('zero-result');
-      var zeroMonthly = document.getElementById('zero-monthly');
-      var zeroNote    = document.getElementById('zero-note');
-      var zeroFill    = document.getElementById('zero-fill-payment');
-
-      function calcZero() {
-        if (!zeroBalance || !zeroMonths) return;
-        var bal = parseFloat(zeroBalance.value) || 0;
-        var mos = parseInt(zeroMonths.value)    || 0;
-        if (bal <= 0 || mos <= 0) { if (zeroResult) zeroResult.style.display = 'none'; return; }
-        var monthly = bal / mos;
-        if (zeroMonthly) zeroMonthly.textContent = '£' + monthly.toLocaleString('en-GB', {minimumFractionDigits:2, maximumFractionDigits:2});
-        if (zeroNote) zeroNote.textContent = '(£' + bal.toLocaleString('en-GB', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' ÷ ' + mos + ' months)';
-        if (zeroResult) zeroResult.style.display = '';
-        if (zeroFill) zeroFill.dataset.amount = monthly.toFixed(2);
-      }
-      if (zeroBalance) zeroBalance.addEventListener('input', calcZero);
-      if (zeroMonths)  zeroMonths.addEventListener('input',  calcZero);
     })();
 
     // 21. Goals Dirty Checking
