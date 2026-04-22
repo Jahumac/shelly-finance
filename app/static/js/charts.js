@@ -125,26 +125,48 @@
       var values = rawData.map(function(d) { return d.price; });
       var ctx = canvas.getContext('2d');
 
+      var benchmarkRaw = canvas.dataset.benchmark ? JSON.parse(canvas.dataset.benchmark) : null;
+      var benchmarkValues = benchmarkRaw ? benchmarkRaw.map(function(d) { return d.price; }) : null;
+
       if (typeof window.Chart === 'function') {
         var gradient = ctx.createLinearGradient(0, 0, 0, canvas.height || 220);
         gradient.addColorStop(0, c.accent + '33');
         gradient.addColorStop(1, c.accent + '00');
 
+        var datasets = [{
+          label: 'Price',
+          data: values,
+          borderColor: c.accent,
+          backgroundColor: gradient,
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          pointBackgroundColor: c.accent,
+          fill: true,
+          tension: 0.2
+        }];
+
+        if (benchmarkValues) {
+          datasets.push({
+            label: 'Benchmark',
+            data: benchmarkValues,
+            borderColor: 'rgba(251,191,36,0.7)',
+            backgroundColor: 'transparent',
+            borderWidth: 1.5,
+            borderDash: [5, 4],
+            pointRadius: 0,
+            pointHoverRadius: 3,
+            pointBackgroundColor: 'rgba(251,191,36,0.7)',
+            fill: false,
+            tension: 0.2
+          });
+        }
+
         new Chart(ctx, {
           type: 'line',
           data: {
             labels: labels,
-            datasets: [{
-              data: values,
-              borderColor: c.accent,
-              backgroundColor: gradient,
-              borderWidth: 2,
-              pointRadius: 0,
-              pointHoverRadius: 4,
-              pointBackgroundColor: c.accent,
-              fill: true,
-              tension: 0.2
-            }]
+            datasets: datasets
           },
           options: lineOptions({
             tooltip: { intersect: false, mode: 'index' },

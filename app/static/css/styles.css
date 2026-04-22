@@ -1920,6 +1920,30 @@ button.badge-like-button {
   color: var(--error);
 }
 
+.holding-perf-strip {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.holding-perf-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 120px;
+}
+
+.holding-perf-stat span {
+  font-size: 0.78rem;
+}
+
+.holding-perf-stat strong {
+  font-size: 1.05rem;
+}
+
 .perf-legend {
   display: flex;
   align-items: center;

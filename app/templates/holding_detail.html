@@ -70,10 +70,40 @@
       <a class="badge {% if history_period == '1y' %}badge-primary-action{% else %}badge-meta{% endif %}" href="/holdings/{{ item.id }}?period=1y">1Y</a>
     </div>
   </div>
-  
-  <div class="chart-wrap mt-1">
-    <canvas id="historyChart" role="img" aria-label="Holding price history chart" data-history='{{ history_data | tojson | safe }}'></canvas>
+
+  {% if perf_stats %}
+  <div class="holding-perf-strip mt-1">
+    <div class="holding-perf-stat">
+      <span class="text-muted">{{ perf_stats.period_label | capitalize }} return</span>
+      <strong class="{% if perf_stats.actual_pct >= 0 %}perf-positive{% else %}perf-negative{% endif %}">
+        {{ '{:+.2f}'.format(perf_stats.actual_pct) }}%
+      </strong>
+    </div>
+    <div class="holding-perf-stat">
+      <span class="text-muted">Benchmark ({{ perf_stats.benchmark_rate | int }}% p.a.)</span>
+      <strong>{{ '{:+.2f}'.format(perf_stats.benchmark_pct) }}%</strong>
+    </div>
+    <div class="holding-perf-stat">
+      <span class="text-muted">vs benchmark</span>
+      <strong class="{% if perf_stats.vs_pct >= 0 %}perf-positive{% else %}perf-negative{% endif %}">
+        {{ '{:+.2f}'.format(perf_stats.vs_pct) }}%
+        {% if perf_stats.vs_pct >= 0 %}▲{% else %}▼{% endif %}
+      </strong>
+    </div>
   </div>
+  {% endif %}
+
+  <div class="chart-wrap mt-1">
+    <canvas id="historyChart" role="img" aria-label="Holding price history chart"
+            data-history='{{ history_data | tojson | safe }}'
+            {% if benchmark_data %}data-benchmark='{{ benchmark_data | tojson | safe }}'{% endif %}></canvas>
+  </div>
+  {% if benchmark_data %}
+  <p class="helper-text mt-05">
+    Dashed line shows {{ perf_stats.benchmark_rate | int }}% p.a. benchmark growth from the same starting price.
+    {% if perf_stats.vs_pct >= 0 %}This fund is <strong class="perf-positive">ahead</strong> of the benchmark over this period.{% else %}This fund is <strong class="perf-negative">behind</strong> the benchmark over this period.{% endif %}
+  </p>
+  {% endif %}
   <p id="history-chart-error" class="helper-text mt-05" style="display:none;"></p>
 </section>
 {% else %}

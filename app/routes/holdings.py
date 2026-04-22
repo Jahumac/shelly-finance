@@ -2,7 +2,7 @@
 from flask import Blueprint, jsonify, request, current_app, flash, redirect, url_for, render_template
 from flask_login import current_user, login_required
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date as date_type
 
 from app.calculations import effective_account_value
 from app.models import (
@@ -10,6 +10,7 @@ from app.models import (
     add_holding_catalogue_item,
     delete_holding_catalogue_item,
     fetch_all_accounts,
+    fetch_assumptions,
     fetch_catalogue_holding,
     fetch_first_position_for_catalogue_holding,
     fetch_holding_catalogue,
@@ -173,13 +174,68 @@ def holding_detail(catalogue_id):
             holding_id=int(first_pos["holding_id"]),
             mode="view",
         ) + "#holdings-section"
-    
+
+    # ── Benchmark comparison ─────────────────────────────────────────────────
+    # Compare price performance over the selected period against the user's
+    # benchmark rate (from assumptions, default 7% p.a.).
+    # Only meaningful for multi-day periods with ≥2 price points.
+    perf_stats = None
+    benchmark_data = None
+    if history_data and len(history_data) >= 2 and period != "1d":
+        try:
+            assumptions = fetch_assumptions(current_user.id)
+            raw_rate = (assumptions.get("benchmark_rate") if assumptions else None)
+            benchmark_rate = float(raw_rate) if raw_rate else 7.0  # % p.a.
+
+            first_price = float(history_data[0]["price"])
+            last_price = float(history_data[-1]["price"])
+
+            # Parse first and last dates to get elapsed days
+            first_label = history_data[0]["date"]
+            last_label = history_data[-1]["date"]
+            try:
+                d0 = date_type.fromisoformat(first_label)
+                d1 = date_type.fromisoformat(last_label)
+                days_elapsed = max((d1 - d0).days, 1)
+            except ValueError:
+                days_elapsed = None
+
+            if first_price > 0 and days_elapsed:
+                actual_pct = (last_price / first_price - 1) * 100
+                rate_decimal = benchmark_rate / 100
+                benchmark_pct = ((1 + rate_decimal) ** (days_elapsed / 365) - 1) * 100
+                vs_pct = actual_pct - benchmark_pct
+
+                perf_stats = {
+                    "actual_pct": round(actual_pct, 2),
+                    "benchmark_pct": round(benchmark_pct, 2),
+                    "vs_pct": round(vs_pct, 2),
+                    "benchmark_rate": benchmark_rate,
+                    "period_label": {"1m": "1 month", "6m": "6 months", "1y": "1 year"}.get(period, period),
+                    "days": days_elapsed,
+                }
+
+                # Build normalised benchmark price series (starts at same price as fund)
+                benchmark_data = []
+                for entry in history_data:
+                    try:
+                        d = date_type.fromisoformat(entry["date"])
+                        days_from_start = max((d - d0).days, 0)
+                        bench_price = first_price * ((1 + rate_decimal) ** (days_from_start / 365))
+                        benchmark_data.append({"date": entry["date"], "price": round(bench_price, 4)})
+                    except ValueError:
+                        pass
+        except Exception:
+            pass  # benchmark is optional — never crash the page over it
+
     return render_template(
         "holding_detail.html",
         item=item,
         history_data=history_data,
         history_period=period,
         view_in_account_url=view_in_account_url,
+        perf_stats=perf_stats,
+        benchmark_data=benchmark_data,
     )
 
 
