@@ -437,6 +437,24 @@
           }, 600);
         });
       });
+
+      // Sync hero stats immediately on load (server-rendered values may differ
+      // from JS calculation in edge cases like inherited/overridden months)
+      recalcSummary();
+
+      // Prev/next month navigation arrows
+      var prevMonthBtn = document.getElementById('prev-month');
+      var nextMonthBtn = document.getElementById('next-month');
+      function shiftMonth(key, delta) {
+        var parts = key.split('-');
+        var y = parseInt(parts[0]);
+        var m = parseInt(parts[1]) + delta;
+        if (m < 1)  { m = 12; y--; }
+        if (m > 12) { m = 1;  y++; }
+        window.location.href = '/budget/?month=' + y + '-' + (m < 10 ? '0' + m : m);
+      }
+      if (prevMonthBtn) prevMonthBtn.addEventListener('click', function() { shiftMonth(MONTH, -1); });
+      if (nextMonthBtn) nextMonthBtn.addEventListener('click', function() { shiftMonth(MONTH, 1); });
     })();
 
     // 12. Monthly Review Logic
