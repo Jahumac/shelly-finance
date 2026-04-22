@@ -2776,6 +2776,43 @@ button.badge-like-button {
   }
 }
 
+/* ── Monthly review hero: mobile layout ────────────────────────────────── */
+@media (max-width: 600px) {
+  .review-hero-card .hero-top {
+    position: relative;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  /* Turtle stays pinned top-right, out of document flow */
+  .review-hero-card .hero-turtle-wrap {
+    position: absolute;
+    top: 0;
+    right: 0;
+    margin-left: 0;
+  }
+
+  /* Title block: pad right so text doesn't run under the turtle */
+  .review-hero-card .hero-top > div:first-child {
+    padding-right: 70px;
+  }
+
+  /* Actions bar: button on left, month nav on right, same row */
+  .review-hero-card .hero-actions-col {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* Subtitle: don't let it get too large on mobile */
+  .review-hero-card .hero-subtitle {
+    font-size: 0.82rem;
+  }
+}
+
 /* ── Auth pages ──────────────────────────────────────────────────────────── */
 
 /* Full-page wrapper — centers the card */
