@@ -343,6 +343,21 @@ body.is-back-online .site-header {
   font-size: 0.86rem;
 }
 
+.goal-projection {
+  margin: 0.4rem 0 0;
+  font-size: 0.82rem;
+  color: var(--accent);
+}
+
+.goal-projection-reached {
+  color: var(--accent-2);
+}
+
+.goal-projection-none,
+.goal-projection-long {
+  color: var(--muted);
+}
+
 .goal-row {
   padding: 0.6rem 0;
 }
