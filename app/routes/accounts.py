@@ -3,7 +3,16 @@ from datetime import date, datetime, timezone
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from app.calculations import contribution_breakdown, effective_account_value, to_float
+from app.calculations import (
+    ISA_WRAPPER_TYPES,
+    contribution_breakdown,
+    effective_account_value,
+    is_pension_account,
+    to_float,
+    uk_tax_year_end,
+    uk_tax_year_label,
+    uk_tax_year_start,
+)
 from app.models import (
     CATEGORY_OPTIONS,
     DEFAULT_TAG_OPTIONS,
@@ -26,6 +35,8 @@ from app.models import (
     fetch_holding_totals_by_account,
     fetch_holdings_for_account,
     fetch_account_snapshot_history,
+    fetch_isa_contributions,
+    fetch_pension_contributions,
     fetch_user_tags,
     reconnect_holdings_to_catalogue,
     sync_holding_prices_from_catalogue,
@@ -93,6 +104,19 @@ def _render_accounts_page(user_id, selected=None, detail_mode="view", position_e
     holdings_totals = fetch_holding_totals_by_account(user_id)
     effective_values = {row["id"]: effective_account_value(row, holdings_totals) for row in rows}
     contrib_breakdowns = {row["id"]: contribution_breakdown(row, assumptions) for row in rows}
+
+    # Tax-year logged contributions per account: sum of isa/pension contributions
+    # logged against each account this UK tax year. Empty for taxable (GIA) accounts.
+    today = date.today()
+    ty_start_iso = uk_tax_year_start(today).isoformat()
+    ty_end_iso = uk_tax_year_end(today).isoformat()
+    tax_year_logged = {}
+    for c in fetch_isa_contributions(user_id, ty_start_iso, ty_end_iso) or []:
+        aid = int(c["account_id"])
+        tax_year_logged[aid] = tax_year_logged.get(aid, 0.0) + float(c["amount"] or 0)
+    for c in fetch_pension_contributions(user_id, ty_start_iso, ty_end_iso) or []:
+        aid = int(c["account_id"])
+        tax_year_logged[aid] = tax_year_logged.get(aid, 0.0) + float(c["amount"] or 0)
 
     # Staleness: flag holdings-based accounts if prices > 7 days old
     prices_stale = False
@@ -177,6 +201,8 @@ def _render_accounts_page(user_id, selected=None, detail_mode="view", position_e
         allocation_total=allocation_total,
         overrides=overrides,
         current_month_key=date.today().strftime("%Y-%m"),
+        tax_year_logged=tax_year_logged,
+        tax_year_label=uk_tax_year_label(today),
         catalogue_prices=catalogue_prices,
         edit_holding=edit_holding,
         tax_band=assumptions["tax_band"] if assumptions and "tax_band" in assumptions else "basic",

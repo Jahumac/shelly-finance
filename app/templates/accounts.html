@@ -324,6 +324,18 @@
           <strong>£{{ '{:,.2f}'.format(selected.monthly_contribution or 0) }}</strong>
           {% endif %}
         </div>
+        {% set _ty_logged = tax_year_logged.get(selected.id, 0) if tax_year_logged else 0 %}
+        {% set _wt_selected = (selected.wrapper_type or '') %}
+        {% set _is_tax_advantaged = _wt_selected in ['Stocks & Shares ISA', 'Cash ISA', 'Lifetime ISA', 'SIPP', 'Personal Pension', 'Workplace Pension'] %}
+        {% if _is_tax_advantaged %}
+        <div class="acct-detail-stat" title="Extra contributions you've logged to this account this UK tax year, on top of the regular monthly amount">
+          <span>Logged {{ tax_year_label }}</span>
+          <strong>£{{ '{:,.2f}'.format(_ty_logged) }}</strong>
+          {% if _ty_logged == 0 %}
+          <small class="text-muted block mt-025"><a href="/allowance/" class="link-accent">Log a top-up →</a></small>
+          {% endif %}
+        </div>
+        {% endif %}
         <div class="acct-detail-stat">
           <span>Growth rate</span>
           <strong>
