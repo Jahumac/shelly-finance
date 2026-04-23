@@ -56,7 +56,7 @@ def _sync_linked_override(item_id, month_key, amount, user_id):
     item = fetch_budget_item(item_id, user_id)
     if not item:
         return
-    linked = item.get("linked_account_id") if hasattr(item, "get") else item["linked_account_id"]
+    linked = item.get("linked_account_id")
     if not linked:
         return
     upsert_single_month_contribution_override(
@@ -101,7 +101,6 @@ def _build_monthly_data(month_key, user_id):
             else:
                 amount = float(item["default_amount"] or 0)
             # Track whether amount came from the current month or was inherited
-            source = "current"
             if item["id"] in entry_map:
                 source = "current"
             elif item["id"] in prior_entry_map:
