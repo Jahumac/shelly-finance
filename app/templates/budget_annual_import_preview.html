@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% block title %}Preview annual import · Shelly{% endblock %}
+{% block content %}
+
+<nav class="subnav subnav-budget">
+  <a href="/budget/" class="subnav-active">Budget Plan</a>
+  <a href="/monthly-review/">Monthly Update</a>
+  <a href="/allowance/">Allowances</a>
+  <a href="/budget/trend/">Trend</a>
+  <a href="/budget/debts/">Debts</a>
+</nav>
+
+<section class="card highlight mb-1">
+  <div class="hero-top">
+    <div>
+      <p class="eyebrow">Annual Import</p>
+      <h2 class="hero-value">Preview changes</h2>
+      <p class="hero-subtitle">
+        {{ total_changes }} change{{ 's' if total_changes != 1 else '' }} across
+        {{ diff.months | length }} month{{ 's' if diff.months | length != 1 else '' }}.
+        Review below, then confirm to apply. Nothing has been saved yet.
+      </p>
+    </div>
+  </div>
+</section>
+
+<div class="row-end mb-1">
+  <form method="post" action="/budget/annual-import/confirm" class="inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="badge badge-primary-action">Apply {{ total_changes }} change{{ 's' if total_changes != 1 else '' }}</button>
+  </form>
+  <form method="post" action="/budget/annual-import/cancel" class="inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="badge">Cancel</button>
+  </form>
+</div>
+
+{% if diff.unrecognised_sheets %}
+<section class="card alert-banner alert-info mb-1">
+  <p class="m-0"><strong>Ignored sheets:</strong> {{ diff.unrecognised_sheets | join(', ') }} — only tabs named like "Apr 2026" are read. Summary and Investment Tracking are always skipped.</p>
+</section>
+{% endif %}
+
+{% for m in diff.months %}
+<section class="panel mb-1">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">{{ m.month_label }}</p>
+      <h3>{{ m.changes | length }} change{{ 's' if m.changes | length != 1 else '' }}</h3>
+    </div>
+    {% if m.unchanged_count %}
+    <small class="text-muted">{{ m.unchanged_count }} unchanged row{{ 's' if m.unchanged_count != 1 else '' }} skipped</small>
+    {% endif %}
+  </div>
+
+  {% if m.changes %}
+  <table class="mini-table">
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th>Section</th>
+        <th class="text-right">Current</th>
+        <th class="text-right">Proposed</th>
+        <th class="text-right">Δ</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in m.changes %}
+      {% set delta = c.new - c.old %}
+      <tr>
+        <td>
+          {{ c.item_name }}
+          {% if c.linked %}<span class="budget-pill" title="Linked to an account — this will also update the account's contribution override for this month">linked</span>{% endif %}
+        </td>
+        <td>{{ c.section }}</td>
+        <td class="text-right">
+          £{{ '{:,.2f}'.format(c.old) }}
+          {% if not c.old_is_entry %}<small class="text-muted">(default)</small>{% endif %}
+        </td>
+        <td class="text-right"><strong>£{{ '{:,.2f}'.format(c.new) }}</strong></td>
+        <td class="text-right {% if delta > 0 %}text-success{% elif delta < 0 %}text-danger{% endif %}">
+          {% if delta > 0 %}+{% endif %}£{{ '{:,.2f}'.format(delta) }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if diff.unknown_items_by_month.get(m.month_key) %}
+  <p class="helper-text mt-075">
+    <strong>Skipped (no matching budget item):</strong>
+    {{ diff.unknown_items_by_month[m.month_key] | join(', ') }}.
+    Items must already exist in Edit Budget — annual import won't create them.
+  </p>
+  {% endif %}
+</section>
+{% endfor %}
+
+<div class="row-end mb-1">
+  <form method="post" action="/budget/annual-import/confirm" class="inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="badge badge-primary-action">Apply {{ total_changes }} change{{ 's' if total_changes != 1 else '' }}</button>
+  </form>
+  <form method="post" action="/budget/annual-import/cancel" class="inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit" class="badge">Cancel</button>
+  </form>
+</div>
+
+{% endblock %}

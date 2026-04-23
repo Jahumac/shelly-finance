@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from io import BytesIO
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, send_file, url_for
+from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, send_file, session, url_for
 from flask_login import current_user, login_required
 
 from app.utils import optional_float, optional_int, valid_month_key
@@ -368,55 +368,135 @@ def _sheet_name_to_month_key(sheet_name):
     return f"{year:04d}-{month:02d}"
 
 
-def _parse_annual_month_sheet(ws, month_key, uid, existing_items_by_id, existing_items_by_name):
-    """Parse an annual-export month tab (cols: item_id, name, notes, amount).
+def _read_annual_month_sheet(ws, existing_items_by_id, existing_items_by_name):
+    """Read rows off an annual-export month tab (cols: item_id, name, notes, amount).
 
-    Matches by item_id first (reliable), falls back to name+section. Unknown items
-    are skipped. Returns (items_applied, linked_sync_triggers) where the latter is
-    a list of (item_id, amount) for post-commit override sync.
+    Returns a list of (matched_item, amount) tuples for rows we understood,
+    plus a list of unmatched (name, amount) tuples for the preview so the user
+    sees what was skipped and why.
     """
-    items_applied = 0
-    linked_syncs = []
+    matched = []
+    unmatched = []
 
     for row in ws.iter_rows(min_row=4, values_only=True):
         if not row or len(row) < 4:
             continue
         id_cell, name_cell, _notes_cell, amount_cell = row[0], row[1], row[2], row[3]
 
-        # Skip section headers (row has an "Amount" literal in col D) and totals
+        # Skip section headers (col D = literal "Amount") and section-total rows.
         if isinstance(amount_cell, str):
             continue
+        # Skip fully-blank rows between sections.
+        if amount_cell is None and not isinstance(name_cell, str):
+            continue
 
-        # Item row: id_cell is an int (from the hidden column A)
         matched_item = None
         if isinstance(id_cell, int) and id_cell in existing_items_by_id:
             matched_item = existing_items_by_id[id_cell]
         elif isinstance(name_cell, str):
             matched_item = existing_items_by_name.get(name_cell.strip().lower())
 
-        if not matched_item:
-            continue
-
         try:
             amount = float(amount_cell) if amount_cell is not None else 0.0
         except (TypeError, ValueError):
             continue
 
-        upsert_budget_entry(month_key, matched_item["id"], amount, uid)
-        items_applied += 1
-        if matched_item.get("linked_account_id"):
-            linked_syncs.append((matched_item["id"], amount))
+        if matched_item:
+            matched.append((matched_item, amount))
+        elif isinstance(name_cell, str) and name_cell.strip():
+            unmatched.append((name_cell.strip(), amount))
 
-    return items_applied, linked_syncs
+    return matched, unmatched
+
+
+def _compute_annual_import_diff(wb, uid):
+    """Walk the workbook's month tabs, compare proposed amounts against current
+    DB state, and return a structured diff suitable for a preview screen and a
+    later apply pass.
+
+    Output shape:
+        {
+          "months": [
+            {
+              "month_key": "2026-07",
+              "month_label": "Jul 2026",
+              "changes": [{"item_id", "item_name", "section", "old", "new", "linked"}, ...],
+              "unchanged_count": int,
+            },
+            ...
+          ],
+          "unknown_items_by_month": {"2026-07": ["Foo", "Bar"], ...},
+          "unrecognised_sheets": ["Sheet1", ...],
+        }
+    """
+    existing_items = fetch_budget_items(uid)
+    items_by_id = {it["id"]: it for it in existing_items}
+    items_by_name = {it["name"].strip().lower(): it for it in existing_items}
+
+    months = []
+    unknown_items_by_month = {}
+    unrecognised_sheets = []
+
+    for sheet_name in wb.sheetnames:
+        if sheet_name in ("Summary", "Investment Tracking"):
+            continue
+        month_key = _sheet_name_to_month_key(sheet_name)
+        if not month_key:
+            unrecognised_sheets.append(sheet_name)
+            continue
+
+        ws = wb[sheet_name]
+        matched, unmatched = _read_annual_month_sheet(ws, items_by_id, items_by_name)
+
+        # Current DB state for this month, to build the diff
+        current_entries = fetch_budget_entries(month_key, uid)
+        current_by_item = {e["budget_item_id"]: float(e["amount"] or 0) for e in current_entries}
+
+        changes = []
+        unchanged_count = 0
+        for item, new_amount in matched:
+            old_amount = current_by_item.get(item["id"])
+            # If there's no current entry but the workbook amount equals the item's
+            # default, treat that as unchanged too — the round-trip would otherwise
+            # look noisy with every untouched carry-forward row showing up.
+            effective_old = old_amount if old_amount is not None else float(item["default_amount"] or 0)
+            if abs(effective_old - new_amount) < 0.005:
+                unchanged_count += 1
+                continue
+            changes.append({
+                "item_id": item["id"],
+                "item_name": item["name"],
+                "section": item["section"],
+                "old": effective_old,
+                "old_is_entry": old_amount is not None,
+                "new": new_amount,
+                "linked": bool(item["linked_account_id"]),
+            })
+
+        if changes or unmatched:
+            months.append({
+                "month_key": month_key,
+                "month_label": _month_label(month_key),
+                "changes": changes,
+                "unchanged_count": unchanged_count,
+            })
+        if unmatched:
+            unknown_items_by_month[month_key] = [name for name, _ in unmatched]
+
+    return {
+        "months": months,
+        "unknown_items_by_month": unknown_items_by_month,
+        "unrecognised_sheets": unrecognised_sheets,
+    }
 
 
 @budget_bp.route("/annual-import", methods=["POST"])
 @login_required
 def budget_annual_import():
-    """Upload a workbook produced by /budget/annual-export.xlsx and apply each
-    recognised month tab. Existing budget items are matched by the hidden item_id
-    column; unknown items are skipped (not auto-created — the annual import trusts
-    the export as a round-trip format)."""
+    """Stage 1 of annual upload: parse the workbook, compute a diff against current
+    budget state, and show a preview. No DB writes yet — user must confirm via the
+    /annual-import/confirm route before anything lands.
+    """
     uid = current_user.id
 
     f = request.files.get("file")
@@ -428,45 +508,83 @@ def budget_annual_import():
         from openpyxl import load_workbook
         wb = load_workbook(BytesIO(f.read()), data_only=True)
     except Exception as e:
-        from flask import current_app
         current_app.logger.warning("annual-import: could not read workbook: %s", e)
         flash("Could not read the Excel file.", "error")
         return redirect(url_for("budget.budget"))
 
-    existing_items = fetch_budget_items(uid)
-    items_by_id = {it["id"]: it for it in existing_items}
-    items_by_name = {it["name"].strip().lower(): it for it in existing_items}
+    diff = _compute_annual_import_diff(wb, uid)
 
-    total_items_applied = 0
-    months_applied = []
-    all_syncs = []
+    total_changes = sum(len(m["changes"]) for m in diff["months"])
+    if total_changes == 0:
+        flash(
+            "No changes detected — the workbook matches your current budget. Nothing to import.",
+            "info",
+        )
+        session.pop("budget_annual_import", None)
+        return redirect(url_for("budget.budget"))
 
-    for sheet_name in wb.sheetnames:
-        if sheet_name in ("Summary", "Investment Tracking"):
+    # Stash a minimal payload for the confirm step — just the fields we need
+    # to replay the writes. Keeps the session cookie small.
+    session["budget_annual_import"] = {
+        "changes": [
+            {"item_id": c["item_id"], "month_key": m["month_key"],
+             "new": c["new"], "linked": c["linked"]}
+            for m in diff["months"]
+            for c in m["changes"]
+        ],
+    }
+
+    return render_template(
+        "budget_annual_import_preview.html",
+        diff=diff,
+        total_changes=total_changes,
+        active_page="budget",
+    )
+
+
+@budget_bp.route("/annual-import/confirm", methods=["POST"])
+@login_required
+def budget_annual_import_confirm():
+    """Stage 2: apply the previously-staged diff. Re-validates ownership at each
+    write via upsert_budget_entry + _sync_linked_override."""
+    uid = current_user.id
+    staged = session.pop("budget_annual_import", None)
+    if not staged or not staged.get("changes"):
+        flash("Nothing to import — the preview expired. Upload the file again.", "info")
+        return redirect(url_for("budget.budget"))
+
+    total_written = 0
+    months_touched = set()
+    linked_syncs = []
+    for change in staged["changes"]:
+        item_id = int(change["item_id"])
+        month_key = change["month_key"]
+        if not valid_month_key(month_key):
             continue
-        month_key = _sheet_name_to_month_key(sheet_name)
-        if not month_key:
-            continue
-        ws = wb[sheet_name]
-        applied, syncs = _parse_annual_month_sheet(ws, month_key, uid, items_by_id, items_by_name)
-        if applied:
-            total_items_applied += applied
-            months_applied.append(month_key)
-        for item_id, amount in syncs:
-            all_syncs.append((item_id, month_key, amount))
+        amount = float(change["new"])
+        upsert_budget_entry(month_key, item_id, amount, uid)
+        total_written += 1
+        months_touched.add(month_key)
+        if change.get("linked"):
+            linked_syncs.append((item_id, month_key, amount))
 
-    # Trigger contribution-override sync for linked items, after all entries landed
-    for item_id, month_key, amount in all_syncs:
+    for item_id, month_key, amount in linked_syncs:
         _sync_linked_override(item_id, month_key, amount, uid)
 
-    if not months_applied:
-        flash("No month tabs matched — expected sheets named like 'Apr 2026'. Nothing imported.", "error")
-    else:
-        flash(
-            f"Imported {total_items_applied} entries across {len(months_applied)} month"
-            f"{'s' if len(months_applied) != 1 else ''}.",
-            "success",
-        )
+    flash(
+        f"Imported {total_written} entries across {len(months_touched)} month"
+        f"{'s' if len(months_touched) != 1 else ''}.",
+        "success",
+    )
+    return redirect(url_for("budget.budget"))
+
+
+@budget_bp.route("/annual-import/cancel", methods=["POST"])
+@login_required
+def budget_annual_import_cancel():
+    """Discard a staged annual-import diff."""
+    session.pop("budget_annual_import", None)
+    flash("Annual import cancelled — nothing was changed.", "info")
     return redirect(url_for("budget.budget"))
 
 
