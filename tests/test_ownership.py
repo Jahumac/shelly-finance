@@ -199,3 +199,97 @@ def test_alice_cannot_delete_bobs_budget_item_via_route(app, client, two_users):
                 (two_users["bob"]["budget"],),
             ).fetchone()
         assert row["is_active"] == 1  # still active
+
+
+# ── Budget → contribution_overrides back-sync ────────────────────────────────
+
+def test_linked_budget_edit_creates_contribution_override(app, two_users):
+    """Saving a budget entry for a linked item writes a single-month override."""
+    from app.models import get_connection, upsert_budget_entry
+    from app.routes.budget import _sync_linked_override
+
+    with app.app_context():
+        # Link Alice's budget item to her account
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE budget_items SET linked_account_id = ? WHERE id = ?",
+                (two_users["alice"]["account"], two_users["alice"]["budget"]),
+            )
+            conn.commit()
+
+        upsert_budget_entry("2026-07", two_users["alice"]["budget"], 555, two_users["alice"]["uid"])
+        _sync_linked_override(two_users["alice"]["budget"], "2026-07", 555, two_users["alice"]["uid"])
+
+        with get_connection() as conn:
+            rows = conn.execute(
+                "SELECT from_month, to_month, override_amount, reason FROM contribution_overrides WHERE account_id = ?",
+                (two_users["alice"]["account"],),
+            ).fetchall()
+        assert len(rows) == 1
+        assert rows[0]["from_month"] == "2026-07"
+        assert rows[0]["to_month"] == "2026-07"
+        assert rows[0]["override_amount"] == 555
+        assert rows[0]["reason"] == "from budget"
+
+
+def test_linked_budget_second_edit_replaces_not_duplicates(app, two_users):
+    """A follow-up edit on the same month replaces the override, not duplicates it."""
+    from app.models import get_connection
+    from app.routes.budget import _sync_linked_override
+
+    with app.app_context():
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE budget_items SET linked_account_id = ? WHERE id = ?",
+                (two_users["alice"]["account"], two_users["alice"]["budget"]),
+            )
+            conn.commit()
+
+        _sync_linked_override(two_users["alice"]["budget"], "2026-07", 400, two_users["alice"]["uid"])
+        _sync_linked_override(two_users["alice"]["budget"], "2026-07", 500, two_users["alice"]["uid"])
+
+        with get_connection() as conn:
+            rows = conn.execute(
+                "SELECT override_amount FROM contribution_overrides WHERE account_id = ?",
+                (two_users["alice"]["account"],),
+            ).fetchall()
+        assert len(rows) == 1
+        assert rows[0]["override_amount"] == 500
+
+
+def test_alice_cannot_sync_override_into_bobs_account(app, two_users):
+    """Passing Bob's budget item_id into Alice's sync call must not touch Bob's account."""
+    from app.models import get_connection
+    from app.routes.budget import _sync_linked_override
+
+    with app.app_context():
+        # Bob's budget item is linked to Bob's account
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE budget_items SET linked_account_id = ? WHERE id = ?",
+                (two_users["bob"]["account"], two_users["bob"]["budget"]),
+            )
+            conn.commit()
+
+        _sync_linked_override(two_users["bob"]["budget"], "2026-07", 9999, two_users["alice"]["uid"])
+
+        with get_connection() as conn:
+            rows = conn.execute(
+                "SELECT * FROM contribution_overrides WHERE account_id = ?",
+                (two_users["bob"]["account"],),
+            ).fetchall()
+        assert rows == []
+
+
+def test_unlinked_budget_edit_does_not_create_override(app, two_users):
+    """Items without linked_account_id don't touch contribution_overrides."""
+    from app.models import get_connection
+    from app.routes.budget import _sync_linked_override
+
+    # Alice's budget item is NOT linked (default from fixture)
+    with app.app_context():
+        _sync_linked_override(two_users["alice"]["budget"], "2026-07", 555, two_users["alice"]["uid"])
+
+        with get_connection() as conn:
+            rows = conn.execute("SELECT * FROM contribution_overrides").fetchall()
+        assert rows == []

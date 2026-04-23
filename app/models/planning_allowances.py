@@ -261,6 +261,36 @@ def remove_contribution_override_for_month(account_id, month_key, user_id):
         conn.commit()
 
 
+def upsert_single_month_contribution_override(account_id, month_key, amount, user_id, reason="from budget"):
+    """Upsert a single-month contribution override for an account.
+
+    Replaces any existing single-month override (from_month == to_month == month_key)
+    for this account. Used by the budget page to reflect per-month edits on linked
+    items straight through to projections without creating duplicates.
+
+    Verifies the account belongs to user_id — silently no-ops if not.
+    """
+    with get_connection() as conn:
+        owned = conn.execute(
+            "SELECT 1 FROM accounts WHERE id = ? AND user_id = ?",
+            (account_id, user_id),
+        ).fetchone()
+        if not owned:
+            return
+        conn.execute(
+            """DELETE FROM contribution_overrides
+               WHERE account_id = ? AND from_month = ? AND to_month = ?""",
+            (account_id, month_key, month_key),
+        )
+        conn.execute(
+            """INSERT INTO contribution_overrides
+               (account_id, from_month, to_month, override_amount, reason, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (account_id, month_key, month_key, amount, reason, datetime.now(timezone.utc).isoformat()),
+        )
+        conn.commit()
+
+
 def delete_contribution_override(override_id, user_id=None):
     with get_connection() as conn:
         if user_id is not None:

@@ -29,6 +29,7 @@ from app.models import (
     update_budget_section,
     update_debt,
     upsert_budget_entry,
+    upsert_single_month_contribution_override,
 )
 from app.models.debts import amortisation_schedule
 
@@ -38,6 +39,24 @@ budget_bp = Blueprint("budget", __name__)
 def _default_month_key():
     today = date.today()
     return f"{today.year}-{today.month:02d}"
+
+
+def _sync_linked_override(item_id, month_key, amount, user_id):
+    """When a linked budget item's entry changes, reflect it to contribution_overrides
+    so projections and account views pick up the per-month edit automatically.
+
+    Does nothing for unlinked items. Silently no-ops if the account isn't owned by
+    user_id (handled by upsert_single_month_contribution_override).
+    """
+    item = fetch_budget_item(item_id, user_id)
+    if not item:
+        return
+    linked = item.get("linked_account_id") if hasattr(item, "get") else item["linked_account_id"]
+    if not linked:
+        return
+    upsert_single_month_contribution_override(
+        int(linked), month_key, float(amount or 0), user_id, reason="from budget"
+    )
 
 
 def _month_label(month_key):
@@ -138,7 +157,9 @@ def budget():
     if request.method == "POST":
         item_id = request.form.get("item_id", type=int)
         if item_id:
-            upsert_budget_entry(month_key, item_id, optional_float(request.form.get("amount"), 0.0), uid)
+            amount = optional_float(request.form.get("amount"), 0.0)
+            upsert_budget_entry(month_key, item_id, amount, uid)
+            _sync_linked_override(item_id, month_key, amount, uid)
         return redirect(url_for("budget.budget", month=month_key))
 
     sections, summary = _build_monthly_data(month_key, uid)
@@ -171,6 +192,7 @@ def budget_save_entry():
     amount = optional_float(request.form.get("amount"), 0.0)
     if item_id:
         upsert_budget_entry(month_key, item_id, amount, uid)
+        _sync_linked_override(item_id, month_key, amount, uid)
     return jsonify({"ok": True})
 
 
