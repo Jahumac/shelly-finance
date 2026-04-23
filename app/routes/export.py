@@ -24,6 +24,7 @@ from app.calculations import (
     effective_fee_pct,
     effective_monthly_contribution,
     future_value,
+    is_pension_account,
     projected_account_value,
     projected_account_value_at_year,
     projected_account_value_at_month,
@@ -32,7 +33,11 @@ from app.calculations import (
     projected_account_value_no_fees,
     projected_total_retirement_value,
     to_float,
+    uk_tax_year_end,
+    uk_tax_year_start,
     years_to_retirement,
+    ISA_WRAPPER_TYPES,
+    LISA_WRAPPER_TYPES,
 )
 from app.models import (
     fetch_all_accounts,
@@ -41,8 +46,10 @@ from app.models import (
     fetch_budget_items,
     fetch_budget_sections,
     fetch_holding_totals_by_account,
+    fetch_isa_contributions,
     fetch_monthly_performance_data,
     fetch_monthly_performance_data_by_account,
+    fetch_pension_contributions,
     fetch_prior_month_budget_entries,
 )
 
@@ -465,6 +472,68 @@ def export_projections():
 
 # ── Budget export ─────────────────────────────────────────────────────────────
 
+GBP = '£#,##0.00'
+
+
+def _income_key(db_sections):
+    income_section = next((s for s in db_sections if "income" in s["key"].lower()), None)
+    return income_section["key"] if income_section else (db_sections[0]["key"] if db_sections else "income")
+
+
+def _write_budget_month_sheet(ws, title_text, db_sections, items, entry_map, item_id_col=False):
+    """Render one month's budget into `ws`. Returns a dict of section_key → total.
+
+    If item_id_col is True, an extra hidden column A carries the budget_item_id
+    (used by the annual export so a future re-upload can match by ID).
+    """
+    col_offset = 1 if item_id_col else 0
+    _set_col_width(ws, 1 + col_offset, 30)
+    _set_col_width(ws, 2 + col_offset, 20)
+    _set_col_width(ws, 3 + col_offset, 16)
+    if item_id_col:
+        _set_col_width(ws, 1, 8)
+
+    _title_cell(ws, 1, title_text, 3 + col_offset)
+    cell = ws.cell(row=2, column=1, value=f"Generated {datetime.now().strftime('%d %b %Y at %H:%M')}")
+    cell.font = _SUBTITLE_FONT
+
+    row = 4
+    section_totals = {}
+
+    for sec in db_sections:
+        section_items = [it for it in items if it["section"] == sec["key"]]
+        if not section_items:
+            continue
+
+        header_vals = ([""] if item_id_col else []) + [sec["label"], "", "Amount"]
+        _header_row(ws, row, header_vals)
+        row += 1
+
+        sec_total = 0.0
+        for item in section_items:
+            amount = float(entry_map[item["id"]]["amount"]) if item["id"] in entry_map else float(item["default_amount"] or 0)
+            vals = ([item["id"]] if item_id_col else []) + [item["name"], item["notes"] or "", amount]
+            _data_row(ws, row, vals, num_formats={3 + col_offset: GBP})
+            sec_total += amount
+            row += 1
+
+        total_vals = ([""] if item_id_col else []) + ["", "Section total", sec_total]
+        _data_row(ws, row, total_vals, bold=True, num_formats={3 + col_offset: GBP})
+        section_totals[sec["key"]] = sec_total
+        row += 2
+
+    total_income = section_totals.get(_income_key(db_sections), 0)
+    total_expenses = sum(v for k, v in section_totals.items() if k != _income_key(db_sections))
+    surplus = total_income - total_expenses
+
+    for label, val in [("Total Income", total_income), ("Total Expenses", total_expenses), ("Surplus", surplus)]:
+        row_vals = ([""] if item_id_col else []) + [label, "", val]
+        _data_row(ws, row, row_vals, bold=(label == "Surplus"), num_formats={3 + col_offset: GBP})
+        row += 1
+
+    return section_totals
+
+
 @export_bp.route("/budget/export.xlsx")
 @login_required
 def export_budget():
@@ -473,10 +542,9 @@ def export_budget():
     month_label = datetime.strptime(month_key, "%Y-%m").strftime("%B %Y")
 
     db_sections = fetch_budget_sections(uid)
-    items       = fetch_budget_items(uid)
-    entries     = fetch_budget_entries(month_key, uid)
-    entry_map   = {e["budget_item_id"]: e for e in entries}
-
+    items = fetch_budget_items(uid)
+    entries = fetch_budget_entries(month_key, uid)
+    entry_map = {e["budget_item_id"]: e for e in entries}
     if not entry_map:
         prior = fetch_prior_month_budget_entries(month_key, uid)
         entry_map = {e["budget_item_id"]: e for e in prior}
@@ -484,53 +552,255 @@ def export_budget():
     wb = Workbook()
     ws = wb.active
     ws.title = f"Budget {month_key}"
+    _write_budget_month_sheet(ws, f"Shelly Finance — Budget for {month_label}", db_sections, items, entry_map)
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fname = f"budget_{month_key}.xlsx"
+    return send_file(buf, as_attachment=True, download_name=fname,
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+# ── Annual budget export (UK tax year) ────────────────────────────────────────
+
+_MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def _tax_year_months(start_year):
+    """Return the 12 month_key strings ('YYYY-MM') covering tax year start_year/start_year+1.
+
+    UK tax year: Apr (start_year) through Mar (start_year + 1).
+    """
+    result = []
+    for offset in range(12):
+        m = 4 + offset
+        y = start_year + (m - 1) // 12
+        month = ((m - 1) % 12) + 1
+        result.append(f"{y:04d}-{month:02d}")
+    return result
+
+
+def _resolved_month_map(month_key, uid, carry_forward):
+    """Entry map for a month. If the month has no entries, fall back to the most
+    recent prior month in-workbook (carry_forward), then to DB prior-month, then
+    to default_amount (handled by the sheet writer)."""
+    entries = fetch_budget_entries(month_key, uid)
+    entry_map = {e["budget_item_id"]: e for e in entries}
+    if not entry_map and carry_forward:
+        # Reuse the last month we already resolved so the year stays consistent
+        return dict(carry_forward)
+    if not entry_map:
+        prior = fetch_prior_month_budget_entries(month_key, uid)
+        entry_map = {e["budget_item_id"]: e for e in prior}
+    return entry_map
+
+
+def _write_annual_summary_sheet(ws, months, month_labels, db_sections, items, month_entry_maps):
+    """Write a wide 'items × 12 months + Total' matrix."""
+    n_months = len(months)
     _set_col_width(ws, 1, 30)
     _set_col_width(ws, 2, 20)
-    _set_col_width(ws, 3, 16)
+    for col in range(3, 3 + n_months):
+        _set_col_width(ws, col, 12)
+    _set_col_width(ws, 3 + n_months, 14)
 
-    _title_cell(ws, 1, f"Shelly Finance — Budget for {month_label}", 3)
-    cell = ws.cell(row=2, column=1, value=f"Generated {datetime.now().strftime('%d %b %Y at %H:%M')}")
-    cell.font = _SUBTITLE_FONT
+    _title_cell(ws, 1, "Shelly Finance — Annual Budget Summary", 3 + n_months)
+    ws.cell(row=2, column=1, value=f"Generated {datetime.now().strftime('%d %b %Y at %H:%M')}").font = _SUBTITLE_FONT
 
-    GBP = '£#,##0.00'
-    row = 4
-    income_section = next((s for s in db_sections if "income" in s["key"].lower()), None)
-    income_key = income_section["key"] if income_section else (db_sections[0]["key"] if db_sections else "income")
-    section_totals = {}
+    _header_row(ws, 4, ["Item", "Notes"] + month_labels + ["Total"])
+    row = 5
+    month_totals = [0.0] * n_months
+    section_totals_per_month = {sec["key"]: [0.0] * n_months for sec in db_sections}
 
     for sec in db_sections:
         section_items = [it for it in items if it["section"] == sec["key"]]
         if not section_items:
             continue
 
-        # Section header
-        _header_row(ws, row, [sec["label"], "", "Amount"])
+        _header_row(ws, row, [sec["label"], ""] + [""] * n_months + [""])
         row += 1
 
-        sec_total = 0.0
         for item in section_items:
-            amount = float(entry_map[item["id"]]["amount"]) if item["id"] in entry_map else float(item["default_amount"] or 0)
-            _data_row(ws, row, [item["name"], item["notes"] or "", amount], num_formats={3: GBP})
-            sec_total += amount
+            row_amounts = []
+            for i, month_key in enumerate(months):
+                entry_map = month_entry_maps[month_key]
+                amt = float(entry_map[item["id"]]["amount"]) if item["id"] in entry_map else float(item["default_amount"] or 0)
+                row_amounts.append(amt)
+                month_totals[i] += amt
+                section_totals_per_month[sec["key"]][i] += amt
+            item_total = sum(row_amounts)
+            num_formats = {c: GBP for c in range(3, 4 + n_months)}
+            _data_row(ws, row, [item["name"], item["notes"] or ""] + row_amounts + [item_total], num_formats=num_formats)
             row += 1
 
-        _data_row(ws, row, ["", "Section total", sec_total], bold=True, num_formats={3: GBP})
-        section_totals[sec["key"]] = sec_total
+        sec_totals = section_totals_per_month[sec["key"]]
+        num_formats = {c: GBP for c in range(3, 4 + n_months)}
+        _data_row(ws, row, ["", "Section total"] + sec_totals + [sum(sec_totals)],
+                  bold=True, num_formats=num_formats)
         row += 2
 
-    # Summary block
-    total_income   = section_totals.get(income_key, 0)
-    total_expenses = sum(v for k, v in section_totals.items() if k != income_key)
-    surplus        = total_income - total_expenses
+    # Overall summary
+    income_key = _income_key(db_sections)
+    income_by_month = section_totals_per_month.get(income_key, [0.0] * n_months)
+    expense_by_month = [sum(section_totals_per_month[k][i] for k in section_totals_per_month if k != income_key)
+                        for i in range(n_months)]
+    surplus_by_month = [income_by_month[i] - expense_by_month[i] for i in range(n_months)]
 
-    for label, val in [("Total Income", total_income), ("Total Expenses", total_expenses), ("Surplus", surplus)]:
-        _data_row(ws, row, [label, "", val], bold=(label == "Surplus"), num_formats={3: GBP})
+    num_formats = {c: GBP for c in range(3, 4 + n_months)}
+    for label, series in [("Total Income", income_by_month),
+                          ("Total Expenses", expense_by_month),
+                          ("Surplus", surplus_by_month)]:
+        _data_row(ws, row, [label, ""] + series + [sum(series)],
+                  bold=(label == "Surplus"), num_formats=num_formats)
         row += 1
+
+
+def _write_investment_tracking_sheet(ws, uid, start_year, accounts, items, month_entry_maps, assumptions):
+    """Planned (budget) vs Actual (logged) vs Allowance per wrapper, plus per-account detail."""
+    _set_col_width(ws, 1, 26)
+    _set_col_width(ws, 2, 16)
+    _set_col_width(ws, 3, 16)
+    _set_col_width(ws, 4, 16)
+    _set_col_width(ws, 5, 16)
+    _set_col_width(ws, 6, 12)
+
+    ty_label = f"{start_year}/{str(start_year + 1)[-2:]}"
+    _title_cell(ws, 1, f"Shelly Finance — Investment Tracking (Tax Year {ty_label})", 6)
+    ws.cell(row=2, column=1, value=f"Generated {datetime.now().strftime('%d %b %Y at %H:%M')}").font = _SUBTITLE_FONT
+
+    account_map = {int(a["id"]): dict(a) for a in accounts}
+
+    # Planned per account = sum across 12 months of linked budget item amounts
+    linked_items = [it for it in items if it.get("linked_account_id")]
+    planned_per_account = {}
+    for it in linked_items:
+        aid = int(it["linked_account_id"])
+        total = 0.0
+        for mk, entry_map in month_entry_maps.items():
+            total += float(entry_map[it["id"]]["amount"]) if it["id"] in entry_map else float(it["default_amount"] or 0)
+        planned_per_account[aid] = planned_per_account.get(aid, 0.0) + total
+
+    # Actual logged contributions in the tax year
+    ty_start_iso = date(start_year, 4, 6).isoformat()
+    ty_end_iso = date(start_year + 1, 4, 5).isoformat()
+    isa_logs = fetch_isa_contributions(uid, ty_start_iso, ty_end_iso) or []
+    pension_logs = fetch_pension_contributions(uid, ty_start_iso, ty_end_iso) or []
+
+    actual_per_account = {}
+    for row in list(isa_logs) + list(pension_logs):
+        aid = int(row["account_id"])
+        actual_per_account[aid] = actual_per_account.get(aid, 0.0) + float(row["amount"] or 0)
+
+    # ── Wrapper rollup ───────────────────────────────────────────────────────
+    isa_allowance = float(assumptions["isa_allowance"]) if assumptions and assumptions.get("isa_allowance") else 20000.0
+    lisa_allowance = float(assumptions["lisa_allowance"]) if assumptions and assumptions.get("lisa_allowance") else 4000.0
+    pension_allowance = float(assumptions["pension_allowance"]) if assumptions and assumptions.get("pension_allowance") else 60000.0
+
+    def _sum(pred):
+        planned = sum(planned_per_account.get(aid, 0.0) for aid in account_map if pred(account_map[aid]))
+        actual = sum(actual_per_account.get(aid, 0.0) for aid in account_map if pred(account_map[aid]))
+        return planned, actual
+
+    isa_planned, isa_actual = _sum(lambda a: (a.get("wrapper_type") or "") in ISA_WRAPPER_TYPES)
+    lisa_planned, lisa_actual = _sum(lambda a: (a.get("wrapper_type") or "") in LISA_WRAPPER_TYPES)
+    pension_planned, pension_actual = _sum(lambda a: is_pension_account(a))
+
+    _header_row(ws, 4, ["Wrapper", "Planned (budget)", "Logged (actuals)", "Allowance", "Remaining", "% Used"])
+
+    def _pct(used, allowance):
+        return (used / allowance * 100.0) if allowance > 0 else 0.0
+
+    PCT = '0.0"%"'
+    rows_data = [
+        ("ISA (all)", isa_planned, isa_actual, isa_allowance),
+        ("  of which LISA", lisa_planned, lisa_actual, lisa_allowance),
+        ("Pension", pension_planned, pension_actual, pension_allowance),
+    ]
+    row = 5
+    for label, planned, actual, allowance in rows_data:
+        used = max(planned, actual)  # show worst-case usage for "remaining"
+        remaining = max(allowance - used, 0.0)
+        _data_row(ws, row, [label, planned, actual, allowance, remaining, _pct(used, allowance)],
+                  num_formats={2: GBP, 3: GBP, 4: GBP, 5: GBP, 6: PCT})
+        row += 1
+
+    # ISA allowance note (LISA sits inside ISA £20k)
+    note = ws.cell(row=row + 1, column=1,
+                   value="Note: LISA contributions (£4k cap) count toward the overall ISA £20k allowance.")
+    note.font = _SUBTITLE_FONT
+    ws.merge_cells(start_row=row + 1, start_column=1, end_row=row + 1, end_column=6)
+    row += 3
+
+    # ── Per-account detail ────────────────────────────────────────────────────
+    _header_row(ws, row, ["Account", "Wrapper", "Planned (annual)", "Logged (annual)", "Diff (Logged − Planned)", ""])
+    row += 1
+
+    for aid, acc in sorted(account_map.items(), key=lambda kv: kv[1].get("name") or ""):
+        planned = planned_per_account.get(aid, 0.0)
+        actual = actual_per_account.get(aid, 0.0)
+        if planned == 0 and actual == 0:
+            continue
+        wrapper = acc.get("wrapper_type") or "—"
+        _data_row(ws, row, [acc.get("name") or "", wrapper, planned, actual, actual - planned, ""],
+                  num_formats={3: GBP, 4: GBP, 5: GBP})
+        row += 1
+
+
+@export_bp.route("/budget/annual-export.xlsx")
+@login_required
+def export_budget_annual():
+    """Annual budget export: 12 month tabs (Apr→Mar of UK tax year) + Summary
+    + Investment Tracking."""
+    uid = current_user.id
+    today = date.today()
+    default_start = uk_tax_year_start(today).year
+    try:
+        start_year = int(request.args.get("tax_year_start") or default_start)
+    except (ValueError, TypeError):
+        start_year = default_start
+
+    db_sections = fetch_budget_sections(uid)
+    items = fetch_budget_items(uid)
+    accounts = fetch_all_accounts(uid)
+    assumptions = fetch_assumptions(uid)
+
+    months = _tax_year_months(start_year)
+    month_labels = []
+    for mk in months:
+        d = datetime.strptime(mk, "%Y-%m")
+        month_labels.append(f"{_MONTH_NAMES[d.month - 1]} {d.year}")
+
+    # Resolve per-month entry maps (with in-workbook carry-forward for empty months)
+    month_entry_maps = {}
+    carry = None
+    for mk in months:
+        em = _resolved_month_map(mk, uid, carry)
+        month_entry_maps[mk] = em
+        if em:
+            carry = em
+
+    wb = Workbook()
+    # First sheet: Summary
+    ws_sum = wb.active
+    ws_sum.title = "Summary"
+    _write_annual_summary_sheet(ws_sum, months, month_labels, db_sections, items, month_entry_maps)
+
+    # 12 month sheets (re-uses the monthly format with hidden item_id column A)
+    for mk, label in zip(months, month_labels):
+        ws = wb.create_sheet(label)
+        _write_budget_month_sheet(ws, f"Shelly Finance — Budget for {label}", db_sections, items,
+                                  month_entry_maps[mk], item_id_col=True)
+
+    # Investment Tracking
+    ws_inv = wb.create_sheet("Investment Tracking")
+    _write_investment_tracking_sheet(ws_inv, uid, start_year, accounts, items, month_entry_maps, assumptions)
 
     buf = BytesIO()
     wb.save(buf)
     buf.seek(0)
-    fname = f"budget_{month_key}.xlsx"
+    fname = f"budget_tax_year_{start_year}-{str(start_year + 1)[-2:]}.xlsx"
     return send_file(buf, as_attachment=True, download_name=fname,
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 

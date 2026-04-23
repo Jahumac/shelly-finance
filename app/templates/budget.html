@@ -61,7 +61,8 @@
 <div class="budget-toolbar">
   <div class="badge-row">
     <a class="badge" href="/budget/items/">Edit Budget</a>
-    <a class="badge badge-sm" href="/budget/export.xlsx?month={{ month_key }}">↓ Export</a>
+    <a class="badge badge-sm" href="/budget/export.xlsx?month={{ month_key }}">↓ Export month</a>
+    <a class="badge badge-sm" href="/budget/annual-export.xlsx" title="Download the whole UK tax year (Apr–Mar) with one tab per month, a summary, and an investment-tracking tab">↓ Export tax year</a>
     <label class="badge badge-sm budget-import-label" title="Import budget from an Excel file">
       ↑ Import
       <form method="post" action="/budget/import" enctype="multipart/form-data" id="import-form" style="display:none">
