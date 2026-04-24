@@ -4917,3 +4917,20 @@ a.link-accent:hover {
 .allocation-label { flex: 1; }
 .allocation-value { font-weight: 600; white-space: nowrap; }
 .allocation-pct   { min-width: 3.5rem; text-align: right; }
+
+/* ── Offline banner ─────────────────────────────────────────────────── */
+.offline-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #f59e0b;
+  color: #0f172a;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+  padding: 0.4rem 1rem;
+  z-index: 9999;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+.offline-banner[hidden] { display: none; }

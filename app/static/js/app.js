@@ -2072,4 +2072,46 @@
       .catch(() => { });
   }
 
+  /* ── Offline: cache warming + "viewing cached data" banner ────────── */
+  if ('serviceWorker' in navigator) {
+    /* Warm the cache so every top-level page works offline next time.
+       Runs once per load, only when online, 2s after load to stay out of
+       the critical path. */
+    var PAGES_TO_WARM = [
+      '/', '/accounts/', '/budget/', '/goals/',
+      '/projections/', '/performance/', '/holdings/',
+      '/allowance/', '/settings/'
+    ];
+    window.addEventListener('load', function() {
+      if (!navigator.onLine) return;
+      setTimeout(function() {
+        PAGES_TO_WARM.forEach(function(path) {
+          if (path === window.location.pathname) return;
+          fetch(path, { credentials: 'same-origin' }).catch(function() {});
+        });
+      }, 2000);
+    });
+
+    /* Banner shown when the backend is unreachable, so the user knows
+       they're looking at cached data rather than live numbers. */
+    var banner = document.createElement('div');
+    banner.className = 'offline-banner';
+    banner.hidden = true;
+    banner.textContent = '⚠ Viewing cached data — offline';
+    document.body.appendChild(banner);
+
+    function checkBackend() {
+      return fetch('/api/ping', { cache: 'no-store' })
+        .then(function(r) { return r.ok; })
+        .catch(function() { return false; });
+    }
+    function refreshBanner() {
+      checkBackend().then(function(online) { banner.hidden = online; });
+    }
+    window.addEventListener('online', refreshBanner);
+    window.addEventListener('offline', refreshBanner);
+    refreshBanner();
+    setInterval(refreshBanner, 30000);
+  }
+
 })();
