@@ -24,28 +24,6 @@ def is_price_stale(price_updated_at, now=None):
     return True  # unparseable ⇒ assume stale so users notice
 
 
-def age_from_dob(dob_str, today=None):
-    """Calculate current age in fractional years from a date-of-birth string (YYYY-MM-DD).
-
-    Falls back to 0 if the DOB is missing or unparseable.
-    """
-    if not dob_str:
-        return 0.0
-    today = today or date.today()
-    try:
-        dob = datetime.strptime(dob_str, "%Y-%m-%d").date()
-    except (ValueError, TypeError):
-        return 0.0
-    age_years = today.year - dob.year
-    # Subtract 1 if birthday hasn't happened yet this year
-    if (today.month, today.day) < (dob.month, dob.day):
-        age_years -= 1
-    # Add fractional part for months
-    months_since_birthday = (today.month - dob.month) % 12
-    if today.day < dob.day:
-        months_since_birthday = max(months_since_birthday - 1, 0)
-    return age_years + months_since_birthday / 12.0
-
 
 def current_age_from_assumptions(assumptions):
     """Get the user's current age, preferring date_of_birth over legacy current_age."""
@@ -146,11 +124,6 @@ def contribution_breakdown(account, assumptions=None):
     }
 
 
-def effective_monthly_contribution(account, assumptions=None):
-    """Return the total amount going into the account pot each month,
-    including tax relief, government bonuses, and employer contributions."""
-    return contribution_breakdown(account, assumptions)["total_into_pot"]
-
 
 def future_value(current_value, monthly_contribution, annual_growth_rate, years):
     monthly_rate = annual_growth_rate / 12
@@ -165,14 +138,6 @@ def future_value(current_value, monthly_contribution, annual_growth_rate, years)
 
     return future_current + future_contrib
 
-
-def add_months_to_key(month_key, offset):
-    """Return YYYY-MM `offset` months after month_key."""
-    y, m = [int(x) for x in month_key.split("-")]
-    m = m + offset
-    y += (m - 1) // 12
-    m = (m - 1) % 12 + 1
-    return f"{y:04d}-{m:02d}"
 
 
 def projection_start_month_key(assumptions=None, today=None):
@@ -308,34 +273,6 @@ def goal_current_value(selected_tags, accounts, holdings_totals=None):
 def total_monthly_contributions(accounts):
     return sum(to_float(a["monthly_contribution"]) for a in accounts)
 
-
-def retirement_target_date(dob_str, retirement_age, mode="birthday"):
-    """Calculate the exact retirement date based on the chosen mode.
-
-    Modes:
-        birthday       — retire on the day you turn retirement_age
-        end_of_year    — retire on 31 Dec of the year you turn retirement_age
-        end_of_tax_year — retire on 5 Apr following the tax year you turn retirement_age
-    """
-    if not dob_str:
-        return None
-    try:
-        dob = datetime.strptime(dob_str, "%Y-%m-%d").date()
-    except (ValueError, TypeError):
-        return None
-    retire_year = dob.year + int(retirement_age)
-    if mode == "end_of_year":
-        return date(retire_year, 12, 31)
-    elif mode == "end_of_tax_year":
-        # UK tax year ends 5 April. If birthday is before 6 April,
-        # you turn retirement_age in the current tax year (ending 5 Apr that year).
-        # Otherwise you turn retirement_age in the *next* tax year (ending 5 Apr next year).
-        if (dob.month, dob.day) < (4, 6):
-            return date(retire_year, 4, 5)
-        else:
-            return date(retire_year + 1, 4, 5)
-    else:  # birthday
-        return date(retire_year, dob.month, dob.day)
 
 
 def years_to_retirement(current_age, retirement_age, assumptions=None):
@@ -677,89 +614,6 @@ def uk_tax_year_start(today=None):
     return date(start_year, 4, 6)
 
 
-def resolve_contribution_day(year, month, nominal_day):
-    """Return the actual calendar day a contribution falls on for a given month.
-
-    Handles two adjustments:
-    1. Clamps days beyond the month end (e.g. 31 in February → last day of Feb).
-       Use nominal_day=31 to mean "last day of month".
-    2. If that day falls on a Saturday or Sunday, shifts back to the preceding
-       Friday (matching UK payroll practice — salary arrives the last working day).
-
-    Returns an integer day number (1-31).
-    """
-    import calendar
-    max_day = calendar.monthrange(year, month)[1]
-    day = min(nominal_day, max_day)
-    wd = date(year, month, day).weekday()  # 0=Mon .. 6=Sun
-    if wd == 5:    # Saturday → Friday
-        day -= 1
-    elif wd == 6:  # Sunday → Friday
-        day -= 2
-    return max(1, day)
-
-
-def months_in_tax_year(today=None, salary_day=0):
-    """Return the number of monthly ISA contributions that have gone through
-    in the current UK tax year.
-
-    salary_day: day of month when salary/contributions go in (1-31).
-        Use 31 to mean "last working day of the month".
-        If >= 6: April's contribution falls in the new tax year.
-        If < 6 (or 0/unset): April's contribution is in the OLD tax year,
-        so the first new-year contribution is May.
-        Also, the current month only counts if salary_day has passed.
-
-    E.g. salary_day=15, today=9 Apr 2026 → 0 (April contribution hasn't
-    gone through yet).
-    salary_day=1, today=9 Apr 2026 → 0 (April 1 was still old tax year).
-    salary_day=10, today=15 Apr 2026 → 1 (April 10 is new tax year & has passed).
-    """
-    today = today or date.today()
-    start = uk_tax_year_start(today)
-    contribution_day = salary_day if salary_day >= 1 else 1
-
-    # Determine the first month whose contribution belongs to this tax year
-    if contribution_day >= 6:
-        first_year, first_month = start.year, start.month  # April
-    else:
-        # Contribution on 1st-5th April belongs to OLD tax year → starts May
-        first_year = start.year
-        first_month = start.month + 1
-        if first_month > 12:
-            first_month = 1
-            first_year += 1
-
-    count = 0
-    y, m = first_year, first_month
-    while (y < today.year) or (y == today.year and m <= today.month):
-        if y < today.year or (y == today.year and m < today.month):
-            # Past month — contribution definitely happened
-            count += 1
-        elif y == today.year and m == today.month:
-            # Current month — only count if contribution day has passed.
-            # resolve_contribution_day handles end-of-month clamping and
-            # weekend shift (e.g. 31 in February → last working day of Feb).
-            if today.day >= resolve_contribution_day(y, m, contribution_day):
-                count += 1
-        # Advance to next month
-        if m == 12:
-            y, m = y + 1, 1
-        else:
-            m += 1
-
-    return count
-
-
-def full_year_contribution_months(salary_day=0):
-    """Return the number of monthly contributions in a full tax year (11 or 12).
-
-    If salary_day < 6: April's contribution belongs to the old tax year,
-    so only 11 contribution months fall in the new year (May-March).
-    Otherwise 12 (April-March).
-    """
-    contribution_day = salary_day if salary_day >= 1 else 1
-    return 12 if contribution_day >= 6 else 11
 
 
 def review_ready_date(year, month, salary_day=0):
