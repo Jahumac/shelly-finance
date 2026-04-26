@@ -1719,10 +1719,21 @@
         else checkbox.setAttribute('data-tag-checkbox', '');
 
         var span = document.createElement('span');
+        span.className = 'tag-label';
         span.textContent = tagName;
+
+        var del = document.createElement('span');
+        del.className = 'tag-delete';
+        del.setAttribute('role', 'button');
+        del.setAttribute('tabindex', '0');
+        del.setAttribute('data-delete-tag', tagName);
+        del.setAttribute('aria-label', 'Remove tag ' + tagName);
+        del.textContent = '✕';
+        del.addEventListener('click', handleDeleteTag);
 
         label.appendChild(checkbox);
         label.appendChild(span);
+        label.appendChild(del);
         return label;
       }
 

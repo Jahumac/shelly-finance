@@ -304,8 +304,8 @@
               {% for tag in tag_options %}
               <label class="tag-chip">
                 <input type="checkbox" value="{{ tag }}" data-tag-checkbox>
-                <span>{{ tag }}</span>
-                <button type="button" class="tag-delete" data-delete-tag="{{ tag }}" title="Remove tag">&times;</button>
+                <span class="tag-label">{{ tag }}</span>
+                <span class="tag-delete" role="button" tabindex="0" data-delete-tag="{{ tag }}" aria-label="Remove tag {{ tag }}">✕</span>
               </label>
               {% endfor %}
             </div>

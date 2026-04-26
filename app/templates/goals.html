@@ -129,7 +129,7 @@
           {% for tag in tag_options %}
           <label class="tag-chip">
             <input type="checkbox" name="selected_tags" value="{{ tag }}">
-            <span>{{ tag }}</span>
+            <span class="tag-label">{{ tag }}</span>
           </label>
           {% endfor %}
         </div>
@@ -179,7 +179,7 @@
             {% for tag in tag_options %}
             <label class="tag-chip">
               <input type="checkbox" name="selected_tags" value="{{ tag }}" {% if tag in selected_goal_tags %}checked{% endif %}>
-              <span>{{ tag }}</span>
+              <span class="tag-label">{{ tag }}</span>
             </label>
             {% endfor %}
           </div>
