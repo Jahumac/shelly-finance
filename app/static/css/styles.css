@@ -612,26 +612,36 @@ body.is-back-online .site-header {
 
 .tag-chip .tag-delete {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 18px;
-  height: 18px;
+  top: -5px;
+  right: -5px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   border: none;
   background: var(--danger, #f87171);
   color: #fff;
-  font-size: 12px;
+  font-size: 10px;
   line-height: 1;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, transform 0.1s;
   padding: 0;
+  outline: none;
+  box-shadow: none;
 }
-.tag-chip:hover .tag-delete {
+.tag-chip:hover .tag-delete,
+.tag-chip .tag-delete:focus-visible {
   opacity: 1;
+}
+.tag-chip .tag-delete:hover {
+  transform: scale(1.15);
+}
+.tag-chip .tag-delete:focus {
+  outline: none;
+  box-shadow: none;
 }
 
 /* subtle pulse on the tag picker in create mode to draw the eye */

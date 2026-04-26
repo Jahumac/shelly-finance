@@ -60,24 +60,27 @@
   };
 
   /* ── Shelly confirm — replaces browser confirm() ─────────────────── */
-  var overlay = document.getElementById('shelly-confirm');
-  var titleEl = document.getElementById('shelly-confirm-title');
-  var msgEl   = document.getElementById('shelly-confirm-msg');
-  var okBtn   = document.getElementById('shelly-confirm-ok');
-  var cancelBtn = document.getElementById('shelly-confirm-cancel');
+  // Elements are looked up lazily (script runs in <head>, body not yet parsed).
   var pendingResolve = null;
+
+  function _sc() { return document.getElementById('shelly-confirm'); }
 
   window.shellyConfirm = function (opts) {
     opts = opts || {};
-    if (!overlay) return Promise.resolve(confirm(opts.message || 'Are you sure?'));
+    var ov = _sc();
+    if (!ov) return Promise.resolve(confirm(opts.message || 'Are you sure?'));
 
-    titleEl.textContent = opts.title || 'Are you sure?';
-    msgEl.textContent   = opts.message || '';
-    okBtn.textContent   = opts.confirmText || 'Yes, do it';
-    cancelBtn.textContent = opts.cancelText || 'Nope, go back';
-    overlay.classList.remove('hidden');
-    overlay.setAttribute('aria-hidden', 'false');
-    okBtn.focus();
+    document.getElementById('shelly-confirm-title').textContent = opts.title || 'Are you sure?';
+    document.getElementById('shelly-confirm-msg').textContent   = opts.message || '';
+    document.getElementById('shelly-confirm-ok').textContent    = opts.confirmText || 'Yes, do it';
+    document.getElementById('shelly-confirm-cancel').textContent = opts.cancelText || 'Nope, go back';
+    if (opts.icon) {
+      var iconEl = ov.querySelector('.shelly-modal-icon img');
+      if (iconEl) iconEl.src = opts.icon;
+    }
+    ov.classList.remove('hidden');
+    ov.setAttribute('aria-hidden', 'false');
+    document.getElementById('shelly-confirm-ok').focus();
 
     return new Promise(function (resolve) {
       pendingResolve = resolve;
@@ -85,22 +88,26 @@
   };
 
   function closeConfirm(result) {
-    if (!overlay) return;
-    overlay.classList.add('hidden');
-    overlay.setAttribute('aria-hidden', 'true');
+    var ov = _sc();
+    if (!ov) return;
+    ov.classList.add('hidden');
+    ov.setAttribute('aria-hidden', 'true');
     if (pendingResolve) {
       pendingResolve(result);
       pendingResolve = null;
     }
   }
 
-  if (okBtn) okBtn.addEventListener('click', function () { closeConfirm(true); });
-  if (cancelBtn) cancelBtn.addEventListener('click', function () { closeConfirm(false); });
-  if (overlay) overlay.addEventListener('click', function (e) {
-    if (e.target === overlay) closeConfirm(false);
+  document.addEventListener('DOMContentLoaded', function () {
+    var ov = _sc();
+    if (!ov) return;
+    document.getElementById('shelly-confirm-ok').addEventListener('click', function () { closeConfirm(true); });
+    document.getElementById('shelly-confirm-cancel').addEventListener('click', function () { closeConfirm(false); });
+    ov.addEventListener('click', function (e) { if (e.target === ov) closeConfirm(false); });
   });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && overlay && !overlay.classList.contains('hidden')) closeConfirm(false);
+    var ov = _sc();
+    if (e.key === 'Escape' && ov && !ov.classList.contains('hidden')) closeConfirm(false);
   });
 
   /* ── Tag sync helper ─────────────────────────────────────────────── */
@@ -1677,9 +1684,10 @@
                 var n = data.count;
                 window.shellyConfirm({
                   title: 'Tag in use',
-                  message: '"' + tagName + '" is currently applied to ' + n + ' account' + (n === 1 ? '' : 's') + '. Removing it from the list won\'t remove it from those accounts — you\'ll need to do that manually. Remove anyway?',
-                  confirmText: 'Yes, remove tag',
+                  message: '"' + tagName + '" is on ' + n + ' account' + (n === 1 ? '' : 's') + '. Removing it from the picker won\'t strip it from those accounts — you\'ll need to do that manually. Remove anyway?',
+                  confirmText: 'Yes, remove it',
                   cancelText: 'Keep it',
+                  icon: '/static/icons/shelly/Accounts.png',
                 }).then(function(confirmed) { if (confirmed) doDelete(true); });
               }
             });
@@ -1688,8 +1696,9 @@
         window.shellyConfirm({
           title: 'Remove "' + tagName + '"?',
           message: 'This removes the tag from the picker. It won\'t affect accounts already using it.',
-          confirmText: 'Yes, remove tag',
+          confirmText: 'Yes, remove it',
           cancelText: 'Keep it',
+          icon: '/static/icons/shelly/Accounts.png',
         }).then(function (confirmed) {
           if (!confirmed) return;
           doDelete(false);
