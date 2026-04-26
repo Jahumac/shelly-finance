@@ -646,6 +646,16 @@ def _run_migrations(conn):
         )
     """)
 
+    # ── Hidden default tags per user ─────────────────────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS hidden_tags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            tag TEXT NOT NULL,
+            UNIQUE(user_id, tag)
+        )
+    """)
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS pension_contributions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -1664,18 +1664,35 @@
         var tagName = btn.getAttribute('data-delete-tag');
         if (!tagName) return;
 
+        function doDelete(force) {
+          var fd = new FormData();
+          fd.append('tag', tagName);
+          if (force) fd.append('force', '1');
+          fetch('/accounts/api/tags/delete', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+              if (data.ok) {
+                btn.closest('.tag-chip').remove();
+              } else if (data.in_use) {
+                var n = data.count;
+                window.shellyConfirm({
+                  title: 'Tag in use',
+                  message: '"' + tagName + '" is currently applied to ' + n + ' account' + (n === 1 ? '' : 's') + '. Removing it from the list won\'t remove it from those accounts — you\'ll need to do that manually. Remove anyway?',
+                  confirmText: 'Yes, remove tag',
+                  cancelText: 'Keep it',
+                }).then(function(confirmed) { if (confirmed) doDelete(true); });
+              }
+            });
+        }
+
         window.shellyConfirm({
           title: 'Remove "' + tagName + '"?',
-          message: 'This removes the tag from the list.',
+          message: 'This removes the tag from the picker. It won\'t affect accounts already using it.',
           confirmText: 'Yes, remove tag',
           cancelText: 'Keep it',
         }).then(function (confirmed) {
           if (!confirmed) return;
-          var fd = new FormData();
-          fd.append('tag', tagName);
-          fetch('/accounts/api/tags/delete', { method: 'POST', body: fd })
-            .then(r => r.json())
-            .then(data => { if (data.ok) btn.closest('.tag-chip').remove(); });
+          doDelete(false);
         });
       }
 

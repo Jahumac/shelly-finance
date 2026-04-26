@@ -29,6 +29,9 @@ from app.models import (
     fetch_catalogue_with_prices,
     fetch_contribution_overrides,
     fetch_custom_tags,
+    fetch_hidden_tags,
+    hide_default_tag,
+    tag_in_use_count,
     fetch_holding_catalogue,
     fetch_holding_totals_by_account,
     fetch_holdings_for_account,
@@ -199,6 +202,7 @@ def _render_accounts_page(user_id, selected=None, detail_mode="view", position_e
         tag_options=fetch_user_tags(user_id),
         custom_tags=fetch_custom_tags(user_id),
         default_tags=DEFAULT_TAG_OPTIONS,
+        hidden_tags=fetch_hidden_tags(user_id),
         selected_tags=split_tags(selected['tags']) if selected and 'tags' in selected else [],
         positions=positions,
         catalogue_rows=catalogue_rows,
@@ -256,14 +260,26 @@ def api_add_tag():
 @accounts_bp.route("/api/tags/delete", methods=["POST"])
 @login_required
 def api_delete_tag():
-    """JSON API: delete a custom tag for the current user."""
+    """JSON API: delete or hide a tag for the current user.
+
+    Returns in_use_count > 0 as a warning on the first call (force=0).
+    Pass force=1 to proceed despite accounts using the tag.
+    """
+    uid = current_user.id
     tag = (request.form.get("tag") or "").strip()
+    force = request.form.get("force") == "1"
     if not tag:
         return jsonify({"ok": False, "error": "Tag cannot be empty"}), 400
+
+    count = tag_in_use_count(uid, tag)
+    if count > 0 and not force:
+        return jsonify({"ok": False, "in_use": True, "count": count, "tag": tag})
+
     if tag in DEFAULT_TAG_OPTIONS:
-        return jsonify({"ok": False, "error": "Cannot delete default tags"}), 400
-    deleted = delete_custom_tag(current_user.id, tag)
-    return jsonify({"ok": True, "deleted": deleted, "tag": tag})
+        hide_default_tag(uid, tag)
+    else:
+        delete_custom_tag(uid, tag)
+    return jsonify({"ok": True, "tag": tag})
 
 
 @accounts_bp.route("/api/create", methods=["POST"])

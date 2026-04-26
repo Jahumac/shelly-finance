@@ -151,18 +151,55 @@ DEFAULT_HOLDING_CATALOGUE = [  # kept for reference only — no longer auto-seed
 # ── Tags ──────────────────────────────────────────────────────────────────────
 
 def fetch_user_tags(user_id):
-    """Return merged list: default tags + user's custom tags (de-duped, ordered)."""
+    """Return merged list: default tags + user's custom tags, minus any hidden ones."""
     with get_connection() as conn:
-        rows = conn.execute(
+        custom_rows = conn.execute(
             "SELECT tag FROM custom_tags WHERE user_id = ? ORDER BY tag",
             (user_id,),
         ).fetchall()
-    custom = [r["tag"] for r in rows]
-    merged = list(DEFAULT_TAG_OPTIONS)
+        hidden_rows = conn.execute(
+            "SELECT tag FROM hidden_tags WHERE user_id = ?",
+            (user_id,),
+        ).fetchall()
+    hidden = {r["tag"] for r in hidden_rows}
+    custom = [r["tag"] for r in custom_rows]
+    merged = [t for t in DEFAULT_TAG_OPTIONS if t not in hidden]
     for tag in custom:
         if tag not in merged:
             merged.append(tag)
     return merged
+
+
+def fetch_hidden_tags(user_id):
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT tag FROM hidden_tags WHERE user_id = ?", (user_id,)
+        ).fetchall()
+    return {r["tag"] for r in rows}
+
+
+def hide_default_tag(user_id, tag):
+    """Hide a default tag for a user. Returns True if newly hidden."""
+    with get_connection() as conn:
+        try:
+            conn.execute(
+                "INSERT INTO hidden_tags (user_id, tag) VALUES (?, ?)",
+                (user_id, tag),
+            )
+            conn.commit()
+            return True
+        except Exception:
+            return False
+
+
+def tag_in_use_count(user_id, tag):
+    """Return number of accounts that have this tag assigned."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT tags FROM accounts WHERE user_id = ? AND is_active = 1 AND tags IS NOT NULL",
+            (user_id,),
+        ).fetchall()
+    return sum(1 for r in rows if tag in [t.strip() for t in r["tags"].split(",")])
 
 
 def fetch_custom_tags(user_id):

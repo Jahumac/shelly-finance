@@ -305,9 +305,7 @@
               <label class="tag-chip">
                 <input type="checkbox" value="{{ tag }}" data-tag-checkbox>
                 <span>{{ tag }}</span>
-                {% if tag in custom_tags %}
-                <button type="button" class="tag-delete" data-delete-tag="{{ tag }}" title="Remove custom tag">&times;</button>
-                {% endif %}
+                <button type="button" class="tag-delete" data-delete-tag="{{ tag }}" title="Remove tag">&times;</button>
               </label>
               {% endfor %}
             </div>
