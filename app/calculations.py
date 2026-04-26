@@ -216,6 +216,10 @@ def projection_monthly_contribution(account, assumptions=None, month_index=0):
     return effective_monthly_contribution(adjusted, assumptions)
 
 
+def effective_monthly_contribution(account, assumptions=None):
+    return contribution_breakdown(account, assumptions)["total_into_pot"]
+
+
 def convert_to_gbp(amount, from_currency, fx_rates=None):
     """Convert an amount from a source currency to GBP.
 
@@ -658,6 +662,38 @@ def uk_tax_year_start(today=None):
     return date(start_year, 4, 6)
 
 
+
+
+def months_in_tax_year(today=None, salary_day=0):
+    today = today or date.today()
+    start = uk_tax_year_start(today)
+    contribution_day = salary_day if salary_day >= 1 else 1
+    if contribution_day >= 6:
+        first_year, first_month = start.year, start.month
+    else:
+        first_year = start.year
+        first_month = start.month + 1
+        if first_month > 12:
+            first_month = 1
+            first_year += 1
+    count = 0
+    y, m = first_year, first_month
+    while (y < today.year) or (y == today.year and m <= today.month):
+        if y < today.year or (y == today.year and m < today.month):
+            count += 1
+        elif y == today.year and m == today.month:
+            if today.day >= _resolve_contribution_day(y, m, contribution_day):
+                count += 1
+        if m == 12:
+            y, m = y + 1, 1
+        else:
+            m += 1
+    return count
+
+
+def full_year_contribution_months(salary_day=0):
+    contribution_day = salary_day if salary_day >= 1 else 1
+    return 12 if contribution_day >= 6 else 11
 
 
 def _resolve_contribution_day(year, month, nominal_day):
