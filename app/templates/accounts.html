@@ -158,8 +158,9 @@
             <label>
               <span>Balance Method</span>
               <select name="valuation_mode" data-valuation-mode>
-                <option value="manual" {% if selected.valuation_mode == 'manual' %}selected{% endif %}>Manual</option>
+                <option value="manual" {% if selected.valuation_mode == 'manual' or not selected.valuation_mode %}selected{% endif %}>Manual</option>
                 <option value="holdings" {% if selected.valuation_mode == 'holdings' %}selected{% endif %}>Built from holdings</option>
+                <option value="premium_bonds" {% if selected.valuation_mode == 'premium_bonds' %}selected{% endif %}>Premium Bonds</option>
               </select>
             </label>
             <label>
@@ -393,9 +394,9 @@
         {% endif %}
         <div class="acct-detail-stat">
           <span>Valuation</span>
-          <strong>{{ 'From holdings' if selected.valuation_mode == 'holdings' else 'Manual' }}</strong>
+          <strong>{% if selected.valuation_mode == 'holdings' %}From holdings{% elif selected.valuation_mode == 'premium_bonds' %}Premium Bonds{% else %}Manual{% endif %}</strong>
         </div>
-        {% if selected.valuation_mode != 'holdings' %}
+        {% if selected.valuation_mode not in ('holdings', 'premium_bonds') %}
         {% set _eff_rate = selected.growth_rate_override if selected.growth_mode == 'custom' and selected.growth_rate_override else global_growth_rate %}
         {% set _bal = effective_values[selected.id] or 0 %}
         <div class="acct-detail-stat">
@@ -405,6 +406,18 @@
         <div class="acct-detail-stat">
           <span>Est. monthly growth</span>
           <strong class="text-gain">£{{ '{:,.2f}'.format(_bal * _eff_rate / 12) }}</strong>
+        </div>
+        {% endif %}
+        {% if selected.valuation_mode == 'premium_bonds' %}
+        {% set _pb_rate = selected.growth_rate_override if selected.growth_mode == 'custom' and selected.growth_rate_override else 0.033 %}
+        {% set _bal = effective_values[selected.id] or 0 %}
+        <div class="acct-detail-stat" title="Estimated annual prizes based on prize fund rate — not guaranteed">
+          <span>Prize fund rate</span>
+          <strong>{{ '{:.1f}'.format(_pb_rate * 100) }}% (est.)</strong>
+        </div>
+        <div class="acct-detail-stat" title="Prizes won this UK tax year">
+          <span>Prizes {{ tax_year_label }}</span>
+          <strong class="text-gain">£{{ '{:,.2f}'.format(pb_prizes_ty_total) }}</strong>
         </div>
         {% endif %}
         {% if selected.goal_value %}
@@ -547,6 +560,66 @@
         <p class="helper-text">No adjustments yet — Shelly's using your standard account contribution.</p>
         {% endif %}
       </section>
+
+      {% if selected.valuation_mode == 'premium_bonds' %}
+      {# ── Premium Bonds prize history ──────────────────────────────────── #}
+      <section class="panel mt-1">
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Prize Draw</p>
+            <h3>Prize History</h3>
+          </div>
+        </div>
+        <p class="helper-text">Log each month's prize draw result. NS&amp;I announces prizes on the 1st of each month — even £0 is worth recording so your history stays complete.</p>
+
+        <form method="post" class="pb-prize-log-form mt-075">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="form_name" value="log_prize">
+          <div class="pb-prize-log-row">
+            <label>
+              <span>Month</span>
+              <input type="month" name="month_key" value="{{ current_month_key }}" required>
+            </label>
+            <label>
+              <span>Prize amount (£)</span>
+              <input type="number" step="0.01" min="0" name="prize_amount" placeholder="0.00" required>
+            </label>
+            <button type="submit" class="badge badge-primary-action">Log prize</button>
+          </div>
+        </form>
+
+        {% if pb_prizes %}
+        <div class="pb-prize-list mt-075">
+          {% for prize in pb_prizes %}
+          <div class="pb-prize-row">
+            <div>
+              <strong>{{ prize.month_key }}</strong>
+              {% if prize.prize_amount > 0 %}
+                <span class="pb-prize-won">£{{ '{:,.2f}'.format(prize.prize_amount) }}</span>
+              {% else %}
+                <span class="pb-prize-nil">No win</span>
+              {% endif %}
+            </div>
+            <form method="post" class="form-reset" style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="form_name" value="delete_prize">
+              <input type="hidden" name="prize_id" value="{{ prize.id }}">
+              <button type="submit" class="badge badge-meta badge-sm"
+                      data-confirm="Remove prize entry for {{ prize.month_key }}?"
+                      data-confirm-title="Delete prize entry?"
+                      data-confirm-ok="Yes, remove it"
+                      data-confirm-cancel="Keep it">✕</button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+        <p class="helper-text mt-05">Total {{ tax_year_label }}: <strong>£{{ '{:,.2f}'.format(pb_prizes_ty_total) }}</strong></p>
+        {% else %}
+        <p class="helper-text mt-075">No prizes logged yet. Use the form above to start tracking.</p>
+        {% endif %}
+      </section>
+      {% endif %}
+
     {% endif %}
   </section>
 

@@ -25,6 +25,15 @@ submodule.
 from ._conn import close_db, get_connection
 from .schema import SCHEMA, init_db
 
+# Premium Bonds prize tracking
+from .premium_bonds import (
+    delete_prize,
+    fetch_prize_for_month,
+    fetch_prizes,
+    fetch_prizes_tax_year,
+    log_prize,
+)
+
 # Users + API tokens
 from .users import (
     User,

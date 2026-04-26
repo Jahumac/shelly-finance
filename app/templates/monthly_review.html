@@ -81,7 +81,7 @@
     </div>
     <div class="hero-strip-stat">
       <span>Accounts</span>
-      <strong>{{ (holdings_items | length) + (manual_items | length) }}</strong>
+      <strong>{{ (holdings_items | length) + (manual_items | length) + (premium_bonds_items | length) }}</strong>
     </div>
     <div class="hero-strip-stat">
       <span>Expected contributions</span>
@@ -325,6 +325,76 @@
     <p class="helper-text">No manual accounts to review this month. If you add any manual-value accounts, Shelly will prompt you to update them here.</p>
   {% endif %}
 </section>
+
+{% if premium_bonds_items %}
+<section class="card mb-1">
+  <div class="section-header">
+    <div>
+      <p class="eyebrow">Premium Bonds</p>
+      <h2>Prize Draw Results</h2>
+    </div>
+  </div>
+  <p class="helper-text">NS&amp;I announces prize results on the 1st of each month. Log what you won — or £0 if nothing this time. Update the balance below to match your NS&amp;I account.</p>
+  <div class="review-list">
+    {% for item in premium_bonds_items %}
+    {% set existing_prize = pb_prizes_this_month.get(item.account_id) %}
+    <section class="card position-entry-card">
+      <div class="section-header mb-05">
+        <div>
+          <h3>{{ item.account_name }}</h3>
+          <p>{% if item.provider %}{{ item.provider }} · {% endif %}{{ item.wrapper_type or 'Premium Bonds' }}</p>
+        </div>
+        <a class="badge" href="/accounts/{{ item.account_id }}">Open account</a>
+      </div>
+
+      {# Prize logging #}
+      <form method="post" class="pb-prize-log-form mb-075">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="form_name" value="log_prize">
+        <input type="hidden" name="month" value="{{ month_key }}">
+        <input type="hidden" name="account_id" value="{{ item.account_id }}">
+        <div class="pb-prize-log-row">
+          <label>
+            <span>Prize this month (£)</span>
+            <input type="number" step="0.01" min="0" name="prize_amount"
+                   value="{{ '{:.2f}'.format(existing_prize.prize_amount) if existing_prize else '' }}"
+                   placeholder="0.00"
+                   {% if review.status == 'complete' %}disabled{% endif %}>
+          </label>
+          {% if review.status != 'complete' %}
+          <button type="submit" class="badge badge-primary-action">
+            {{ 'Update prize' if existing_prize else 'Log prize' }}
+          </button>
+          {% endif %}
+        </div>
+        {% if existing_prize and existing_prize.prize_amount > 0 %}
+        <p class="helper-text mt-025">Last logged: <strong class="pb-prize-won">£{{ '{:,.2f}'.format(existing_prize.prize_amount) }}</strong></p>
+        {% elif existing_prize %}
+        <p class="helper-text mt-025">Logged: no win this month.</p>
+        {% endif %}
+      </form>
+
+      {# Balance update — same as manual accounts #}
+      <form method="post" class="settings-form simple-list-item" style="border-top: 1px solid var(--border); padding-top: 0.75rem; margin-top: 0;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="form_name" value="update_account_balance">
+        <input type="hidden" name="month" value="{{ month_key }}">
+        <input type="hidden" name="account_id" value="{{ item.account_id }}">
+        <label>
+          <span>Current NS&amp;I balance (£)</span>
+          <input type="number" step="0.01" name="current_value"
+                 value="{{ '{:.2f}'.format(item.current_value) if item.current_value else '' }}"
+                 {% if review.status == 'complete' %}disabled{% endif %}>
+        </label>
+        {% if review.status != 'complete' %}
+        <button type="submit" class="badge badge-primary-action">Update balance</button>
+        {% endif %}
+      </form>
+    </section>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 
 <section class="card">
   <div class="section-header">

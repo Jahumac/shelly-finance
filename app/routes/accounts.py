@@ -24,6 +24,7 @@ from app.models import (
     delete_account,
     delete_custom_tag,
     delete_holding,
+    delete_prize,
     fetch_account,
     fetch_all_accounts,
     fetch_catalogue_with_prices,
@@ -38,7 +39,10 @@ from app.models import (
     fetch_account_snapshot_history,
     fetch_isa_contributions,
     fetch_pension_contributions,
+    fetch_prizes,
+    fetch_prizes_tax_year,
     fetch_user_tags,
+    log_prize,
     reconnect_holdings_to_catalogue,
     sync_holding_prices_from_catalogue,
     fetch_assumptions,
@@ -166,6 +170,15 @@ def _render_accounts_page(user_id, selected=None, detail_mode="view", position_e
                 edit_holding = p
                 break
 
+    # Premium Bonds prize history for selected account
+    pb_prizes = []
+    pb_prizes_ty_total = 0.0
+    if selected and selected.get("valuation_mode") == "premium_bonds":
+        pb_prizes = fetch_prizes(selected["id"], user_id)
+        ty_start_month = uk_tax_year_start(today).strftime("%Y-%m")
+        ty_end_month = uk_tax_year_end(today).strftime("%Y-%m")
+        pb_prizes_ty_total = fetch_prizes_tax_year(selected["id"], user_id, ty_start_month, ty_end_month)
+
     allocation_rows = []
     allocation_total = 0.0
     if selected and positions:
@@ -226,6 +239,8 @@ def _render_accounts_page(user_id, selected=None, detail_mode="view", position_e
         account_daily_values=account_daily_values,
         global_growth_rate=float(assumptions["annual_growth_rate"]) if assumptions and assumptions["annual_growth_rate"] else 0.05,
         prices_stale=prices_stale,
+        pb_prizes=pb_prizes,
+        pb_prizes_ty_total=pb_prizes_ty_total,
     )
 
 
@@ -458,6 +473,21 @@ def account_detail(account_id):
         if form_name == "delete_account":
             delete_account(account_id, uid)
             return redirect(url_for("accounts.accounts"))
+
+        if form_name == "log_prize":
+            month_key = request.form.get("month_key", "")
+            prize_amount = optional_float(request.form.get("prize_amount"), 0.0)
+            if month_key and prize_amount is not None:
+                log_prize(account_id, uid, month_key, prize_amount)
+                flash(f"Prize of £{prize_amount:,.2f} logged for {month_key}.", "success")
+            return redirect(url_for("accounts.account_detail", account_id=account_id))
+
+        if form_name == "delete_prize":
+            prize_id = optional_int(request.form.get("prize_id"))
+            if prize_id:
+                delete_prize(prize_id, uid)
+                flash("Prize entry removed.", "success")
+            return redirect(url_for("accounts.account_detail", account_id=account_id))
 
         payload = _account_payload_from_form(request.form)
         payload["id"] = account_id

@@ -1454,7 +1454,7 @@
         'Stocks & Shares ISA':       { cat: 'ISA',     bal: 'holdings', showEmployer: false, method: null, personalLabel: 'Monthly contribution', hint: 'How much do you put into this ISA each month? Even a rough figure helps Shelly map out your future.' },
         'Cash ISA':                   { cat: 'ISA',     bal: 'manual',   showEmployer: false, method: null, personalLabel: 'Monthly deposit', hint: 'How much do you stash away in this Cash ISA each month?' },
         'Lifetime ISA':               { cat: 'ISA',     bal: 'holdings', showEmployer: false, method: null, personalLabel: 'Your monthly contribution', hint: 'How much do you pay in each month? The government tops it up with a lovely 25% bonus (up to £1,000/year).' },
-        'Premium Bonds':              { cat: 'Savings', bal: 'manual',   showEmployer: false, method: null, personalLabel: 'Monthly purchase', hint: 'How much do you usually add to Premium Bonds each month? Shelly treats prize returns as an estimate, not guaranteed interest.' },
+        'Premium Bonds':              { cat: 'Savings', bal: 'premium_bonds', showEmployer: false, method: null, personalLabel: 'Monthly purchase', hint: 'How much do you usually add to Premium Bonds each month? Shelly tracks your prize draws and uses a gentle estimate for projections.' },
         'SIPP':                       { cat: 'Pension', bal: 'holdings', showEmployer: false, method: null, personalLabel: 'Your monthly contribution', hint: 'How much do you pay in? Your provider claims 25% tax relief from HMRC automatically — free money, basically.' },
         'Workplace Pension':          { cat: 'Pension', bal: 'manual',   showEmployer: true,  method: ['salary_sacrifice','relief_at_source'], methodDefault: 'salary_sacrifice', personalLabel: 'Your employee contribution', hint: 'How is your workplace pension set up? Pick the method first — Shelly will work out the rest.', methodHints: { salary_sacrifice: 'Contributions come out of your pay before tax — no further relief needed.', relief_at_source: 'You pay from net pay; your provider claims 20% tax relief from HMRC (e.g. NEST).' } },
         'General Investment Account': { cat: 'Taxable', bal: 'holdings', showEmployer: false, method: null, personalLabel: 'Monthly investment', hint: 'How much do you invest into this account each month?' },
@@ -1493,7 +1493,7 @@
           provider: 'NS&I',
           wrapper: 'Premium Bonds',
           category: 'Savings',
-          valuation: 'manual',
+          valuation: 'premium_bonds',
           growthMode: 'custom',
           rate: '3.3'
         }

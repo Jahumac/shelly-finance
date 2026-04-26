@@ -656,6 +656,19 @@ def _run_migrations(conn):
         )
     """)
 
+    # ── Premium Bonds prize log ───────────────────────────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS premium_bonds_prizes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            account_id INTEGER NOT NULL REFERENCES accounts(id),
+            month_key TEXT NOT NULL,
+            prize_amount REAL NOT NULL DEFAULT 0,
+            logged_at TEXT,
+            UNIQUE(account_id, month_key)
+        )
+    """)
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS pension_contributions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

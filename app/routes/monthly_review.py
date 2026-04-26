@@ -27,6 +27,8 @@ from app.models import (
     fetch_monthly_review_items,
     fetch_or_create_monthly_review,
     fetch_primary_goal,
+    fetch_prize_for_month,
+    log_prize,
     mark_review_item_updated,
     remove_contribution_override_for_month,
     set_contribution_confirmed,
@@ -144,6 +146,11 @@ def monthly_review():
             review = fetch_monthly_review(month_key, uid)
             if review:
                 update_monthly_review(review["id"], "not_started", review.get("notes") or "", uid)
+        elif form_name == "log_prize":
+            account_id = optional_int(request.form.get("account_id"))
+            prize_amount = _optional_float(request.form.get("prize_amount"), 0.0)
+            if account_id and fetch_account(account_id, uid):
+                log_prize(account_id, uid, month_key, prize_amount or 0.0)
         return redirect(url_for("monthly_review.monthly_review", month=month_key))
 
     review = fetch_or_create_monthly_review(month_key, uid)
@@ -151,8 +158,15 @@ def monthly_review():
     items = fetch_monthly_review_items(review["id"])
 
     holdings_items = [item for item in items if item["valuation_mode"] == "holdings"]
-    manual_items = [item for item in items if item["valuation_mode"] != "holdings"]
+    premium_bonds_items = [item for item in items if item["valuation_mode"] == "premium_bonds"]
+    manual_items = [item for item in items if item["valuation_mode"] not in ("holdings", "premium_bonds")]
     contribution_items = [item for item in items if (item["expected_contribution"] or 0) > 0]
+
+    # Existing prize for each PB account this month
+    pb_prizes_this_month = {}
+    for pb_item in premium_bonds_items:
+        existing = fetch_prize_for_month(pb_item["account_id"], month_key)
+        pb_prizes_this_month[pb_item["account_id"]] = existing
 
     holdings_by_account = {}
     for row in fetch_all_holdings_grouped(uid):
@@ -180,7 +194,7 @@ def monthly_review():
     # Manual accounts whose balance hasn't been touched this review — snapshotting them
     # without an update will record a stale value and corrupt performance history.
     unupdated_manual_names = [
-        item["account_name"] for item in manual_items
+        item["account_name"] for item in (manual_items + premium_bonds_items)
         if not item.get("balance_updated")
     ]
     unconfirmed_count = sum(
@@ -250,9 +264,11 @@ def monthly_review():
         month_label=month_label(month_key),
         current_month_num=mk_month,
         holdings_items=holdings_items,
+        premium_bonds_items=premium_bonds_items,
         manual_items=manual_items,
         manual_holdings=manual_holdings,
         contribution_items=contribution_items,
+        pb_prizes_this_month=pb_prizes_this_month,
         holdings_by_account=holdings_by_account,
         assumptions=assumptions,
         review_ready_date=ready_date,
