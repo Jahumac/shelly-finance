@@ -58,7 +58,6 @@
           <th class="num">{{ label }}</th>
           {% endfor %}
           <th class="num">Avg</th>
-          <th class="num">Budget</th>
         </tr>
       </thead>
       <tbody>
@@ -74,10 +73,7 @@
             {% endif %}
           </td>
           {% endfor %}
-          <td class="num {% if data.avg > data.default and data.default > 0 %}perf-negative{% endif %}">
-            <strong>£{{ '{:,.0f}'.format(data.avg) }}</strong>
-          </td>
-          <td class="num text-muted">£{{ '{:,.0f}'.format(data.default) }}</td>
+          <td class="num"><strong>£{{ '{:,.0f}'.format(data.avg) }}</strong></td>
         </tr>
         {% endfor %}
       </tbody>

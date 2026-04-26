@@ -700,53 +700,32 @@ def budget_trend():
             active_page="budget",
         )
 
-    # Load all active items, sections, accounts (for linked defaults)
+    # Load sections for ordering and income detection
     db_sections = fetch_budget_sections(uid)
-    all_items = fetch_budget_items(uid)
-    accounts = fetch_all_accounts(uid)
-    account_map = {a["id"]: a for a in accounts}
-    section_label = {s["key"]: s["label"] for s in db_sections}
-    section_order = {s["key"]: s["sort_order"] for s in db_sections}
+    section_order_map = {s["label"]: s["sort_order"] for s in db_sections}
+    income_section = next((s for s in db_sections if "income" in s["key"].lower()), None)
+    income_section_label = income_section["label"] if income_section else None
 
-    # Build entry lookup: {month_key: {item_id: amount}}
-    entry_lookup = {}
-    for mk in months:
-        entry_lookup[mk] = {
-            e["budget_item_id"]: float(e["amount"] or 0)
-            for e in fetch_budget_entries(mk, uid)
-        }
+    # Only use actual recorded entries — no fallback to current defaults
+    raw = fetch_budget_trend(uid, months)
 
-    # Build structure using ALL active items, falling back to linked/default amounts
+    # Build sections: {section_name: {item_name: {month_key: amount, "avg": float}}}
     sections = {}
-    for item in all_items:
-        skey = item["section"]
-        sn = section_label.get(skey, skey)
-        inn = item["name"]
-
-        # Default amount: prefer linked account monthly contribution
-        if item["linked_account_id"] and item["linked_account_id"] in account_map:
-            fallback = float(account_map[item["linked_account_id"]]["monthly_contribution"] or 0)
-        else:
-            fallback = float(item["default_amount"] or 0)
-
+    for row in raw:
+        sn  = row["section_name"]
+        inn = row["item_name"]
+        mk  = row["month_key"]
+        amt = float(row["actual_amount"] or 0)
         if sn not in sections:
-            sections[sn] = {"_order": section_order.get(skey, 99)}
+            sections[sn] = {}
         if inn not in sections[sn]:
-            sections[sn][inn] = {"default": fallback}
+            sections[sn][inn] = {}
+        sections[sn][inn][mk] = amt
 
-        for mk in months:
-            if item["id"] in entry_lookup.get(mk, {}):
-                sections[sn][inn][mk] = entry_lookup[mk][item["id"]]
-            else:
-                sections[sn][inn][mk] = fallback
+    # Sort sections by sort_order
+    sections = dict(sorted(sections.items(), key=lambda x: section_order_map.get(x[0], 99)))
 
-    # Sort sections by sort_order, remove internal _order key
-    sections = {
-        k: {ik: iv for ik, iv in v.items() if ik != "_order"}
-        for k, v in sorted(sections.items(), key=lambda x: x[1].get("_order", 99))
-    }
-
-    # Averages
+    # Averages (only over months that have an actual entry)
     for sn, items in sections.items():
         for inn, data in items.items():
             month_vals = [data[mk] for mk in months if mk in data]
@@ -757,10 +736,6 @@ def budget_trend():
     ]
 
     # Hero stats
-    income_section = next((s for s in db_sections if "income" in s["key"].lower()), None)
-    income_key = income_section["key"] if income_section else None
-    income_section_label = income_section["label"] if income_section else None
-
     trend_avg_income = 0.0
     trend_avg_spend = 0.0
     trend_item_count = 0
