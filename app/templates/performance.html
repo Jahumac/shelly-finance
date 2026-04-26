@@ -3,7 +3,7 @@
 {% block title %}Performance{% endblock %}
 {% block content %}
 
-<nav class="subnav">
+<nav class="subnav subnav-goals">
   <a href="/goals/">Goals</a>
   <a href="/projections/">Projections</a>
   <a href="/performance/" class="subnav-active">Performance</a>
@@ -77,7 +77,7 @@
 
 {# ── Chart ─────────────────────────────────────────────────────── #}
 <div class="panel chart-wrap mb-15">
-  <div class="flex flex-between flex-center mb-1">
+  <div class="flex flex-between flex-center mb-1 perf-chart-header">
     <h3 class="section-title-sm">Portfolio Value Over Time</h3>
     <div class="perf-legend">
       <span class="perf-legend-dot" style="background:var(--accent-2)"></span><span>Actual</span>

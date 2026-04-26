@@ -2109,6 +2109,15 @@ button.badge-like-button {
   gap: 0.6rem;
   font-size: 0.78rem;
   color: var(--muted);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 600px) {
+  .perf-chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
 }
 
 .perf-legend-dot {
@@ -3920,6 +3929,20 @@ button.badge-like-button {
   .subnav-budget a:nth-child(4),
   .subnav-budget a:nth-child(5) {
     flex-basis: 28%;
+  }
+
+  /* Goals/Performance subnav has 4 tabs — wrap into 2 rows: 3 on top, 1 on bottom */
+  .subnav-goals {
+    flex-wrap: wrap;
+    border-radius: 1rem;
+  }
+  .subnav-goals a:nth-child(1),
+  .subnav-goals a:nth-child(2),
+  .subnav-goals a:nth-child(3) {
+    flex-basis: 30%;
+  }
+  .subnav-goals a:nth-child(4) {
+    flex-basis: 100%;
   }
 }
 
