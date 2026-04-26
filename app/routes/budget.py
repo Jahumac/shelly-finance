@@ -147,8 +147,10 @@ def _build_monthly_data(month_key, user_id):
                 source = "default"
 
             linked_account_name = None
+            pre_salary = False
             if linked_account:
                 linked_account_name = linked_account["name"]
+                pre_salary = (linked_account.get("contribution_method") == "salary_sacrifice")
 
             section_items.append({
                 "id": item["id"],
@@ -158,6 +160,7 @@ def _build_monthly_data(month_key, user_id):
                 "linked": item["linked_account_id"] is not None,
                 "linked_account_name": linked_account_name,
                 "source": source,
+                "pre_salary": pre_salary,
             })
         section_total = sum(i["amount"] for i in section_items)
         section_totals[section_key] = section_total
@@ -168,9 +171,17 @@ def _build_monthly_data(month_key, user_id):
             "total": section_total,
         })
 
+    # Pre-salary items (salary sacrifice) are shown for visibility but never flowed
+    # through take-home pay, so exclude them from the surplus deduction.
+    pre_salary_total = sum(
+        item["amount"]
+        for sec in sections
+        for item in sec["rows"]
+        if item.get("pre_salary")
+    )
     total_income = section_totals.get(income_key, 0)
     total_expenses = sum(v for k, v in section_totals.items() if k != income_key)
-    surplus = total_income - total_expenses
+    surplus = total_income - (total_expenses - pre_salary_total)
     savings_total = 0.0
     for sec in db_sections:
         k = sec["key"]

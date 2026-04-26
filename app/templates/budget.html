@@ -125,23 +125,36 @@
   {% if section.rows %}
   <div class="budget-rows">
     {% for item in section.rows %}
-    <div class="budget-row">
+    <div class="budget-row{% if item.pre_salary %} budget-row-pre-salary{% endif %}">
       <div class="budget-row-left">
         <span class="budget-row-name">{{ item.name }}</span>
-        {% if item.linked %}<span class="budget-pill" title="Uses {{ item.linked_account_name or 'the account' }}'s normal monthly contribution unless you save a one-month change">linked · {{ item.linked_account_name or '—' }}</span>{% endif %}
-        {% if item.source == 'inherited' %}<span class="budget-row-source" data-source="inherited" title="Carried forward from the last month you edited">prev month</span>{% endif %}
-        {% if item.source == 'default' %}<span class="budget-row-source" data-source="default" title="Using the default amount — change it to save for this month">default</span>{% endif %}
-        {% if item.source == 'override' %}<span class="budget-row-source" data-source="override" title="Using a contribution override for this month">override</span>{% endif %}
+        {% if item.pre_salary %}
+          <span class="budget-pill budget-pill-pre-salary" title="Deducted before your salary arrives — shown for visibility but not counted against your take-home">pre-salary</span>
+        {% elif item.linked %}
+          <span class="budget-pill" title="Uses {{ item.linked_account_name or 'the account' }}'s normal monthly contribution unless you save a one-month change">linked · {{ item.linked_account_name or '—' }}</span>
+        {% endif %}
+        {% if not item.pre_salary %}
+          {% if item.source == 'inherited' %}<span class="budget-row-source" data-source="inherited" title="Carried forward from the last month you edited">prev month</span>{% endif %}
+          {% if item.source == 'default' %}<span class="budget-row-source" data-source="default" title="Using the default amount — change it to save for this month">default</span>{% endif %}
+          {% if item.source == 'override' %}<span class="budget-row-source" data-source="override" title="Using a contribution override for this month">override</span>{% endif %}
+        {% endif %}
         {% if item.notes %}<span class="budget-row-note">{{ item.notes }}</span>{% endif %}
       </div>
       <div class="budget-row-right">
         <span class="budget-row-currency">£</span>
+        {% if item.pre_salary %}
+        <input type="number" step="0.01"
+               class="budget-amount-input budget-amount-readonly"
+               value="{{ '{:.2f}'.format(item.amount) }}"
+               readonly tabindex="-1">
+        {% else %}
         <input type="number" step="0.01"
                class="budget-amount-input"
                data-item-id="{{ item.id }}"
                data-section="{{ section.key }}"
                value="{{ '{:.2f}'.format(item.amount) }}">
         <span class="budget-save-indicator" id="ind-{{ item.id }}"></span>
+        {% endif %}
       </div>
     </div>
     {% endfor %}

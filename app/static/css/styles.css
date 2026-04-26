@@ -2125,6 +2125,22 @@ button.badge-like-button {
   border: 1px solid rgba(56,189,248,0.18);
 }
 
+.budget-pill-pre-salary {
+  background: rgba(148,163,184,0.1);
+  color: var(--muted);
+  border-color: rgba(148,163,184,0.2);
+}
+
+.budget-row-pre-salary {
+  opacity: 0.6;
+}
+
+.budget-amount-readonly {
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
 .budget-row-right {
   display: flex;
   align-items: center;
