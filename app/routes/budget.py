@@ -816,12 +816,11 @@ def budget_items_view():
         sort_order = max(
             (i["sort_order"] for i in existing if i["section"] == section), default=-1
         ) + 1
-        linked_raw = request.form.get("linked_account_id", "")
         create_budget_item({
             "name": request.form.get("name", "").strip(),
             "section": section,
             "default_amount": optional_float(request.form.get("default_amount"), 0.0),
-            "linked_account_id": int(linked_raw) if linked_raw else None,
+            "linked_account_id": None,
             "notes": request.form.get("notes", "").strip(),
             "sort_order": sort_order,
         }, uid)
@@ -882,13 +881,16 @@ def budget_item_action(item_id):
         delete_budget_item(item_id, uid)
         return redirect(url_for("budget.budget_items_view"))
 
-    linked_raw = request.form.get("linked_account_id", "")
+    item = fetch_budget_item(item_id, uid)
+    if not item:
+        flash("Budget item not found.", "error")
+        return redirect(url_for("budget.budget_items_view"))
     ok = update_budget_item({
         "id": item_id,
         "name": request.form.get("name", "").strip(),
         "section": request.form.get("section", ""),
         "default_amount": max(0.0, optional_float(request.form.get("default_amount"), 0.0)),
-        "linked_account_id": int(linked_raw) if linked_raw else None,
+        "linked_account_id": item["linked_account_id"],
         "notes": request.form.get("notes", "").strip(),
     }, uid)
     if not ok:

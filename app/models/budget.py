@@ -9,10 +9,86 @@ from ._conn import get_connection
 
 def fetch_budget_items(user_id):
     with get_connection() as conn:
+        _ensure_account_contribution_items(conn, user_id)
         return conn.execute(
             "SELECT * FROM budget_items WHERE is_active = 1 AND user_id = ? ORDER BY section, sort_order, id",
             (user_id,),
         ).fetchall()
+
+
+def _ensure_account_contribution_items(conn, user_id):
+    """Keep account monthly contributions visible in Budget automatically."""
+    existing_sections = conn.execute(
+        "SELECT key FROM budget_sections WHERE user_id = ?",
+        (user_id,),
+    ).fetchall()
+    existing_keys = {row["key"] for row in existing_sections}
+    missing = [(k, l, o) for k, l, o in _DEFAULT_SECTIONS if k not in existing_keys]
+    if missing:
+        conn.executemany(
+            "INSERT OR IGNORE INTO budget_sections (user_id, key, label, sort_order) VALUES (?, ?, ?, ?)",
+            [(user_id, k, l, o) for k, l, o in missing],
+        )
+
+    investment_section = conn.execute(
+        """
+        SELECT key FROM budget_sections
+        WHERE user_id = ?
+          AND (lower(key) LIKE '%invest%' OR lower(key) LIKE '%saving%')
+        ORDER BY sort_order, id
+        LIMIT 1
+        """,
+        (user_id,),
+    ).fetchone()
+    section_key = investment_section["key"] if investment_section else "investment"
+
+    accounts = conn.execute(
+        """
+        SELECT id, name
+        FROM accounts
+        WHERE user_id = ?
+          AND is_active = 1
+          AND COALESCE(monthly_contribution, 0) > 0
+        ORDER BY id ASC
+        """,
+        (user_id,),
+    ).fetchall()
+
+    for account in accounts:
+        existing = conn.execute(
+            """
+            SELECT id FROM budget_items
+            WHERE user_id = ?
+              AND linked_account_id = ?
+              AND is_active = 1
+            LIMIT 1
+            """,
+            (user_id, account["id"]),
+        ).fetchone()
+        if existing:
+            continue
+        sort_row = conn.execute(
+            "SELECT COALESCE(MAX(sort_order), -1) AS max_sort FROM budget_items WHERE user_id = ? AND section = ?",
+            (user_id, section_key),
+        ).fetchone()
+        conn.execute(
+            """
+            INSERT INTO budget_items (
+                user_id, name, section, default_amount, linked_account_id,
+                notes, sort_order, is_active
+            )
+            VALUES (?, ?, ?, 0, ?, ?, ?, 1)
+            """,
+            (
+                user_id,
+                account["name"],
+                section_key,
+                account["id"],
+                "Auto-created from account contribution.",
+                (sort_row["max_sort"] or -1) + 1,
+            ),
+        )
+    conn.commit()
 
 
 def fetch_budget_item(item_id, user_id=None):

@@ -604,3 +604,26 @@ def test_linked_budget_items_do_not_inherit_prior_month_one_offs(app, two_users)
         row = next(row for section in sections for row in section["rows"])
         assert row["amount"] == 1000
         assert row["source"] == "linked"
+
+
+def test_accounts_with_monthly_contributions_auto_appear_in_budget(app, two_users):
+    from app.models import fetch_budget_items, get_connection
+    from app.routes.budget import _build_monthly_data
+
+    with app.app_context():
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE accounts SET name = 'Premium Bonds', monthly_contribution = 10 WHERE id = ?",
+                (two_users["alice"]["account"],),
+            )
+            conn.commit()
+
+        items = fetch_budget_items(two_users["alice"]["uid"])
+        item = next(i for i in items if i["linked_account_id"] == two_users["alice"]["account"])
+        assert item["name"] == "Premium Bonds"
+        assert item["section"] == "investment"
+
+        sections, _ = _build_monthly_data("2026-04", two_users["alice"]["uid"])
+        row = next(row for section in sections for row in section["rows"] if row["name"] == "Premium Bonds")
+        assert row["amount"] == 10
+        assert row["source"] == "linked"
