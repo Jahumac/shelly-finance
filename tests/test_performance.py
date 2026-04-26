@@ -43,3 +43,18 @@ def test_monthly_performance_carries_forward_missing_account_snapshots(app, make
         assert perf["total_return"] == 0.0
         assert perf["total_market_gain"] == 0.0
         assert perf["carried_forward_months"] == 1
+
+
+def test_performance_plan_uses_recorded_monthly_contributions():
+    from app.calculations import compute_performance_series
+
+    monthly_data = [
+        ("2026-03", 1000, 0, 0),
+        ("2026-04", 1000, 0, 0),
+        ("2026-05", 1100, 100, 0),
+    ]
+
+    perf = compute_performance_series(monthly_data, assumed_rate=0, assumed_monthly=500)
+
+    assert perf["projected_values"] == [1000, 1000, 1100]
+    assert perf["vs_plan"] == 0

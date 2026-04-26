@@ -54,6 +54,13 @@ def fetch_monthly_review_items(review_id):
 def ensure_monthly_review_items(review_id, user_id):
     accounts = fetch_all_accounts(user_id)
     with get_connection() as conn:
+        review = conn.execute(
+            "SELECT month_key FROM monthly_reviews WHERE id = ? AND user_id = ?",
+            (review_id, user_id),
+        ).fetchone()
+        if not review:
+            return
+        month_key = review["month_key"]
         existing_rows = conn.execute(
             "SELECT account_id FROM monthly_review_items WHERE review_id = ?",
             (review_id,),
@@ -62,6 +69,23 @@ def ensure_monthly_review_items(review_id, user_id):
 
         for account in accounts:
             if account["id"] not in existing_ids:
+                override = conn.execute(
+                    """
+                    SELECT override_amount
+                    FROM contribution_overrides
+                    WHERE account_id = ?
+                      AND from_month <= ?
+                      AND to_month >= ?
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """,
+                    (account["id"], month_key, month_key),
+                ).fetchone()
+                expected = (
+                    override["override_amount"]
+                    if override is not None
+                    else account["monthly_contribution"] or 0
+                )
                 conn.execute(
                     """
                     INSERT INTO monthly_review_items (
@@ -70,7 +94,7 @@ def ensure_monthly_review_items(review_id, user_id):
                     )
                     VALUES (?, ?, ?, 0, 0, 0, '')
                     """,
-                    (review_id, account["id"], account["monthly_contribution"] or 0),
+                    (review_id, account["id"], expected),
                 )
         conn.commit()
 

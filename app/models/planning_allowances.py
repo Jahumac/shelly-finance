@@ -251,8 +251,10 @@ def fetch_all_active_overrides(month_key, user_id):
     return {r["account_id"]: r for r in rows}
 
 
-def create_contribution_override(payload):
+def create_contribution_override(payload, user_id=None):
     with get_connection() as conn:
+        if user_id is not None and not _account_belongs_to_user(conn, payload["account_id"], user_id):
+            return None
         cursor = conn.execute(
             """
             INSERT INTO contribution_overrides (account_id, from_month, to_month, override_amount, reason, created_at)
@@ -267,6 +269,25 @@ def create_contribution_override(payload):
                 datetime.now(timezone.utc).isoformat(),
             ),
         )
+        if user_id is not None:
+            conn.execute(
+                """UPDATE monthly_review_items
+                   SET expected_contribution = ?
+                   WHERE account_id = ?
+                     AND review_id IN (
+                         SELECT id FROM monthly_reviews
+                         WHERE user_id = ?
+                           AND month_key >= ?
+                           AND month_key <= ?
+                     )""",
+                (
+                    payload["override_amount"],
+                    payload["account_id"],
+                    user_id,
+                    payload["from_month"],
+                    payload["to_month"],
+                ),
+            )
         conn.commit()
         return cursor.lastrowid
 
@@ -274,11 +295,27 @@ def create_contribution_override(payload):
 def remove_contribution_override_for_month(account_id, month_key, user_id):
     """Delete a single-month skip override (from_month == to_month == month_key)."""
     with get_connection() as conn:
+        account = conn.execute(
+            "SELECT monthly_contribution FROM accounts WHERE id = ? AND user_id = ?",
+            (account_id, user_id),
+        ).fetchone()
+        if not account:
+            return
         conn.execute(
             """DELETE FROM contribution_overrides
                WHERE account_id = ? AND from_month = ? AND to_month = ?
                AND account_id IN (SELECT id FROM accounts WHERE user_id = ?)""",
             (account_id, month_key, month_key, user_id),
+        )
+        conn.execute(
+            """UPDATE monthly_review_items
+               SET expected_contribution = ?
+               WHERE account_id = ?
+                 AND review_id IN (
+                     SELECT id FROM monthly_reviews
+                     WHERE user_id = ? AND month_key = ?
+                 )""",
+            (account["monthly_contribution"] or 0, account_id, user_id, month_key),
         )
         conn.commit()
 
@@ -309,6 +346,16 @@ def upsert_single_month_contribution_override(account_id, month_key, amount, use
                (account_id, from_month, to_month, override_amount, reason, created_at)
                VALUES (?, ?, ?, ?, ?, ?)""",
             (account_id, month_key, month_key, amount, reason, datetime.now(timezone.utc).isoformat()),
+        )
+        conn.execute(
+            """UPDATE monthly_review_items
+               SET expected_contribution = ?
+               WHERE account_id = ?
+                 AND review_id IN (
+                     SELECT id FROM monthly_reviews
+                     WHERE user_id = ? AND month_key = ?
+                 )""",
+            (amount, account_id, user_id, month_key),
         )
         conn.commit()
 

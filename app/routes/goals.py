@@ -4,8 +4,9 @@ from flask_login import current_user, login_required
 
 from app.calculations import (
     effective_account_value,
-    effective_monthly_contribution,
     projected_account_value_at_month,
+    projection_monthly_contribution,
+    projection_start_month_key,
     progress_to_goal,
     remaining_to_goal,
     to_float,
@@ -18,6 +19,7 @@ from app.models import (
     delete_goal,
     fetch_all_accounts,
     fetch_all_goals,
+    fetch_contribution_overrides,
     fetch_goal,
     fetch_holding_totals_by_account,
     update_goal,
@@ -42,7 +44,7 @@ def _goal_payload_from_form(form):
 def _project_goal(included_accounts, target, assumptions):
     """Estimate how many months until the included accounts reach `target`.
 
-    Uses the same engine as the Projections page — effective_monthly_contribution
+    Uses the same engine as the Projections page — effective monthly
     (which includes tax relief, employer match, LISA bonus) and per-account growth
     rates net of fees. Each account is projected independently then summed, so
     different rates and LISA caps are all handled correctly.
@@ -53,7 +55,7 @@ def _project_goal(included_accounts, target, assumptions):
     if current_total >= target_f:
         return {"reached": True}
 
-    total_monthly = sum(effective_monthly_contribution(a, assumptions) for a in included_accounts)
+    total_monthly = sum(projection_monthly_contribution(a, assumptions, 0) for a in included_accounts)
     if total_monthly <= 0:
         return None  # no contributions → can't project
 
@@ -108,7 +110,7 @@ def _build_goal_card(goal, accounts, holdings_totals, assumptions=None):
     target = float(goal["target_value"] or 0)
 
     monthly_contribution = sum(
-        effective_monthly_contribution(a, assumptions) for a in included_accounts
+        projection_monthly_contribution(a, assumptions, 0) for a in included_accounts
     )
     projection = _project_goal(included_accounts, target, assumptions)
 
@@ -154,11 +156,19 @@ def goals():
             create_goal(payload, uid)
         return redirect(url_for("goals.goals"))
 
+    assumptions = fetch_assumptions(uid)
     accounts = fetch_all_accounts(uid)
     holdings_totals = fetch_holding_totals_by_account(uid)
+    start_month = projection_start_month_key(assumptions)
+    accounts = [
+        {
+            **dict(account),
+            "_contribution_overrides": fetch_contribution_overrides(account["id"]),
+            "_projection_start_month": start_month,
+        }
+        for account in accounts
+    ]
     goal_rows = fetch_all_goals(uid)
-
-    assumptions = fetch_assumptions(uid)
 
     goal_cards = [_build_goal_card(goal, accounts, holdings_totals, assumptions) for goal in goal_rows]
 

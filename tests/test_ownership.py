@@ -372,6 +372,118 @@ def test_linked_budget_edit_creates_contribution_override(app, two_users):
         assert rows[0]["reason"] == "from budget"
 
 
+def test_linked_budget_edit_updates_existing_review_expected_contribution(app, two_users):
+    from app.models import fetch_monthly_review_items, fetch_or_create_monthly_review, get_connection
+    from app.routes.budget import _sync_linked_override
+
+    with app.app_context():
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE budget_items SET linked_account_id = ? WHERE id = ?",
+                (two_users["alice"]["account"], two_users["alice"]["budget"]),
+            )
+            conn.commit()
+
+        review = fetch_or_create_monthly_review("2026-07", two_users["alice"]["uid"])
+        from app.models import ensure_monthly_review_items
+        ensure_monthly_review_items(review["id"], two_users["alice"]["uid"])
+
+        _sync_linked_override(two_users["alice"]["budget"], "2026-07", 555, two_users["alice"]["uid"])
+
+        items = fetch_monthly_review_items(review["id"])
+        item = next(i for i in items if i["account_id"] == two_users["alice"]["account"])
+        assert item["expected_contribution"] == 555
+
+
+def test_review_items_created_after_override_use_override_amount(app, two_users):
+    from app.models import (
+        ensure_monthly_review_items,
+        fetch_monthly_review_items,
+        fetch_or_create_monthly_review,
+        upsert_single_month_contribution_override,
+    )
+
+    with app.app_context():
+        upsert_single_month_contribution_override(
+            two_users["alice"]["account"],
+            "2026-07",
+            0,
+            two_users["alice"]["uid"],
+            reason="Skipped",
+        )
+        review = fetch_or_create_monthly_review("2026-07", two_users["alice"]["uid"])
+        ensure_monthly_review_items(review["id"], two_users["alice"]["uid"])
+
+        items = fetch_monthly_review_items(review["id"])
+        item = next(i for i in items if i["account_id"] == two_users["alice"]["account"])
+        assert item["expected_contribution"] == 0
+
+
+def test_account_override_updates_existing_review_expected_contribution(app, two_users):
+    from app.models import (
+        create_contribution_override,
+        ensure_monthly_review_items,
+        fetch_monthly_review_items,
+        fetch_or_create_monthly_review,
+    )
+
+    with app.app_context():
+        review = fetch_or_create_monthly_review("2026-07", two_users["alice"]["uid"])
+        ensure_monthly_review_items(review["id"], two_users["alice"]["uid"])
+
+        create_contribution_override(
+            {
+                "account_id": two_users["alice"]["account"],
+                "from_month": "2026-07",
+                "to_month": "2026-07",
+                "override_amount": 250,
+                "reason": "Holiday",
+            },
+            two_users["alice"]["uid"],
+        )
+
+        items = fetch_monthly_review_items(review["id"])
+        item = next(i for i in items if i["account_id"] == two_users["alice"]["account"])
+        assert item["expected_contribution"] == 250
+
+
+def test_account_override_shows_in_linked_budget_month(app, two_users):
+    from app.models import create_contribution_override, get_connection
+    from app.routes.budget import _build_monthly_data
+
+    with app.app_context():
+        with get_connection() as conn:
+            conn.execute(
+                "INSERT INTO budget_sections (user_id, key, label, sort_order) VALUES (?, 'fixed', 'Fixed', 1)",
+                (two_users["alice"]["uid"],),
+            )
+            conn.execute(
+                "UPDATE accounts SET monthly_contribution = 400 WHERE id = ?",
+                (two_users["alice"]["account"],),
+            )
+            conn.execute(
+                "UPDATE budget_items SET linked_account_id = ? WHERE id = ?",
+                (two_users["alice"]["account"], two_users["alice"]["budget"]),
+            )
+            conn.commit()
+
+        create_contribution_override(
+            {
+                "account_id": two_users["alice"]["account"],
+                "from_month": "2026-07",
+                "to_month": "2026-07",
+                "override_amount": 250,
+                "reason": "Holiday",
+            },
+            two_users["alice"]["uid"],
+        )
+
+        sections, _ = _build_monthly_data("2026-07", two_users["alice"]["uid"])
+        row = next(row for section in sections for row in section["rows"])
+        assert row["amount"] == 250
+        assert row["source"] == "override"
+
+
 def test_linked_budget_second_edit_replaces_not_duplicates(app, two_users):
     """A follow-up edit on the same month replaces the override, not duplicates it."""
     from app.models import get_connection
@@ -464,3 +576,31 @@ def test_skip_after_budget_edit_replaces_not_duplicates(app, two_users):
         assert len(rows) == 1
         assert rows[0]["override_amount"] == 0
         assert rows[0]["reason"] == "Skipped"
+
+
+def test_linked_budget_items_do_not_inherit_prior_month_one_offs(app, two_users):
+    from app.models import get_connection, upsert_budget_entry
+    from app.routes.budget import _build_monthly_data
+
+    with app.app_context():
+        with get_connection() as conn:
+            conn.execute(
+                "INSERT INTO budget_sections (user_id, key, label, sort_order) VALUES (?, 'fixed', 'Fixed', 1)",
+                (two_users["alice"]["uid"],),
+            )
+            conn.execute(
+                "UPDATE accounts SET monthly_contribution = 1000 WHERE id = ?",
+                (two_users["alice"]["account"],),
+            )
+            conn.execute(
+                "UPDATE budget_items SET linked_account_id = ? WHERE id = ?",
+                (two_users["alice"]["account"], two_users["alice"]["budget"]),
+            )
+            conn.commit()
+
+        upsert_budget_entry("2026-05", two_users["alice"]["budget"], 1200, two_users["alice"]["uid"])
+
+        sections, _ = _build_monthly_data("2026-06", two_users["alice"]["uid"])
+        row = next(row for section in sections for row in section["rows"])
+        assert row["amount"] == 1000
+        assert row["source"] == "linked"

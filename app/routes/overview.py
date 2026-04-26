@@ -16,6 +16,7 @@ from app.calculations import (
     pension_allowance_limits,
     progress_to_goal,
     projected_total_retirement_value,
+    projection_start_month_key,
     review_ready_date,
     tag_totals,
     to_float,
@@ -33,6 +34,7 @@ from app.models import (
     fetch_all_holdings,
     fetch_all_holdings_grouped,
     fetch_assumptions,
+    fetch_contribution_overrides,
     fetch_holding_totals_by_account,
     fetch_isa_contributions,
     fetch_monthly_review,
@@ -57,9 +59,12 @@ def overview():
     holdings_totals = fetch_holding_totals_by_account(uid)
 
     accounts = []
+    start_month = projection_start_month_key(assumptions)
     for account in raw_accounts:
         row = dict(account)
         row["current_value"] = effective_account_value(account, holdings_totals)
+        row["_contribution_overrides"] = fetch_contribution_overrides(account["id"])
+        row["_projection_start_month"] = start_month
         accounts.append(row)
 
     invested_total = total_invested(accounts, holdings_totals)

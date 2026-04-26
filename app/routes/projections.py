@@ -1,8 +1,8 @@
 from flask import Blueprint, render_template
 from flask_login import current_user, login_required
 
-from app.calculations import current_age_from_assumptions, effective_account_value, projected_account_value, projected_account_value_at_year, projected_account_value_no_fees, projected_accounts, projected_total_retirement_value, to_float, years_to_retirement
-from app.models import fetch_all_accounts, fetch_all_goals, fetch_assumptions, fetch_holding_totals_by_account
+from app.calculations import current_age_from_assumptions, effective_account_value, projected_account_value, projected_account_value_at_year, projected_account_value_no_fees, projected_accounts, projected_total_retirement_value, projection_start_month_key, to_float, years_to_retirement
+from app.models import fetch_all_accounts, fetch_all_goals, fetch_assumptions, fetch_contribution_overrides, fetch_holding_totals_by_account
 
 projections_bp = Blueprint("projections", __name__)
 
@@ -52,9 +52,12 @@ def projections():
     holdings_totals = fetch_holding_totals_by_account(uid)
 
     accounts = []
+    start_month = projection_start_month_key(assumptions)
     for account in raw_accounts:
         row = dict(account)
         row["current_value"] = effective_account_value(account, holdings_totals)
+        row["_contribution_overrides"] = fetch_contribution_overrides(account["id"])
+        row["_projection_start_month"] = start_month
         accounts.append(row)
 
     account_rows = projected_accounts(accounts, assumptions)
@@ -81,7 +84,7 @@ def projections():
         "years_remaining": years_remaining,
         "total_projected": total_projected,
         "total_current": sum(to_float(a["current_value"]) for a in accounts),
-        "total_monthly": sum(to_float(a["monthly_contribution"]) for a in accounts),
+        "total_monthly": sum(to_float(r["effective_contribution"]) for r in account_rows),
         "total_fee_impact": total_fee_impact,
     }
 

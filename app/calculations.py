@@ -166,6 +166,66 @@ def future_value(current_value, monthly_contribution, annual_growth_rate, years)
     return future_current + future_contrib
 
 
+def add_months_to_key(month_key, offset):
+    """Return YYYY-MM `offset` months after month_key."""
+    y, m = [int(x) for x in month_key.split("-")]
+    m = m + offset
+    y += (m - 1) // 12
+    m = (m - 1) % 12 + 1
+    return f"{y:04d}-{m:02d}"
+
+
+def projection_start_month_key(assumptions=None, today=None):
+    """Month whose contribution should be considered next in projections.
+
+    Before the monthly review-ready date, the current month's contribution may
+    still be pending/settling, so a current-month budget override matters. Once
+    the review-ready date has passed, projections move on to next month to avoid
+    counting a contribution that should already be reflected in balances.
+    """
+    today = today or date.today()
+    salary_day = 0
+    try:
+        salary_day = int(_safe_get(assumptions, "salary_day", 0) or 0)
+    except (TypeError, ValueError):
+        salary_day = 0
+
+    current_key = f"{today.year:04d}-{today.month:02d}"
+    if salary_day and today >= review_ready_date(today.year, today.month, salary_day):
+        return add_months_to_key(current_key, 1)
+    return current_key
+
+
+def contribution_override_for_month(account, month_key):
+    """Return a personal monthly contribution override for account/month, if any."""
+    overrides = _safe_get(account, "_contribution_overrides", []) or []
+    for override in overrides:
+        try:
+            if override["from_month"] <= month_key <= override["to_month"]:
+                return to_float(override["override_amount"])
+        except (KeyError, TypeError):
+            continue
+    return None
+
+
+def projection_monthly_contribution(account, assumptions=None, month_index=0):
+    """Effective contribution for a projected month, including overrides.
+
+    Overrides replace the account's personal monthly contribution for matching
+    months, then the normal account rules add tax relief, LISA bonus, employer
+    contribution, and contribution fees.
+    """
+    start_month = _safe_get(account, "_projection_start_month")
+    month_key = add_months_to_key(start_month, month_index) if start_month else None
+    override = contribution_override_for_month(account, month_key) if month_key else None
+    if override is None:
+        return effective_monthly_contribution(account, assumptions)
+
+    adjusted = dict(account)
+    adjusted["monthly_contribution"] = override
+    return effective_monthly_contribution(adjusted, assumptions)
+
+
 def convert_to_gbp(amount, from_currency, fx_rates=None):
     """Convert an amount from a source currency to GBP.
 
@@ -360,53 +420,34 @@ def account_gross_growth_rate(account, assumptions):
     return to_float(assumptions["annual_growth_rate"]) if assumptions else 0.0
 
 
-def _project_with_lisa_cap(current, monthly, rate, years, current_age, is_lisa):
-    """Project future value, capping LISA contributions at age 50.
+def _project_account_month_by_month(account, assumptions, month_count, rate):
+    """Project account value month by month so budget overrides can apply."""
+    value = to_float(account["current_value"])
+    monthly_rate = rate / 12.0
+    current_age = current_age_from_assumptions(assumptions)
+    is_lisa = account["wrapper_type"] == "Lifetime ISA"
+    months = max(int(month_count), 0)
 
-    For non-LISA accounts this is just future_value(). Extracted to avoid
-    repeating the cap logic across six projection functions.
-    """
-    if is_lisa:
-        contrib_years = max(min(years, 50 - current_age), 0)
-        frozen_years = years - contrib_years
-        return future_value(future_value(current, monthly, rate, contrib_years), 0, rate, frozen_years)
-    return future_value(current, monthly, rate, years)
+    for idx in range(months):
+        value *= (1 + monthly_rate)
+        if not is_lisa or (current_age + idx / 12.0) < 50:
+            value += projection_monthly_contribution(account, assumptions, idx)
+    return value
 
 
 def projected_account_value_at_year(account, assumptions, yr):
     """Project account value at `yr` years from now, respecting LISA contribution cap at 50."""
-    return _project_with_lisa_cap(
-        to_float(account["current_value"]),
-        effective_monthly_contribution(account, assumptions),
-        account_growth_rate(account, assumptions),
-        yr,
-        current_age_from_assumptions(assumptions),
-        account["wrapper_type"] == "Lifetime ISA",
-    )
+    return _project_account_month_by_month(account, assumptions, int(yr * 12), account_growth_rate(account, assumptions))
 
 
 def projected_account_value_at_month(account, assumptions, month_count):
     """Project account value at `month_count` months from now, respecting LISA cap at 50."""
-    return _project_with_lisa_cap(
-        to_float(account["current_value"]),
-        effective_monthly_contribution(account, assumptions),
-        account_growth_rate(account, assumptions),
-        month_count / 12.0,
-        current_age_from_assumptions(assumptions),
-        account["wrapper_type"] == "Lifetime ISA",
-    )
+    return _project_account_month_by_month(account, assumptions, month_count, account_growth_rate(account, assumptions))
 
 
 def projected_account_value_at_month_no_fees(account, assumptions, month_count):
     """Same as projected_account_value_at_month but using gross growth rate."""
-    return _project_with_lisa_cap(
-        to_float(account["current_value"]),
-        effective_monthly_contribution(account, assumptions),
-        account_gross_growth_rate(account, assumptions),
-        month_count / 12.0,
-        current_age_from_assumptions(assumptions),
-        account["wrapper_type"] == "Lifetime ISA",
-    )
+    return _project_account_month_by_month(account, assumptions, month_count, account_gross_growth_rate(account, assumptions))
 
 
 def projected_account_value(account, assumptions):
@@ -414,14 +455,8 @@ def projected_account_value(account, assumptions):
         return 0.0
     current_age = current_age_from_assumptions(assumptions)
     retirement_age = to_float(assumptions["retirement_age"])
-    return _project_with_lisa_cap(
-        to_float(account["current_value"]),
-        effective_monthly_contribution(account, assumptions),
-        account_growth_rate(account, assumptions),
-        years_to_retirement(current_age, retirement_age, assumptions),
-        current_age,
-        account["wrapper_type"] == "Lifetime ISA",
-    )
+    months = int(years_to_retirement(current_age, retirement_age, assumptions) * 12)
+    return _project_account_month_by_month(account, assumptions, months, account_growth_rate(account, assumptions))
 
 
 def projected_account_value_no_fees(account, assumptions):
@@ -430,26 +465,13 @@ def projected_account_value_no_fees(account, assumptions):
         return 0.0
     current_age = current_age_from_assumptions(assumptions)
     retirement_age = to_float(assumptions["retirement_age"])
-    return _project_with_lisa_cap(
-        to_float(account["current_value"]),
-        effective_monthly_contribution(account, assumptions),
-        account_gross_growth_rate(account, assumptions),
-        years_to_retirement(current_age, retirement_age, assumptions),
-        current_age,
-        account["wrapper_type"] == "Lifetime ISA",
-    )
+    months = int(years_to_retirement(current_age, retirement_age, assumptions) * 12)
+    return _project_account_month_by_month(account, assumptions, months, account_gross_growth_rate(account, assumptions))
 
 
 def projected_account_value_at_year_no_fees(account, assumptions, yr):
     """Same as projected_account_value_at_year but using gross growth rate."""
-    return _project_with_lisa_cap(
-        to_float(account["current_value"]),
-        effective_monthly_contribution(account, assumptions),
-        account_gross_growth_rate(account, assumptions),
-        yr,
-        current_age_from_assumptions(assumptions),
-        account["wrapper_type"] == "Lifetime ISA",
-    )
+    return _project_account_month_by_month(account, assumptions, int(yr * 12), account_gross_growth_rate(account, assumptions))
 
 
 def projected_total_retirement_value(accounts, assumptions):
@@ -465,17 +487,25 @@ def projected_accounts(accounts, assumptions):
     for account in accounts:
         current = to_float(account["current_value"])
         personal = to_float(account["monthly_contribution"])
+        first_month_override = None
+        start_month = _safe_get(account, "_projection_start_month")
+        if start_month:
+            first_month_override = contribution_override_for_month(account, start_month)
+        contribution_account = dict(account)
+        if first_month_override is not None:
+            contribution_account["monthly_contribution"] = first_month_override
+        breakdown = contribution_breakdown(contribution_account, assumptions)
+        effective_contribution = breakdown["total_into_pot"]
         growth = account_growth_rate(account, assumptions)
         projected = projected_account_value(account, assumptions)
         proj_no_fees = projected_account_value_no_fees(account, assumptions)
-        breakdown = contribution_breakdown(account, assumptions)
         rows.append({
             "name": account["name"],
             "provider": account["provider"],
             "wrapper_type": account["wrapper_type"],
             "current_value": current,
             "monthly_contribution": personal,
-            "effective_contribution": breakdown["total_into_pot"],
+            "effective_contribution": effective_contribution,
             "tax_relief": breakdown["tax_relief"],
             "government_bonus": breakdown["government_bonus"],
             "employer": breakdown["employer"],
@@ -549,13 +579,20 @@ def compute_performance_series(monthly_data, assumed_rate, assumed_monthly, benc
     annualised_return = ((cum ** (12.0 / n)) - 1) if n >= 3 else None
 
     # ── Projected "on plan" series from first recorded balance ────────────
-    # Shows what the portfolio would be worth at the assumed rate + assumed
-    # monthly contribution, starting from the same base as the first snapshot.
+    # Uses the contribution recorded for each month instead of today's normal
+    # monthly amount. That keeps reduced/skipped months from budget/reviews from
+    # making the plan line look wildly wrong.
     start_balance = balances[0]
-    projected_values = [
-        round(future_value(start_balance, assumed_monthly, assumed_rate, i / 12.0), 0)
-        for i in range(len(monthly_data))
-    ]
+    def _plan_values(rate):
+        values = [round(start_balance, 0)]
+        current = start_balance
+        monthly_rate = rate / 12.0
+        for i in range(1, len(monthly_data)):
+            current = current * (1 + monthly_rate) + contribs[i]
+            values.append(round(current, 0))
+        return values
+
+    projected_values = _plan_values(assumed_rate)
 
     # ── Month-by-month breakdown table ────────────────────────────────────
     rows = []
@@ -585,10 +622,7 @@ def compute_performance_series(monthly_data, assumed_rate, assumed_monthly, benc
         "labels":            display_labels,
         "actual_values":     [round(b, 0) for b in balances],
         "projected_values":  projected_values,
-        "benchmark_values":  [
-            round(future_value(start_balance, assumed_monthly, benchmark_rate, i / 12.0), 0)
-            for i in range(len(monthly_data))
-        ] if benchmark_rate is not None else None,
+        "benchmark_values":  _plan_values(benchmark_rate) if benchmark_rate is not None else None,
         "monthly_returns":   monthly_returns,
         "table_rows":        rows,
         "n_months":          n,

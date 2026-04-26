@@ -22,6 +22,7 @@ from app.models import (
     fetch_budget_items,
     fetch_budget_sections,
     fetch_budget_trend,
+    fetch_all_active_overrides,
     fetch_debt,
     fetch_months_with_budget_entries,
     fetch_prior_month_budget_entries,
@@ -73,6 +74,7 @@ def _build_monthly_data(month_key, user_id):
     items = fetch_budget_items(user_id)
     entries = fetch_budget_entries(month_key, user_id)
     entry_map = {e["budget_item_id"]: e for e in entries}
+    active_overrides = fetch_all_active_overrides(month_key, user_id)
     accounts = fetch_all_accounts(user_id)
     account_map = {a["id"]: a for a in accounts}
 
@@ -92,27 +94,32 @@ def _build_monthly_data(month_key, user_id):
         for item in items:
             if item["section"] != section_key:
                 continue
+            linked_account = account_map.get(item["linked_account_id"]) if item["linked_account_id"] else None
             if item["id"] in entry_map:
                 amount = float(entry_map[item["id"]]["amount"] or 0)
+            elif linked_account and linked_account["id"] in active_overrides:
+                amount = float(active_overrides[linked_account["id"]]["override_amount"] or 0)
+            elif linked_account:
+                amount = float(linked_account["monthly_contribution"] or 0)
             elif item["id"] in prior_entry_map:
                 amount = float(prior_entry_map[item["id"]]["amount"] or 0)
-            elif item["linked_account_id"] and item["linked_account_id"] in account_map:
-                amount = float(account_map[item["linked_account_id"]]["monthly_contribution"] or 0)
             else:
                 amount = float(item["default_amount"] or 0)
             # Track whether amount came from the current month or was inherited
             if item["id"] in entry_map:
                 source = "current"
+            elif linked_account and linked_account["id"] in active_overrides:
+                source = "override"
+            elif linked_account:
+                source = "linked"
             elif item["id"] in prior_entry_map:
                 source = "inherited"
-            elif item["linked_account_id"] and item["linked_account_id"] in account_map:
-                source = "linked"
             else:
                 source = "default"
 
             linked_account_name = None
-            if item["linked_account_id"] and item["linked_account_id"] in account_map:
-                linked_account_name = account_map[item["linked_account_id"]]["name"]
+            if linked_account:
+                linked_account_name = linked_account["name"]
 
             section_items.append({
                 "id": item["id"],

@@ -21,9 +21,7 @@ from app.models import (
     add_holding,
     add_holding_catalogue_item,
     create_account,
-    create_contribution_override,
     delete_account,
-    delete_contribution_override,
     delete_custom_tag,
     delete_holding,
     fetch_account,
@@ -50,7 +48,7 @@ from app.models import (
     update_holding,
 )
 from app.services.prices import fetch_price, lookup_instrument, to_gbp
-from app.utils import optional_float, optional_int, split_tags, valid_month_key
+from app.utils import optional_float, optional_int, split_tags
 
 ASSET_TYPE_OPTIONS = ["ETF", "Fund", "Share", "Pension Fund", "Cash", "Bond", "Other"]
 BUCKET_OPTIONS = [
@@ -442,29 +440,6 @@ def account_detail(account_id):
         if form_name == "delete_account":
             delete_account(account_id, uid)
             return redirect(url_for("accounts.accounts"))
-
-        if form_name == "add_override":
-            from_raw = valid_month_key(request.form.get("from_month", ""))
-            to_raw = valid_month_key(request.form.get("to_month", ""))
-            if not from_raw or not to_raw:
-                flash("Invalid month format.", "error")
-            elif from_raw > to_raw:
-                flash("'From' month must be before or equal to 'To' month.", "error")
-            else:
-                create_contribution_override({
-                    "account_id": account_id,
-                    "from_month": from_raw,
-                    "to_month": to_raw,
-                    "override_amount": optional_float(request.form.get("override_amount"), 0.0),
-                    "reason": request.form.get("reason", "").strip(),
-                })
-            return redirect(url_for("accounts.account_detail", account_id=account_id))
-
-        if form_name == "delete_override":
-            override_id = optional_int(request.form.get("override_id"))
-            if override_id:
-                delete_contribution_override(override_id, uid)
-            return redirect(url_for("accounts.account_detail", account_id=account_id))
 
         payload = _account_payload_from_form(request.form)
         payload["id"] = account_id

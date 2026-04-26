@@ -22,7 +22,6 @@ from app.calculations import (
     current_age_from_assumptions,
     effective_account_value,
     effective_fee_pct,
-    effective_monthly_contribution,
     future_value,
     is_pension_account,
     projected_account_value,
@@ -31,6 +30,8 @@ from app.calculations import (
     projected_account_value_at_month_no_fees,
     projected_account_value_at_year_no_fees,
     projected_account_value_no_fees,
+    projection_monthly_contribution,
+    projection_start_month_key,
     projected_total_retirement_value,
     to_float,
     uk_tax_year_end,
@@ -45,6 +46,7 @@ from app.models import (
     fetch_budget_entries,
     fetch_budget_items,
     fetch_budget_sections,
+    fetch_contribution_overrides,
     fetch_holding_totals_by_account,
     fetch_isa_contributions,
     fetch_monthly_performance_data,
@@ -121,9 +123,12 @@ def export_projections():
     holdings_totals = fetch_holding_totals_by_account(uid)
 
     accounts = []
+    start_month = projection_start_month_key(assumptions)
     for a in raw_accounts:
         row = dict(a)
         row["current_value"] = effective_account_value(a, holdings_totals)
+        row["_contribution_overrides"] = fetch_contribution_overrides(a["id"])
+        row["_projection_start_month"] = start_month
         accounts.append(row)
 
     current_age    = current_age_from_assumptions(assumptions) if assumptions else 43
@@ -155,7 +160,7 @@ def export_projections():
 
     for i, acc in enumerate(accounts, 5):
         proj = projected_account_value(acc, assumptions)
-        effective = effective_monthly_contribution(acc, assumptions)
+        effective = projection_monthly_contribution(acc, assumptions, 0)
         _data_row(ws, i, [
             acc["name"],
             to_float(acc["current_value"]),
@@ -167,7 +172,7 @@ def export_projections():
     _data_row(ws, total_row, [
         "Total",
         sum(to_float(a["current_value"]) for a in accounts),
-        sum(effective_monthly_contribution(a, assumptions) for a in accounts),
+        sum(projection_monthly_contribution(a, assumptions, 0) for a in accounts),
         total_projected,
     ], bold=True, num_formats={2: GBP, 3: GBP, 4: GBP0})
 
@@ -264,7 +269,7 @@ def export_projections():
         acc_platform_cap = to_float(_safe_get(acc, "platform_fee_cap", 0))
         acc_fund_pct = to_float(_safe_get(acc, "fund_fee_pct", 0))
         acc_contribution_fee_pct = to_float(_safe_get(acc, "contribution_fee_pct", 0))
-        acc_monthly = effective_monthly_contribution(acc, assumptions)
+        acc_monthly = projection_monthly_contribution(acc, assumptions, 0)
         acc_current = to_float(acc["current_value"])
         acc_projected = projected_account_value(acc, assumptions)
         acc_projected_no_fees = projected_account_value_no_fees(acc, assumptions)
