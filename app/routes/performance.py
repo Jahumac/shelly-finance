@@ -3,8 +3,8 @@ from datetime import datetime
 from flask import Blueprint, render_template
 from flask_login import current_user, login_required
 
-from app.calculations import compute_performance_series, to_float, uk_tax_year_start, uk_tax_year_end, uk_tax_year_label
-from app.models import fetch_all_accounts, fetch_assumptions, fetch_daily_snapshots, fetch_holding_totals_by_account, fetch_monthly_performance_data, fetch_monthly_performance_data_by_account, fetch_tax_year_contributions
+from app.calculations import to_float, uk_tax_year_start, uk_tax_year_end, uk_tax_year_label
+from app.models import fetch_all_accounts, fetch_assumptions, fetch_daily_snapshots, fetch_holding_totals_by_account, fetch_tax_year_contributions
 
 performance_bp = Blueprint("performance", __name__)
 
@@ -54,51 +54,17 @@ def performance():
         plan_value      = daily_plan[-1]
         benchmark_value = daily_bench[-1] if daily_bench else None
 
-    # Per-account — use correct live value per valuation mode
-    holding_totals  = fetch_holding_totals_by_account(uid)  # holdings-mode live values
-    accounts_by_id  = {a["id"]: a for a in accounts}
-
-    def _live_value(acct):
-        """Return the correct live value for an account."""
-        if acct.get("valuation_mode") == "holdings":
-            return float(holding_totals.get(acct["id"], 0))
-        return to_float(acct.get("current_value"))
-
-    by_account_raw = fetch_monthly_performance_data_by_account(uid)
+    # By Account — live values only, no monthly snapshot dependency
+    holding_totals = fetch_holding_totals_by_account(uid)
     account_perf = []
-    seen_ids = set()
-    for aid, info in by_account_raw.items():
-        rows = info["rows"]
-        acct = accounts_by_id.get(aid)
-        current_val = _live_value(acct) if acct else (rows[-1][1] if rows else 0)
-        n_months = len(rows)
-        total_return = None
-        if len(rows) >= 2:
-            acct_data = [(mk, bal, contrib) for mk, bal, contrib in rows]
-            ap = compute_performance_series(acct_data, assumed_rate, 0, benchmark_rate=None)
-            if ap:
-                total_return = ap["total_return"]
-        account_perf.append({
-            "account_id":   aid,
-            "account_name": info["account_name"],
-            "total_return": total_return,
-            "current_value": current_val,
-            "n_months": n_months,
-        })
-        seen_ids.add(aid)
-    # Include active accounts with no monthly snapshots at all
     for a in accounts:
-        if a["id"] not in seen_ids:
-            cv = _live_value(a)
-            if cv > 0:
-                account_perf.append({
-                    "account_id":   a["id"],
-                    "account_name": a["name"],
-                    "total_return": None,
-                    "current_value": cv,
-                    "n_months": 0,
-                })
-    account_perf.sort(key=lambda x: -(x["current_value"] or 0))
+        if a.get("valuation_mode") == "holdings":
+            cv = float(holding_totals.get(a["id"], 0))
+        else:
+            cv = to_float(a.get("current_value"))
+        if cv > 0:
+            account_perf.append({"account_name": a["name"], "current_value": cv})
+    account_perf.sort(key=lambda x: -x["current_value"])
 
     return render_template(
         "performance.html",

@@ -94,34 +94,26 @@
     data-benchmark-rate='{{ benchmark_rate_pct or "" }}'></canvas>
 </div>
 
-{# ── By-account snapshot ───────────────────────────────────────────── #}
+{# ── By Account ────────────────────────────────────────────────────── #}
 {% if account_perf %}
 <div class="panel" style="overflow-x:auto;">
   <h3 class="section-title">By Account</h3>
-  <p class="helper-text">Current value of each account, and how much it has grown since Shelly first tracked it.</p>
   <table class="data-table">
     <thead>
       <tr>
         <th>Account</th>
         <th class="num">Current value</th>
-        <th class="num">Total growth</th>
-        <th class="num">Months</th>
       </tr>
     </thead>
     <tbody>
       {% for ap in account_perf %}
       <tr>
         <td>{{ ap.account_name }}</td>
-        <td class="num">£{{ '{:,.0f}'.format(ap.current_value) }}</td>
-        <td class="num {% if ap.total_return is not none %}{% if ap.total_return >= 0 %}perf-positive{% else %}perf-negative{% endif %}{% endif %}">
-          {% if ap.total_return is not none %}{{ '{:+.1f}'.format(ap.total_return) }}%{% else %}<span class="text-muted">—</span>{% endif %}
-        </td>
-        <td class="num text-muted">{{ ap.n_months if ap.n_months else '—' }}</td>
+        <td class="num"><strong>£{{ '{:,.0f}'.format(ap.current_value) }}</strong></td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
-  <p class="helper-text mt-05">Total growth % is based on snapshot values — it includes contributions, so it's a portfolio size measure, not pure investment return.</p>
 </div>
 {% endif %}
 
