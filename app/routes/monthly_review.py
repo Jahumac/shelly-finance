@@ -157,9 +157,13 @@ def monthly_review():
     ensure_monthly_review_items(review["id"], uid)
     items = fetch_monthly_review_items(review["id"])
 
+    def _is_pb(item):
+        return (item["valuation_mode"] == "premium_bonds"
+                or str(item.get("wrapper_type") or "").lower() == "premium bonds")
+
     holdings_items = [item for item in items if item["valuation_mode"] == "holdings"]
-    premium_bonds_items = [item for item in items if item["valuation_mode"] == "premium_bonds"]
-    manual_items = [item for item in items if item["valuation_mode"] not in ("holdings", "premium_bonds")]
+    premium_bonds_items = [item for item in items if _is_pb(item)]
+    manual_items = [item for item in items if item["valuation_mode"] != "holdings" and not _is_pb(item)]
     contribution_items = [item for item in items if (item["expected_contribution"] or 0) > 0]
 
     # Existing prize for each PB account this month
