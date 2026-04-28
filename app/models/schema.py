@@ -148,10 +148,12 @@ CREATE TABLE IF NOT EXISTS budget_items (
     section TEXT NOT NULL,
     default_amount REAL DEFAULT 0,
     linked_account_id INTEGER,
+    linked_debt_id INTEGER,
     notes TEXT,
     sort_order INTEGER DEFAULT 0,
     is_active INTEGER DEFAULT 1,
-    FOREIGN KEY(linked_account_id) REFERENCES accounts(id) ON DELETE SET NULL
+    FOREIGN KEY(linked_account_id) REFERENCES accounts(id) ON DELETE SET NULL,
+    FOREIGN KEY(linked_debt_id) REFERENCES debts(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS budget_entries (
@@ -718,6 +720,12 @@ def _run_migrations(conn):
     # ── Debts: add start_date column ─────────────────────────────────────
     try:
         conn.execute("ALTER TABLE debts ADD COLUMN start_date TEXT")
+    except Exception:
+        pass
+
+    # ── budget_items: add linked_debt_id ─────────────────────────────────
+    try:
+        conn.execute("ALTER TABLE budget_items ADD COLUMN linked_debt_id INTEGER REFERENCES debts(id) ON DELETE SET NULL")
     except Exception:
         pass
 

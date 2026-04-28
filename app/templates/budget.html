@@ -132,6 +132,8 @@
           <span class="budget-pill budget-pill-pre-salary" title="Deducted before your salary arrives — shown for visibility but not counted against your take-home">pre-salary</span>
         {% elif item.linked %}
           <span class="budget-pill" title="Uses {{ item.linked_account_name or 'the account' }}'s normal monthly contribution unless you save a one-month change">linked · {{ item.linked_account_name or '—' }}</span>
+        {% elif item.linked_debt %}
+          <span class="budget-pill budget-pill-debt" title="Pulled from your Debts page — update the monthly payment there to change this amount">debt</span>
         {% endif %}
         {% if not item.pre_salary %}
           {% if item.source == 'inherited' %}<span class="budget-row-source" data-source="inherited" title="Carried forward from the last month you edited">prev month</span>{% endif %}

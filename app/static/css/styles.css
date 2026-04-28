@@ -2276,6 +2276,12 @@ button.badge-like-button {
   border-color: rgba(148,163,184,0.2);
 }
 
+.budget-pill-debt {
+  background: rgba(239,68,68,0.08);
+  color: #dc2626;
+  border-color: rgba(239,68,68,0.18);
+}
+
 .budget-row-pre-salary {
   opacity: 0.6;
 }

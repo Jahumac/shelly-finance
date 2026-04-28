@@ -10,6 +10,7 @@ from ._conn import get_connection
 def fetch_budget_items(user_id):
     with get_connection() as conn:
         _ensure_account_contribution_items(conn, user_id)
+        _ensure_debt_items(conn, user_id)
         return conn.execute(
             "SELECT * FROM budget_items WHERE is_active = 1 AND user_id = ? ORDER BY section, sort_order, id",
             (user_id,),
@@ -116,6 +117,64 @@ def _ensure_account_contribution_items(conn, user_id):
             """,
             (user_id, section_key, account["name"]),
         )
+    conn.commit()
+
+
+def _ensure_debt_items(conn, user_id):
+    """Auto-create/sync budget items for active debts using their monthly_payment."""
+    debt_section = conn.execute(
+        "SELECT key FROM budget_sections WHERE user_id = ? AND key = 'debt' ORDER BY sort_order LIMIT 1",
+        (user_id,),
+    ).fetchone()
+    if not debt_section:
+        return
+    section_key = debt_section["key"]
+
+    active_debts = conn.execute(
+        "SELECT * FROM debts WHERE user_id = ? AND is_active = 1",
+        (user_id,),
+    ).fetchall()
+
+    for debt in active_debts:
+        existing = conn.execute(
+            "SELECT id FROM budget_items WHERE user_id = ? AND linked_debt_id = ? AND is_active = 1 LIMIT 1",
+            (user_id, debt["id"]),
+        ).fetchone()
+        if existing:
+            conn.execute(
+                "UPDATE budget_items SET name = ?, default_amount = ? WHERE id = ?",
+                (debt["name"], float(debt["monthly_payment"] or 0), existing["id"]),
+            )
+        else:
+            sort_row = conn.execute(
+                "SELECT COALESCE(MAX(sort_order), -1) AS max_sort FROM budget_items WHERE user_id = ? AND section = ?",
+                (user_id, section_key),
+            ).fetchone()
+            conn.execute(
+                """
+                INSERT INTO budget_items
+                    (user_id, name, section, default_amount, linked_debt_id, notes, sort_order, is_active)
+                VALUES (?, ?, ?, ?, ?, '', ?, 1)
+                """,
+                (
+                    user_id,
+                    debt["name"],
+                    section_key,
+                    float(debt["monthly_payment"] or 0),
+                    debt["id"],
+                    (sort_row["max_sort"] or -1) + 1,
+                ),
+            )
+
+    # Soft-delete items for debts that have been removed
+    conn.execute(
+        """
+        UPDATE budget_items SET is_active = 0
+        WHERE user_id = ? AND linked_debt_id IS NOT NULL AND is_active = 1
+          AND linked_debt_id NOT IN (SELECT id FROM debts WHERE user_id = ? AND is_active = 1)
+        """,
+        (user_id, user_id),
+    )
     conn.commit()
 
 

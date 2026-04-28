@@ -48,6 +48,20 @@ def _default_month_key():
     return f"{today.year}-{today.month:02d}"
 
 
+def _debt_payoff_month_key(debt):
+    """Return YYYY-MM when the debt clears (from today), or None if it never does."""
+    from app.models.debts import debt_months_remaining
+    balance = float(debt["current_balance"] or 0)
+    payment = float(debt["monthly_payment"] or 0)
+    apr = float(debt["apr"] or 0)
+    months = debt_months_remaining(balance, payment, apr)
+    if not months:
+        return None
+    today = date.today()
+    total = today.month - 1 + months
+    return f"{today.year + total // 12}-{total % 12 + 1:02d}"
+
+
 def _sync_linked_override(item_id, month_key, amount, user_id):
     """When a linked budget item's entry changes, reflect it to contribution_overrides
     so projections and account views pick up the per-month edit automatically.
@@ -106,6 +120,8 @@ def _build_monthly_data(month_key, user_id):
     active_overrides = fetch_all_active_overrides(month_key, user_id)
     accounts = fetch_all_accounts(user_id)
     account_map = {a["id"]: a for a in accounts}
+    debts = fetch_all_debts(user_id)
+    debt_map = {d["id"]: d for d in debts}
 
     # Always load prior-month entries so we can show per-item inheritance
     prior_entries = fetch_prior_month_budget_entries(month_key, user_id)
@@ -114,6 +130,7 @@ def _build_monthly_data(month_key, user_id):
     _income_sec = next((s for s in db_sections if "income" in s["key"].lower()), None)
     income_key = _income_sec["key"] if _income_sec else (db_sections[0]["key"] if db_sections else "income")
 
+    today_key = _default_month_key()
     sections = []
     section_totals = {}
 
@@ -123,6 +140,14 @@ def _build_monthly_data(month_key, user_id):
         for item in items:
             if item["section"] != section_key:
                 continue
+
+            # For debt-linked items: hide in future months past the payoff date
+            linked_debt = debt_map.get(item["linked_debt_id"]) if item["linked_debt_id"] else None
+            if item["linked_debt_id"] and month_key > today_key:
+                payoff_mk = _debt_payoff_month_key(linked_debt) if linked_debt else None
+                if payoff_mk and month_key > payoff_mk:
+                    continue
+
             linked_account = account_map.get(item["linked_account_id"]) if item["linked_account_id"] else None
             if item["id"] in entry_map:
                 amount = float(entry_map[item["id"]]["amount"] or 0)
@@ -141,6 +166,8 @@ def _build_monthly_data(month_key, user_id):
                 source = "override"
             elif linked_account:
                 source = "linked"
+            elif linked_debt:
+                source = "debt"
             elif item["id"] in prior_entry_map:
                 source = "inherited"
             else:
@@ -159,6 +186,7 @@ def _build_monthly_data(month_key, user_id):
                 "amount": amount,
                 "linked": item["linked_account_id"] is not None,
                 "linked_account_name": linked_account_name,
+                "linked_debt": linked_debt is not None,
                 "source": source,
                 "pre_salary": pre_salary,
             })
