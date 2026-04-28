@@ -51,6 +51,7 @@ def _default_month_key():
 def _debt_payoff_month_key(debt):
     """Return YYYY-MM when the debt clears (from today), or None if it never does."""
     from app.models.debts import debt_months_remaining
+    from app.calculations import add_months_to_key
     balance = float(debt["current_balance"] or 0)
     payment = float(debt["monthly_payment"] or 0)
     apr = float(debt["apr"] or 0)
@@ -58,8 +59,7 @@ def _debt_payoff_month_key(debt):
     if not months:
         return None
     today = date.today()
-    total = today.month - 1 + months
-    return f"{today.year + total // 12}-{total % 12 + 1:02d}"
+    return add_months_to_key(f"{today.year}-{today.month:02d}", months)
 
 
 def _sync_linked_override(item_id, month_key, amount, user_id):
