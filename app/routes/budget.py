@@ -238,6 +238,24 @@ def budget():
     )
 
 
+def _stamp_inherited_entries(month_key, user_id):
+    """On first save to a new month, copy prior-month non-linked entries so the
+    month owns its own values and isn't silently affected by later edits to the
+    prior month.
+    """
+    existing = fetch_budget_entries(month_key, user_id)
+    if existing:
+        return
+    prior_entries = fetch_prior_month_budget_entries(month_key, user_id)
+    if not prior_entries:
+        return
+    items = fetch_budget_items(user_id)
+    linked_ids = {it["id"] for it in items if it["linked_account_id"]}
+    for entry in prior_entries:
+        if entry["budget_item_id"] not in linked_ids:
+            upsert_budget_entry(month_key, entry["budget_item_id"], float(entry["amount"] or 0), user_id)
+
+
 @budget_bp.route("/api/entry", methods=["POST"])
 @login_required
 def budget_save_entry():
@@ -247,6 +265,7 @@ def budget_save_entry():
     item_id = request.form.get("item_id", type=int)
     amount = optional_float(request.form.get("amount"), 0.0)
     if item_id:
+        _stamp_inherited_entries(month_key, uid)
         upsert_budget_entry(month_key, item_id, amount, uid)
         _sync_linked_override(item_id, month_key, amount, uid)
     return jsonify({"ok": True})

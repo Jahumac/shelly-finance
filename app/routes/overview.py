@@ -13,6 +13,7 @@ from app.calculations import (
     effective_account_value,
     goal_current_value,
     is_review_due,
+    is_salary_day,
     pension_allowance_limits,
     progress_to_goal,
     projected_total_retirement_value,
@@ -172,6 +173,7 @@ def overview():
     current_month_key = now_date.strftime("%Y-%m")
     review_nudge = False
     review_ready = None
+    payday_banner = salary_day and is_salary_day(now_date, salary_day)
     if salary_day:
         review_due = is_review_due(now_date, salary_day)
         if review_due:
@@ -385,22 +387,6 @@ def overview():
                 "cta_form_action": None,
             })
 
-    # LISA bonus reminder: April 6 – June 30, if LISA was used in the just-ended tax year
-    has_lisa = any("Lifetime" in (a.get("wrapper_type") or "") or "LISA" in (a.get("wrapper_type") or "") for a in raw_accounts)
-    if has_lisa:
-        last_ty_end = date(now_date.year, 4, 5)
-        last_ty_start = date(now_date.year - 1, 4, 6)
-        bonus_window_end = date(now_date.year, 6, 30)
-        if last_ty_end < now_date <= bonus_window_end:
-            prev_ad_hoc = fetch_isa_contributions(uid, last_ty_start.isoformat(), last_ty_end.isoformat())
-            prev_usage = calculate_isa_usage(raw_accounts, prev_ad_hoc, last_ty_end, salary_day)
-            if prev_usage["lisa_used"] > 0:
-                alerts.append({
-                    "kind": "info",
-                    "message": f"The {last_ty_start.year}/{str(last_ty_end.year)[2:]} LISA government bonus should arrive soon — check your account to make sure it's been credited.",
-                    "cta_text": None,
-                    "cta_href": None,
-                })
 
     next_action = None
     if raw_accounts:
@@ -436,14 +422,6 @@ def overview():
                 "cta_text": "Open settings",
                 "cta_href": "/settings/?mode=edit",
             }
-        else:
-            next_action = {
-                "eyebrow": "Shelly's next nudge",
-                "title": "Have a calm look at the trend",
-                "body": "Your main flow is set. Performance is the place to check whether the real path is keeping pace with the plan.",
-                "cta_text": "View performance",
-                "cta_href": "/performance/",
-            }
 
     # ── Asset allocation by individual holding ────────────────────────────────
     all_holdings_grouped = fetch_all_holdings_grouped(uid)
@@ -478,6 +456,7 @@ def overview():
         next_update_display=next_update_display,
         review_nudge=review_nudge,
         review_ready=review_ready,
+        payday_banner=payday_banner,
         alerts=alerts,
         next_action=next_action,
         allocation_labels=allocation_labels,

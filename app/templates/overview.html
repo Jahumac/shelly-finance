@@ -55,6 +55,20 @@
 </section>
 {% endif %}
 
+{# ── Payday banner ────────────────────────────────────────────────────────── #}
+{% if payday_banner and not review_nudge %}
+<section class="card payday-banner mb-1">
+  <div class="flex flex-center flex-wrap gap-075">
+    <img src="{{ url_for('static', filename='icons/shelly/Budget.png') }}" alt="" class="shelly-inline-icon shelly-icon-sm">
+    <div style="flex:1; min-width:200px;">
+      <strong>It's your investment day</strong>
+      <p class="helper-text" style="margin:0.15rem 0 0;">Time to move your contributions — check the budget, then Shelly will be ready for your Monthly Update in a day or two once everything settles.</p>
+    </div>
+    <a href="/budget/" class="badge badge-meta">Open budget</a>
+  </div>
+</section>
+{% endif %}
+
 {# ── Monthly review nudge ────────────────────────────────────────────────── #}
 {% if review_nudge %}
 <section class="card review-nudge mb-1">

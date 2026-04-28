@@ -744,6 +744,14 @@ def is_review_due(today, salary_day=0):
     return today >= ready
 
 
+def is_salary_day(today, salary_day=0):
+    """Return True if today is the resolved salary/investment day for this month."""
+    if not salary_day:
+        return False
+    resolved = _resolve_contribution_day(today.year, today.month, salary_day)
+    return today.day == resolved
+
+
 ISA_WRAPPER_TYPES = {"Stocks & Shares ISA", "Cash ISA", "Lifetime ISA"}
 LISA_WRAPPER_TYPES = {"Lifetime ISA"}
 
