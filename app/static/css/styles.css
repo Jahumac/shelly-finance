@@ -2443,6 +2443,23 @@ button.badge-like-button {
   color: inherit;
 }
 
+/* Budget edit callout */
+.budget-edit-callout {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  background: rgba(15,118,110,0.07);
+  border: 1px solid rgba(15,118,110,0.18);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  margin: 0.5rem 0 0;
+  color: var(--text);
+}
+.budget-edit-callout strong { color: var(--accent); }
+.budget-edit-callout span { color: var(--muted); }
+
 /* Budget linked hint */
 .budget-linked-hint {
   font-size: 0.78rem;
