@@ -141,11 +141,33 @@ def _ensure_debt_items(conn, user_id):
             (user_id, debt["id"]),
         ).fetchone()
         if existing:
+            old = conn.execute(
+                "SELECT default_amount FROM budget_items WHERE id = ?", (existing["id"],)
+            ).fetchone()
+            new_amount = float(debt["monthly_payment"] or 0)
             conn.execute(
                 "UPDATE budget_items SET name = ?, default_amount = ? WHERE id = ?",
-                (debt["name"], float(debt["monthly_payment"] or 0), existing["id"]),
+                (debt["name"], new_amount, existing["id"]),
             )
+            # If the monthly payment changed, clear future stamped entries so
+            # the live amount shows instead of a stale inherited value
+            if old and abs(float(old["default_amount"] or 0) - new_amount) > 0.005:
+                from datetime import date
+                today_key = date.today().strftime("%Y-%m")
+                conn.execute(
+                    "DELETE FROM budget_entries WHERE budget_item_id = ? AND month_key >= ?",
+                    (existing["id"], today_key),
+                )
         else:
+            # Retire any old unlinked item with the same name in the debt section
+            conn.execute(
+                """
+                UPDATE budget_items SET is_active = 0
+                WHERE user_id = ? AND section = ? AND linked_debt_id IS NULL
+                  AND linked_account_id IS NULL AND is_active = 1 AND name = ?
+                """,
+                (user_id, section_key, debt["name"]),
+            )
             sort_row = conn.execute(
                 "SELECT COALESCE(MAX(sort_order), -1) AS max_sort FROM budget_items WHERE user_id = ? AND section = ?",
                 (user_id, section_key),

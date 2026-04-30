@@ -276,7 +276,7 @@ def _stamp_inherited_entries(month_key, user_id):
     if not prior_entries:
         return
     items = fetch_budget_items(user_id)
-    linked_ids = {it["id"] for it in items if it["linked_account_id"]}
+    linked_ids = {it["id"] for it in items if it["linked_account_id"] or it["linked_debt_id"]}
     for entry in prior_entries:
         if entry["budget_item_id"] not in linked_ids:
             upsert_budget_entry(month_key, entry["budget_item_id"], float(entry["amount"] or 0), user_id)
