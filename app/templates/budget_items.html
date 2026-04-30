@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% from '_macros.html' import hero_stat %}
-{% block title %}Edit Budget · Shelly{% endblock %}
+{% block title %}Budget Setup · Shelly{% endblock %}
 {% block content %}
 
 <nav class="subnav">
@@ -13,12 +13,12 @@
 <section class="card highlight mb-1 month-accent-{{ _mk_month }}">
   <div class="hero-top">
     <div>
-      <p class="eyebrow">Editing Budget</p>
+      <p class="eyebrow">Budget Setup</p>
       <h2 class="hero-value">{{ month_label }}</h2>
       {% if salary_cycle_label %}
       <p class="budget-cycle-label">{{ salary_cycle_label }}</p>
       {% endif %}
-      <p class="hero-subtitle">Add, edit, or remove items. Changes to items apply to all months.</p>
+      <p class="hero-subtitle">Add, rename, or remove budget lines. To change this month's amounts, go back to the Budget and type directly into the numbers.</p>
     </div>
     <div class="hero-turtle-wrap">
       <img src="{{ url_for('static', filename='icons/shelly/Budget.png') }}" alt="" class="hero-turtle">
