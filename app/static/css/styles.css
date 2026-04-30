@@ -722,6 +722,13 @@ body.is-back-online .site-header {
   border: 1px solid var(--border);
   border-radius: 12px;
   background: rgba(11, 18, 32, 0.35);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.simple-list-item:hover,
+.simple-list-item:focus-within {
+  background: rgba(56,189,248, 0.07);
+  border-color: var(--accent);
 }
 
 .simple-list-item p {
@@ -945,6 +952,13 @@ button.badge-like-button {
   background: rgba(255,255,255,0.03);
   border: 1px solid var(--border);
   border-radius: 10px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.holding-update-row:hover,
+.holding-update-row:focus-within {
+  background: rgba(56,189,248, 0.07);
+  border-color: var(--accent);
 }
 
 .holding-update-meta strong {

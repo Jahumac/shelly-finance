@@ -335,6 +335,31 @@ def api_skip_contribution():
     return jsonify({"ok": True})
 
 
+@monthly_review_bp.route("/api/update-balance", methods=["POST"])
+@login_required
+def api_update_balance():
+    """AJAX: update a manual account balance and record the review item as updated."""
+    uid = current_user.id
+    data = request.get_json(silent=True) or {}
+    account_id = optional_int(data.get("account_id"))
+    month_key = valid_month_key(data.get("month_key")) or default_month_key()
+    new_balance = _optional_float(data.get("current_value"))
+
+    if not account_id or new_balance is None:
+        return jsonify({"ok": False, "error": "account_id and current_value required"}), 400
+
+    account = fetch_account(account_id, uid)
+    if not account:
+        return jsonify({"ok": False, "error": "Account not found"}), 404
+
+    payload = {**account, "current_value": new_balance, "last_updated": datetime.now(timezone.utc).isoformat()}
+    update_account(payload, uid)
+    upsert_monthly_snapshot(account_id, month_key, new_balance)
+    review = fetch_or_create_monthly_review(month_key, uid)
+    mark_review_item_updated(review["id"], account_id, "balance_updated")
+    return jsonify({"ok": True, "balance": new_balance})
+
+
 @monthly_review_bp.route("/api/restore-contribution", methods=["POST"])
 @login_required
 def api_restore_contribution():

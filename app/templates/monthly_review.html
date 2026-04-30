@@ -243,7 +243,7 @@
 
                   <div class="holding-update-meta">
                     <strong>{{ holding.holding_name }}</strong>
-                    <span>{{ holding.bucket or 'Other' }}{% if holding.ticker %} · {{ holding.ticker }}{% endif %}</span>
+                    {% if holding.ticker %}<span>{{ holding.ticker }}</span>{% endif %}
                   </div>
 
                   <div class="holding-update-inputs">
@@ -300,7 +300,7 @@
   {% if manual_items %}
     <div class="review-list">
       {% for item in manual_items %}
-        <form method="post" class="settings-form simple-list-item">
+        <form method="post" class="settings-form simple-list-item manual-balance-form">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="form_name" value="update_account_balance">
           <input type="hidden" name="month" value="{{ month_key }}">
@@ -380,7 +380,7 @@
       </form>
 
       {# Balance update #}
-      <form method="post" class="settings-form" style="border-top: 1px solid var(--border); padding-top: 0.75rem; margin-top: 0;">
+      <form method="post" class="settings-form manual-balance-form" style="border-top: 1px solid var(--border); padding-top: 0.75rem; margin-top: 0;">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="form_name" value="update_account_balance">
         <input type="hidden" name="month" value="{{ month_key }}">

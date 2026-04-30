@@ -601,11 +601,14 @@
         }
 
         if (submitBtn) {
-          submitBtn.addEventListener('click', async function() {
+          submitBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
             var price = parseFloat(priceEl ? priceEl.value : '0') || 0;
             await autoSave(price);
           });
         }
+
+        form.addEventListener('submit', function(e) { e.preventDefault(); });
 
         if (unitsEl) unitsEl.addEventListener('input', recalc);
         if (priceEl) priceEl.addEventListener('input', recalc);
@@ -687,6 +690,37 @@
           }
         });
       }
+
+      /* Manual account balance forms — AJAX to avoid scroll-to-top */
+      document.querySelectorAll('.manual-balance-form').forEach(function(form) {
+        form.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          var accountId = (form.querySelector('[name="account_id"]') || {}).value;
+          var valEl = form.querySelector('[name="current_value"]');
+          var btn = form.querySelector('button[type="submit"]');
+          if (!accountId || !valEl) return;
+          var origText = btn ? btn.textContent : '';
+          if (btn) { btn.disabled = true; btn.textContent = '…'; }
+          try {
+            var resp = await fetch('/monthly-review/api/update-balance', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                account_id: parseInt(accountId),
+                month_key: MONTH_KEY,
+                current_value: parseFloat(valEl.value) || 0,
+              }),
+            });
+            if (resp.ok) {
+              if (btn) { btn.textContent = 'Saved ✓'; setTimeout(function() { btn.textContent = origText; btn.disabled = false; }, 1500); }
+            } else {
+              if (btn) { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = origText; btn.disabled = false; }, 2000); }
+            }
+          } catch(err) {
+            if (btn) { btn.textContent = origText; btn.disabled = false; }
+          }
+        });
+      });
 
       /* Month navigation (prev/next) */
       function shiftMonth(key, delta) {
