@@ -251,6 +251,30 @@ def fetch_all_active_overrides(month_key, user_id):
     return {r["account_id"]: r for r in rows}
 
 
+def fetch_isa_overrides_for_tax_year(user_id, ty_start, ty_end):
+    """Return all contribution overrides that overlap the tax year, for ISA accounts only.
+
+    Returns list of rows with account_id, from_month, to_month, override_amount.
+    """
+    with get_connection() as conn:
+        return conn.execute(
+            """
+            SELECT co.account_id, co.from_month, co.to_month, co.override_amount
+            FROM contribution_overrides co
+            JOIN accounts a ON a.id = co.account_id
+            WHERE a.user_id = ?
+              AND co.from_month <= ?
+              AND co.to_month >= ?
+              AND a.wrapper_type IN (
+                  'Stocks & Shares ISA', 'Cash ISA', 'Lifetime ISA',
+                  'Stocks and Shares ISA', 'Junior ISA'
+              )
+            ORDER BY co.account_id, co.from_month
+            """,
+            (user_id, ty_end[:7], ty_start[:7]),
+        ).fetchall()
+
+
 def create_contribution_override(payload, user_id=None):
     with get_connection() as conn:
         if user_id is not None and not _account_belongs_to_user(conn, payload["account_id"], user_id):

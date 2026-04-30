@@ -30,6 +30,7 @@ from app.models import (
     fetch_assumptions,
     fetch_cgt_disposals,
     fetch_isa_contributions,
+    fetch_isa_overrides_for_tax_year,
     fetch_pension_carry_forward,
     fetch_pension_contributions,
     fetch_dividend_records,
@@ -56,7 +57,8 @@ def allowance_overview():
     ty_start = uk_tax_year_start(now_date).isoformat()
     ty_end = uk_tax_year_end(now_date).isoformat()
     ad_hoc = fetch_isa_contributions(uid, ty_start, ty_end)
-    usage = calculate_isa_usage(accounts, ad_hoc, now_date, salary_day)
+    isa_overrides = fetch_isa_overrides_for_tax_year(uid, ty_start, ty_end)
+    usage = calculate_isa_usage(accounts, ad_hoc, now_date, salary_day, isa_overrides)
 
     isa_allowance = float(assumptions["isa_allowance"]) if assumptions else 20000
     lisa_allowance = float(assumptions["lisa_allowance"]) if assumptions else 4000

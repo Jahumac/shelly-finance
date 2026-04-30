@@ -756,19 +756,60 @@ ISA_WRAPPER_TYPES = {"Stocks & Shares ISA", "Cash ISA", "Lifetime ISA"}
 LISA_WRAPPER_TYPES = {"Lifetime ISA"}
 
 
-def calculate_isa_usage(accounts, ad_hoc_contributions, today=None, salary_day=0):
+def _contribution_month_keys(today, salary_day):
+    """Return list of YYYY-MM month keys where a regular contribution has gone through this tax year."""
+    start = uk_tax_year_start(today)
+    contribution_day = salary_day if salary_day >= 1 else 1
+    if contribution_day >= 6:
+        y, m = start.year, start.month
+    else:
+        y, m = start.year, start.month + 1
+        if m > 12:
+            y, m = y + 1, 1
+    keys = []
+    while (y < today.year) or (y == today.year and m <= today.month):
+        if y < today.year or (y == today.year and m < today.month):
+            keys.append(f"{y}-{m:02d}")
+        elif y == today.year and m == today.month:
+            if today.day >= _resolve_contribution_day(y, m, contribution_day):
+                keys.append(f"{y}-{m:02d}")
+        if m == 12:
+            y, m = y + 1, 1
+        else:
+            m += 1
+    return keys
+
+
+def calculate_isa_usage(accounts, ad_hoc_contributions, today=None, salary_day=0, isa_overrides=None):
     """Auto-calculate ISA and LISA usage for the current tax year.
 
     accounts: list of account dicts (need wrapper_type, monthly_contribution)
     ad_hoc_contributions: list of isa_contributions rows (need wrapper_type, amount)
     salary_day: day of month when contributions go in (affects April handling)
+    isa_overrides: list of override rows (account_id, from_month, to_month, override_amount)
+                   — used to apply skips/adjustments to per-month contribution amounts
 
     Returns dict with keys: isa_used, lisa_used, monthly_isa, monthly_lisa,
     adhoc_isa, adhoc_lisa, projected_isa, projected_lisa, breakdown.
     """
     today = today or date.today()
-    months = months_in_tax_year(today, salary_day)
+    month_keys = _contribution_month_keys(today, salary_day)
+    months = len(month_keys)
     total_months = full_year_contribution_months(salary_day)
+
+    # Build override lookup: account_id → list of (from_month, to_month, override_amount)
+    override_map = {}
+    for ov in (isa_overrides or []):
+        aid = ov["account_id"]
+        override_map.setdefault(aid, []).append(
+            (ov["from_month"], ov["to_month"], float(ov["override_amount"]))
+        )
+
+    def _effective_monthly(account_id, monthly, month_key):
+        for from_m, to_m, amount in override_map.get(account_id, []):
+            if from_m <= month_key <= to_m:
+                return amount
+        return monthly
 
     monthly_isa = 0.0
     monthly_lisa = 0.0
@@ -787,7 +828,8 @@ def calculate_isa_usage(accounts, ad_hoc_contributions, today=None, salary_day=0
             monthly = float(acc["monthly_contribution"] or 0)
         except (KeyError, TypeError):
             monthly = 0.0
-        total = monthly * months
+        # Sum actual amounts month by month, respecting overrides
+        total = sum(_effective_monthly(acc["id"], monthly, mk) for mk in month_keys)
         projected = monthly * total_months
         entry = {
             "account_id": acc["id"],
