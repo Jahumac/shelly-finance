@@ -852,16 +852,17 @@ def budget_items_view():
     uid = current_user.id
     if request.method == "POST":
         form_name = request.form.get("form_name", "")
+        month_key = valid_month_key(request.form.get("month")) or _default_month_key()
 
         if form_name == "clear_section":
             delete_budget_items_by_section(request.form.get("section_key", ""), uid)
-            return redirect(url_for("budget.budget_items_view"))
+            return redirect(url_for("budget.budget_items_view", month=month_key))
 
         if form_name == "add_section":
             label = request.form.get("section_label", "").strip()
             if label:
                 create_budget_section(label, uid)
-            return redirect(url_for("budget.budget_items_view"))
+            return redirect(url_for("budget.budget_items_view", month=month_key))
 
         if form_name == "edit_section":
             update_budget_section(
@@ -869,11 +870,11 @@ def budget_items_view():
                 request.form.get("section_label", "").strip(),
                 uid,
             )
-            return redirect(url_for("budget.budget_items_view"))
+            return redirect(url_for("budget.budget_items_view", month=month_key))
 
         if form_name == "delete_section":
             delete_budget_section(request.form.get("section_key", ""), uid)
-            return redirect(url_for("budget.budget_items_view"))
+            return redirect(url_for("budget.budget_items_view", month=month_key))
 
         # default: create item
         section = request.form.get("section", "")
@@ -889,7 +890,7 @@ def budget_items_view():
             "notes": request.form.get("notes", "").strip(),
             "sort_order": sort_order,
         }, uid)
-        return redirect(url_for("budget.budget_items_view"))
+        return redirect(url_for("budget.budget_items_view", month=month_key))
 
     db_sections = fetch_budget_sections(uid)
     all_items = fetch_budget_items(uid)
@@ -946,14 +947,15 @@ def budget_items_view():
 @login_required
 def budget_item_action(item_id):
     uid = current_user.id
+    month_key = valid_month_key(request.form.get("month")) or _default_month_key()
     if request.form.get("form_name") == "delete":
         delete_budget_item(item_id, uid)
-        return redirect(url_for("budget.budget_items_view"))
+        return redirect(url_for("budget.budget_items_view", month=month_key))
 
     item = fetch_budget_item(item_id, uid)
     if not item:
         flash("Budget item not found.", "error")
-        return redirect(url_for("budget.budget_items_view"))
+        return redirect(url_for("budget.budget_items_view", month=month_key))
     ok = update_budget_item({
         "id": item_id,
         "name": request.form.get("name", "").strip(),
@@ -964,7 +966,7 @@ def budget_item_action(item_id):
     }, uid)
     if not ok:
         flash("Budget item not found.", "error")
-    return redirect(url_for("budget.budget_items_view"))
+    return redirect(url_for("budget.budget_items_view", month=month_key))
 
 
 # ── Debts ─────────────────────────────────────────────────────────────────────

@@ -53,8 +53,8 @@
 <div class="budget-toolbar">
   <div class="badge-row">
     <a class="badge" href="/budget/?month={{ month_key }}">Back to Budget</a>
-    <a class="badge" href="/budget/items/?mode=create">+ Add Item</a>
-    <a class="badge badge-sm" href="/budget/items/?mode=add_section">+ Add Section</a>
+    <a class="badge" href="/budget/items/?mode=create&month={{ month_key }}">+ Add Item</a>
+    <a class="badge badge-sm" href="/budget/items/?mode=add_section&month={{ month_key }}">+ Add Section</a>
   </div>
 </div>
 
@@ -66,11 +66,12 @@
       <p class="eyebrow">New Section</p>
       <h2>Add Section</h2>
     </div>
-    <div class="badge-row"><a class="badge" href="/budget/items/">Cancel</a></div>
+    <div class="badge-row"><a class="badge" href="/budget/items/?month={{ month_key }}">Cancel</a></div>
   </div>
   <form method="post" class="settings-form mt-1">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="form_name" value="add_section">
+    <input type="hidden" name="month" value="{{ month_key }}">
     <div class="form-grid">
       <label><span>Section name</span><input type="text" name="section_label" required autofocus placeholder="e.g. Subscriptions"></label>
     </div>
@@ -85,10 +86,11 @@
       <p class="eyebrow">New Item</p>
       <h2>Add Budget Item</h2>
     </div>
-    <div class="badge-row"><a class="badge" href="/budget/items/">Cancel</a></div>
+    <div class="badge-row"><a class="badge" href="/budget/items/?month={{ month_key }}">Cancel</a></div>
   </div>
   <form method="post" class="settings-form mt-1">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="month" value="{{ month_key }}">
     <div class="form-grid">
       <label><span>Name</span><input type="text" name="name" required autofocus></label>
       <label>
@@ -113,10 +115,11 @@
       <p class="eyebrow">Editing</p>
       <h2>{{ selected.name }}</h2>
     </div>
-    <div class="badge-row"><a class="badge" href="/budget/items/">Cancel</a></div>
+    <div class="badge-row"><a class="badge" href="/budget/items/?month={{ month_key }}">Cancel</a></div>
   </div>
   <form method="post" action="/budget/items/{{ selected.id }}" class="settings-form mt-1">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="month" value="{{ month_key }}">
     <div class="form-grid">
       <label><span>Name</span><input type="text" name="name" value="{{ selected.name }}" required autofocus></label>
       <label>
@@ -138,6 +141,7 @@
     <form method="post" action="/budget/items/{{ selected.id }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="form_name" value="delete">
+      <input type="hidden" name="month" value="{{ month_key }}">
       <div class="badge-row mt-1"><button type="submit" class="button-danger">Yes, delete</button></div>
     </form>
   </div>
@@ -152,12 +156,13 @@
       <p class="eyebrow">Edit Section</p>
       <h2>{{ edit_label }}</h2>
     </div>
-    <div class="badge-row"><a class="badge" href="/budget/items/">Cancel</a></div>
+    <div class="badge-row"><a class="badge" href="/budget/items/?month={{ month_key }}">Cancel</a></div>
   </div>
   <form method="post" class="settings-form mt-1">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="form_name" value="edit_section">
     <input type="hidden" name="section_key" value="{{ edit_key }}">
+    <input type="hidden" name="month" value="{{ month_key }}">
     <div class="form-grid">
       <label><span>Section name</span><input type="text" name="section_label" value="{{ edit_label }}" required autofocus></label>
     </div>
@@ -170,6 +175,7 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="form_name" value="delete_section">
       <input type="hidden" name="section_key" value="{{ edit_key }}">
+      <input type="hidden" name="month" value="{{ month_key }}">
       <div class="badge-row mt-1"><button type="submit" class="button-danger" data-confirm="This will remove the section and everything in it. Shelly won't be able to bring it back." data-confirm-title="Delete this section?" data-confirm-ok="Yes, delete it" data-confirm-cancel="Keep it">Yes, delete section</button></div>
     </form>
   </div>
@@ -196,7 +202,7 @@
       <h3>{{ group.label }}</h3>
     </div>
     <div class="badge-row">
-      <a class="badge" href="/budget/items/?mode=edit_section&section_key={{ group.key }}&section_label={{ group.label | urlencode }}">Rename / delete</a>
+      <a class="badge" href="/budget/items/?mode=edit_section&section_key={{ group.key }}&section_label={{ group.label | urlencode }}&month={{ month_key }}">Rename / delete</a>
     </div>
   </div>
 
@@ -225,10 +231,11 @@
       <div class="budget-row-right">
         <span class="budget-row-default">£{{ '{:,.2f}'.format(item.default_amount or 0) }}</span>
         <span class="badge-row budget-row-actions">
-          <a class="badge" href="/budget/items/?item_id={{ item.id }}&mode=edit">Edit</a>
+          <a class="badge" href="/budget/items/?item_id={{ item.id }}&mode=edit&month={{ month_key }}">Edit</a>
           <form method="post" action="/budget/items/{{ item.id }}" class="form-contents">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="form_name" value="delete">
+            <input type="hidden" name="month" value="{{ month_key }}">
             <button type="submit" class="badge badge-danger" data-confirm="Remove {{ item.name }} from your budget?" data-confirm-title="Delete budget item?" data-confirm-ok="Yes, remove it" data-confirm-cancel="Keep it">Delete</button>
           </form>
         </span>
@@ -237,11 +244,11 @@
     {% endfor %}
   </div>
   <p class="budget-section-add-hint">
-    <a href="/budget/items/?mode=create&section={{ group.key }}" class="link-accent">+ Add another item</a> to {{ group.label | lower }}
+    <a href="/budget/items/?mode=create&section={{ group.key }}&month={{ month_key }}" class="link-accent">+ Add another item</a> to {{ group.label | lower }}
   </p>
   {% else %}
   <p class="budget-section-add-hint">
-    Nothing here yet — <a href="/budget/items/?mode=create&section={{ group.key }}" class="link-accent">+ Add an item</a> and Shelly will start tracking it.
+    Nothing here yet — <a href="/budget/items/?mode=create&section={{ group.key }}&month={{ month_key }}" class="link-accent">+ Add an item</a> and Shelly will start tracking it.
   </p>
   {% endif %}
 </section>

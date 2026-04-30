@@ -63,7 +63,7 @@
 {# ── Budget toolbar ──────────────────────────────────────────────────────── #}
 <div class="budget-toolbar">
   <div class="badge-row">
-    <a class="badge" href="/budget/items/">Edit Budget</a>
+    <a class="badge" href="/budget/items/?month={{ month_key }}">Edit Budget</a>
     <a class="badge badge-sm" href="/budget/export.xlsx?month={{ month_key }}">↓ Export month</a>
     <a class="badge badge-sm" href="/budget/annual-export.xlsx" title="Download the whole UK tax year (Apr–Mar) with one tab per month, a summary, and an investment-tracking tab">↓ Export tax year</a>
     <label class="badge badge-sm budget-import-label" title="Import budget from an Excel file">
@@ -162,7 +162,7 @@
     {% endfor %}
   </div>
   {% else %}
-  <p class="helper-text">Nothing here yet — <a href="/budget/items/?mode=create&section={{ section.key }}" class="link-accent">+ Add item</a></p>
+  <p class="helper-text">Nothing here yet — <a href="/budget/items/?mode=create&section={{ section.key }}&month={{ month_key }}" class="link-accent">+ Add item</a></p>
   {% endif %}
 </section>
 {% endfor %}
