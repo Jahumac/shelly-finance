@@ -127,6 +127,28 @@
       btn.addEventListener('click', function() { btn.parentElement.remove(); });
     });
 
+    // 0b. Generic data-allowance-toggle — show/hide a collapsible log panel
+    document.querySelectorAll('[data-allowance-toggle]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var targetId = btn.getAttribute('data-allowance-toggle');
+        var panel = document.getElementById(targetId);
+        if (!panel) return;
+        var isHidden = panel.classList.contains('hidden');
+        // Close any other open panels in the same section first
+        var section = btn.closest('section');
+        if (section) {
+          section.querySelectorAll('.allowance-log-panel').forEach(function(p) {
+            if (p !== panel) p.classList.add('hidden');
+          });
+        }
+        panel.classList.toggle('hidden', !isHidden);
+        if (!panel.classList.contains('hidden')) {
+          var first = panel.querySelector('input, select, textarea');
+          if (first) first.focus();
+        }
+      });
+    });
+
     // 1. All [data-confirm] elements
     document.querySelectorAll('[data-confirm]').forEach(function (el) {
       el.addEventListener('click', function (e) {

@@ -467,6 +467,21 @@ body.is-back-online .site-header {
   margin-bottom: 1rem;
 }
 
+/* Allowances page — collapsible log panels */
+.allowance-log-panel {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.allowance-log-panel-inner {
+  padding-top: 0.85rem;
+}
+
+.allowance-history-table {
+  border-top: 1px solid var(--border);
+  padding-top: 0.25rem;
+}
+
 .section-header h2 {
   margin: 0;
   color: var(--text);
