@@ -956,16 +956,32 @@ def budget_item_action(item_id):
     if not item:
         flash("Budget item not found.", "error")
         return redirect(url_for("budget.budget_items_view", month=month_key))
+
+    old_default = float(item["default_amount"] or 0)
+    new_default = max(0.0, optional_float(request.form.get("default_amount"), 0.0))
+
     ok = update_budget_item({
         "id": item_id,
         "name": request.form.get("name", "").strip(),
         "section": request.form.get("section", ""),
-        "default_amount": max(0.0, optional_float(request.form.get("default_amount"), 0.0)),
+        "default_amount": new_default,
         "linked_account_id": item["linked_account_id"],
         "notes": request.form.get("notes", "").strip(),
     }, uid)
     if not ok:
         flash("Budget item not found.", "error")
+        return redirect(url_for("budget.budget_items_view", month=month_key))
+
+    # If the default changed, update this month's entry too — but only if it
+    # still matches the old default (carry-forward), not if the user had
+    # deliberately set a different amount for this month.
+    if abs(old_default - new_default) > 0.005 and not item["linked_account_id"] and not item["linked_debt_id"]:
+        entries = fetch_budget_entries(month_key, uid)
+        for e in entries:
+            if e["budget_item_id"] == item_id and abs(float(e["amount"] or 0) - old_default) < 0.005:
+                upsert_budget_entry(month_key, item_id, new_default, uid)
+                break
+
     return redirect(url_for("budget.budget_items_view", month=month_key))
 
 
