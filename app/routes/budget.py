@@ -85,30 +85,28 @@ def _month_label(month_key):
 
 
 def _salary_cycle_label(month_key, salary_day):
-    """Return e.g. '28 Apr → 27 May' for the pay cycle covering month_key.
+    """Return e.g. '28 Apr → 27 May' for the pay cycle funded by month_key's salary.
 
-    The cycle starts on salary_day of the prior month and ends salary_day-1 of month_key.
+    The cycle starts on salary_day of month_key and ends on salary_day-1 of the
+    following month — so 'April' always means the cycle your April salary funds.
     Returns None when salary_day is not set.
     """
     if not salary_day:
         return None
     import calendar
     y, m = int(month_key[:4]), int(month_key[5:7])
-    # End: salary_day - 1 of month_key (clamped to valid date)
-    end_day = min(max(salary_day - 1, 1), calendar.monthrange(y, m)[1])
+    # Start: salary_day of this month (clamped to last valid day)
+    start_day = min(salary_day, calendar.monthrange(y, m)[1])
+    start_date = date(y, m, start_day)
+    # End: salary_day - 1 of next month (clamped)
+    ny = y if m < 12 else y + 1
+    nm = m + 1 if m < 12 else 1
     if salary_day == 1:
-        # Cycle ends on the last day of the prior month
-        pm = m - 1 if m > 1 else 12
-        py = y if m > 1 else y - 1
-        end_day = calendar.monthrange(py, pm)[1]
-        end_date = date(py, pm, end_day)
-    else:
+        end_day = calendar.monthrange(y, m)[1]
         end_date = date(y, m, end_day)
-    # Start: salary_day of prior month (clamped)
-    pm = m - 1 if m > 1 else 12
-    py = y if m > 1 else y - 1
-    start_day = min(salary_day, calendar.monthrange(py, pm)[1])
-    start_date = date(py, pm, start_day)
+    else:
+        end_day = min(salary_day - 1, calendar.monthrange(ny, nm)[1])
+        end_date = date(ny, nm, end_day)
     return f"{start_date.strftime('%-d %b')} → {end_date.strftime('%-d %b')}"
 
 
