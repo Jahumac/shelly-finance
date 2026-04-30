@@ -2350,6 +2350,16 @@ button.badge-like-button {
   transition: opacity 0.3s;
 }
 
+/* Manual balance save status indicator */
+.manual-save-status {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
+  transition: opacity 0.3s;
+}
+.manual-save-ok  { color: var(--accent-2); }
+.manual-save-err { color: #f87171; }
+
 /* ── 12-month budget strip ─────────────────────────────────────────── */
 
 .budget-year-strip {

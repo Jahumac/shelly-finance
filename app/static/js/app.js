@@ -693,14 +693,20 @@
 
       /* Manual account balance forms — AJAX to avoid scroll-to-top */
       document.querySelectorAll('.manual-balance-form').forEach(function(form) {
+        /* Insert a status span next to the submit button */
+        var btn = form.querySelector('button[type="submit"]');
+        var statusEl = document.createElement('span');
+        statusEl.className = 'manual-save-status';
+        if (btn && btn.parentNode) btn.parentNode.insertBefore(statusEl, btn.nextSibling);
+
         form.addEventListener('submit', async function(e) {
           e.preventDefault();
           var accountId = (form.querySelector('[name="account_id"]') || {}).value;
           var valEl = form.querySelector('[name="current_value"]');
-          var btn = form.querySelector('button[type="submit"]');
           if (!accountId || !valEl) return;
-          var origText = btn ? btn.textContent : '';
-          if (btn) { btn.disabled = true; btn.textContent = '…'; }
+          if (btn) btn.disabled = true;
+          statusEl.textContent = '';
+          statusEl.className = 'manual-save-status';
           try {
             var resp = await fetch('/monthly-review/api/update-balance', {
               method: 'POST',
@@ -711,13 +717,14 @@
                 current_value: parseFloat(valEl.value) || 0,
               }),
             });
-            if (resp.ok) {
-              if (btn) { btn.textContent = 'Saved ✓'; setTimeout(function() { btn.textContent = origText; btn.disabled = false; }, 1500); }
-            } else {
-              if (btn) { btn.textContent = 'Error'; setTimeout(function() { btn.textContent = origText; btn.disabled = false; }, 2000); }
-            }
+            statusEl.textContent = resp.ok ? 'Saved ✓' : 'Error saving';
+            statusEl.className = 'manual-save-status ' + (resp.ok ? 'manual-save-ok' : 'manual-save-err');
           } catch(err) {
-            if (btn) { btn.textContent = origText; btn.disabled = false; }
+            statusEl.textContent = 'Error saving';
+            statusEl.className = 'manual-save-status manual-save-err';
+          } finally {
+            if (btn) btn.disabled = false;
+            setTimeout(function() { statusEl.textContent = ''; statusEl.className = 'manual-save-status'; }, 2500);
           }
         });
       });
