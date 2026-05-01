@@ -578,12 +578,22 @@
         return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
       }
 
+      // Format a local Date as YYYY-MM-DD using local components.
+      // toISOString() would return UTC, which mismatches snapshot keys stored in
+      // UK local time when the browser is in BST (off-by-one day).
+      function formatYMD(d) {
+        var y = d.getFullYear();
+        var m = String(d.getMonth() + 1).padStart(2, '0');
+        var dd = String(d.getDate()).padStart(2, '0');
+        return y + '-' + m + '-' + dd;
+      }
+
       function ensureMinPoints(labels, values) {
         if (!labels.length) {
           var today = new Date();
           var yesterday = new Date(today.getTime() - 86400000);
           return {
-            labels: [yesterday.toISOString().split('T')[0], today.toISOString().split('T')[0]],
+            labels: [formatYMD(yesterday), formatYMD(today)],
             values: [fallbackValue, fallbackValue]
           };
         }
@@ -591,7 +601,7 @@
           var dt = parseYMD(labels[0]) || new Date();
           var prev = new Date(dt.getTime() - 86400000);
           return {
-            labels: [prev.toISOString().split('T')[0], labels[0]],
+            labels: [formatYMD(prev), labels[0]],
             values: [values[0], values[0]]
           };
         }
@@ -624,7 +634,7 @@
             if (points[k].d < startDate) lastV = points[k].v; else break;
           }
           for (var cur = new Date(startDate); cur <= endDate; cur.setDate(cur.getDate() + 1)) {
-            var s = cur.toISOString().split('T')[0];
+            var s = formatYMD(cur);
             if (map.hasOwnProperty(s)) lastV = map[s];
             labels.push(s); values.push(lastV);
           }

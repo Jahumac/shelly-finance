@@ -194,10 +194,13 @@ def fetch_daily_snapshots(user_id, limit=365):
     with get_connection() as conn:
         rows = conn.execute(
             """
-            SELECT snapshot_date, total_value FROM portfolio_daily_snapshots
-            WHERE user_id = ?
+            SELECT snapshot_date, total_value FROM (
+                SELECT snapshot_date, total_value FROM portfolio_daily_snapshots
+                WHERE user_id = ?
+                ORDER BY snapshot_date DESC
+                LIMIT ?
+            )
             ORDER BY snapshot_date ASC
-            LIMIT ?
             """,
             (user_id, limit),
         ).fetchall()

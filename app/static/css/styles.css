@@ -5117,6 +5117,9 @@ a.link-accent:hover {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+.mini-table th.text-right  { text-align: right; }
+.mini-table th.text-center { text-align: center; }
+.mini-table th.text-left   { text-align: left; }
 .mini-table td {
   padding: 0.6rem 0.75rem;
   border-bottom: 1px solid rgba(255,255,255,0.04);
