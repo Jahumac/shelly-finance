@@ -349,7 +349,8 @@ def budget_import():
         from openpyxl import load_workbook
         wb = load_workbook(BytesIO(f.read()), data_only=True)
         ws = wb.active
-    except Exception:
+    except Exception as e:
+        current_app.logger.warning("budget import: could not read workbook: %s", e)
         flash("Could not read the Excel file.", "error")
         return redirect(url_for("budget.budget", month=month_key))
 

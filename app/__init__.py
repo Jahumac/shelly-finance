@@ -121,6 +121,14 @@ def create_app():
             return jsonify({"error": "Demo account is read-only"}), 403
         flash("Demo account is read-only", "error")
         return redirect(request.referrer or url_for("overview.overview"))
+
+    @app.errorhandler(413)
+    def too_large(_e):
+        if request.path.startswith("/api/"):
+            return jsonify({"error": "Request too large"}), 413
+        flash("That file is too large — uploads are capped at 16 MB.", "error")
+        return redirect(request.referrer or url_for("overview.overview"))
+
     # ── Context processors ────────────────────────────────────────────────────
     @app.context_processor
     def inject_dashboard_name():

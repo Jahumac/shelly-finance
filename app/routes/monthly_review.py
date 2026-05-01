@@ -1,7 +1,7 @@
 import calendar as _cal
 from datetime import date, datetime, timezone
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required
 
 from app.calculations import (
@@ -428,7 +428,8 @@ def import_csv():
     except ValueError as exc:
         flash(f"Could not parse CSV: {exc}", "error")
         return redirect(url_for("monthly_review.monthly_review"))
-    except Exception:
+    except Exception as e:
+        current_app.logger.warning("monthly-review CSV import: parser %s failed: %s", platform, e)
         flash("An unexpected error occurred while reading the CSV. Check the file format.", "error")
         return redirect(url_for("monthly_review.monthly_review"))
 
