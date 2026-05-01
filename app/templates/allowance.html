@@ -504,7 +504,7 @@
       <p class="helper-text mb-075">Log asset sales from your GIA to track gains and losses against the £{{ '{:,.0f}'.format(cgt_annual_exemption) }} annual exemption. Gains inside an ISA or pension are not subject to CGT.</p>
       {% if cgt_disposals %}
       {% if cgt_over_exemption > 0 %}
-      <p class="helper-text mb-075" style="color:var(--danger);">⚠ Net gains exceed the annual exemption by <strong>£{{ '{:,.2f}'.format(cgt_over_exemption) }}</strong>. Declare this on your Self Assessment.</p>
+      <p class="helper-text mb-075 text-danger">⚠ Net gains exceed the annual exemption by <strong>£{{ '{:,.2f}'.format(cgt_over_exemption) }}</strong>. Declare this on your Self Assessment.</p>
       {% endif %}
       <div class="table-scroll mb-075">
         <table class="mini-table">

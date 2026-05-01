@@ -4458,7 +4458,7 @@ button.badge-like-button {
 .text-danger   { color: var(--danger); }
 .text-success  { color: #86efac; }
 .text-gain     { color: #86efac; }
-.text-loss     { color: var(--danger); } /* No --success var yet; matches existing JS colour */
+.text-loss     { color: var(--danger); }
 .text-sm      { font-size: 0.8rem; }
 .text-sm-2    { font-size: 0.875rem; }
 .text-xs      { font-size: 0.75rem; }
@@ -4589,11 +4589,6 @@ a.link-accent:hover {
 .text-error {
   color: #fca5a5;
   font-size: 0.875rem;
-}
-
-/* Success text */
-.text-success {
-  color: #86efac;
 }
 
 /* Danger card/panel border */
