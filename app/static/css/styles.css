@@ -1261,7 +1261,6 @@ button.badge-like-button {
      than data rows and throwing the numeric columns out of alignment. */
   grid-template-columns:
     minmax(0, 1fr)   /* name */
-    minmax(0, 1fr)   /* bucket */
     6rem             /* units */
     7rem             /* price */
     7rem             /* value */
@@ -1294,15 +1293,6 @@ button.badge-like-button {
   display: block;
   font-size: 0.78rem;
   color: var(--muted);
-}
-
-.holdings-cell-bucket {
-  color: var(--muted);
-  font-size: 0.88rem;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: center;
 }
 
 .holdings-cell-units,
@@ -1394,7 +1384,6 @@ button.badge-like-button {
     grid-template-columns: 1fr auto;
     grid-template-areas:
       "name     value"
-      "bucket   bucket"
       "units    price"
       "actions  actions";
     row-gap: 0.55rem;
@@ -1405,13 +1394,11 @@ button.badge-like-button {
     background: rgba(255, 255, 255, 0.03);
   }
   .holdings-cell-name    { grid-area: name;    text-align: left; }
-  .holdings-cell-bucket  { grid-area: bucket;  font-size: 0.78rem; text-align: left; }
   .holdings-cell-units   { grid-area: units;   text-align: left; }
   .holdings-cell-price   { grid-area: price;   text-align: left; }
   .holdings-cell-value   { grid-area: value;   font-size: 1.05rem; text-align: right; }
   .holdings-cell-actions { grid-area: actions; padding-top: 0.5rem; border-top: 1px solid rgba(51, 65, 85, 0.3); }
   .holdings-label        { display: block; }
-  .holdings-cell-bucket:empty { display: none; }
 }
 
 .muted-cell {

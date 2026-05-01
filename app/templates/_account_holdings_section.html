@@ -46,7 +46,6 @@
           <div class="holdings-list" role="table" aria-label="Portfolio holdings">
             <div class="holdings-row holdings-row-head" role="row">
               <div role="columnheader">Holding</div>
-              <div role="columnheader" class="text-center">Bucket</div>
               <div role="columnheader" class="text-center">Units</div>
               <div role="columnheader" class="text-center">Price</div>
               <div role="columnheader" class="text-center">Value</div>
@@ -65,7 +64,6 @@
                   <small class="holding-unlinked-badge" title="No price source linked — prices won't update automatically">no auto-price</small>
                 {% endif %}
               </div>
-              <div class="holdings-cell-bucket" role="cell">{{ position.bucket or '' }}</div>
               <div class="holdings-cell-units" role="cell">
                 <span class="holdings-label">Units</span>
                 <input type="number" step="any" name="units" form="edit-holding-{{ position.id }}" value="{{ '{:.4f}'.format(position.units or 0) }}" class="holdings-input">

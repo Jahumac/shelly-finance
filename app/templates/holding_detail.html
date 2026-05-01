@@ -15,13 +15,11 @@
       <p class="text-muted mt-025">{{ item.ticker }}</p>
       {% endif %}
     </div>
+    {% if view_in_account_url %}
     <div class="badge-row">
-      {% if view_in_account_url %}
-        <a class="badge badge-meta" href="{{ view_in_account_url }}" title="View this holding in your account">{{ item.bucket or 'Other' }}</a>
-      {% else %}
-        <span class="badge badge-meta">{{ item.bucket or 'Other' }}</span>
-      {% endif %}
+      <a class="badge badge-meta" href="{{ view_in_account_url }}">View in account</a>
     </div>
+    {% endif %}
   </div>
 
   <div class="mt-1">

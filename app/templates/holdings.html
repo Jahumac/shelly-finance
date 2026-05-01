@@ -187,14 +187,6 @@
               {% endfor %}
             </select>
           </label>
-          <label>
-            <span>Bucket</span>
-            <select name="catalogue_bucket">
-              {% for option in bucket_options %}
-                <option value="{{ option }}" {% if selected.bucket == option %}selected{% endif %}>{{ option }}</option>
-              {% endfor %}
-            </select>
-          </label>
           <label class="form-full-col"><span>Notes</span><input type="text" name="catalogue_notes" value="{{ selected.notes or '' }}"></label>
         </div>
         <div class="badge-row">
@@ -212,10 +204,6 @@
         <div class="acct-detail-stat">
           <span>Asset Type</span>
           <strong>{{ selected.asset_type or '—' }}</strong>
-        </div>
-        <div class="acct-detail-stat">
-          <span>Bucket</span>
-          <strong>{{ selected.bucket or '—' }}</strong>
         </div>
         {% if selected.last_price %}
         <div class="acct-detail-stat">
