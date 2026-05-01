@@ -38,7 +38,7 @@
   <div class="budget-year-strip-inner">
     {% for m in month_strip %}
     <a href="/budget/?month={{ m.key }}"
-       class="budget-month-pill{% if m.is_current %} budget-month-active{% endif %}{% if m.is_today and not m.is_current %} budget-month-today{% endif %}{% if m.has_data %} budget-month-has-data{% endif %}">
+       class="budget-month-pill month-accent-{{ m.month_num }}{% if m.is_current %} budget-month-active{% endif %}{% if m.is_today and not m.is_current %} budget-month-today{% endif %}{% if m.has_data %} budget-month-has-data{% endif %}">
       <span class="budget-month-pill-label">{{ m.label }}</span>
       {% if m.has_data %}<span class="budget-month-dot"></span>{% endif %}
     </a>
