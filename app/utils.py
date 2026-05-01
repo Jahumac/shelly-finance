@@ -1,7 +1,9 @@
 """Shared utility helpers used across route modules."""
 import re
+from datetime import date
 
 _MONTH_KEY_RE = re.compile(r"^\d{4}-\d{2}$")
+_TAX_YEAR_RE = re.compile(r"^(\d{4})-(\d{2})$")
 
 
 def split_tags(tags_value):
@@ -37,3 +39,26 @@ def valid_month_key(raw):
     """Return the YYYY-MM portion of raw if it looks valid, else None."""
     s = (raw or "")[:7]
     return s if _MONTH_KEY_RE.match(s) else None
+
+
+def valid_date(raw):
+    """Return raw if it parses as a calendar YYYY-MM-DD date, else None."""
+    s = (raw or "").strip()
+    if not s:
+        return None
+    try:
+        date.fromisoformat(s)
+    except (ValueError, TypeError):
+        return None
+    return s
+
+
+def valid_tax_year(raw):
+    """Return raw if it's a UK tax year like 2023-24 (YY = (YYYY+1) mod 100), else None."""
+    s = (raw or "").strip()
+    m = _TAX_YEAR_RE.match(s)
+    if not m:
+        return None
+    if (int(m.group(1)) + 1) % 100 != int(m.group(2)):
+        return None
+    return s

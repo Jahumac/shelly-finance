@@ -4,7 +4,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from app.calculations import current_age_from_assumptions
-from app.utils import optional_float, optional_int
+from app.utils import optional_float, optional_int, valid_date
 from app.models import (
     fetch_assumptions,
     fetch_holding_catalogue_in_use,
@@ -42,7 +42,11 @@ def settings():
             if update_day > 31:
                 update_day = update_day - 31  # wrap into next month (early days)
 
-        new_dob = request.form.get("date_of_birth", "").strip()
+        raw_dob = request.form.get("date_of_birth", "").strip()
+        new_dob = valid_date(raw_dob) or ""
+        if raw_dob and not new_dob:
+            flash("Please enter a valid date of birth (YYYY-MM-DD).", "error")
+            return redirect(url_for("settings.settings"))
 
         payload = {
             "annual_growth_rate": _f("annual_growth_rate", 7) / 100.0,

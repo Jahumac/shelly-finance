@@ -55,7 +55,7 @@ from app.models import (
     update_holding,
 )
 from app.services.prices import fetch_price, lookup_instrument, to_gbp
-from app.utils import optional_float, optional_int, split_tags
+from app.utils import optional_float, optional_int, split_tags, valid_month_key
 
 ASSET_TYPE_OPTIONS = ["ETF", "Fund", "Share", "Pension Fund", "Cash", "Bond", "Other"]
 BUCKET_OPTIONS = [
@@ -489,11 +489,13 @@ def account_detail(account_id):
             return redirect(url_for("accounts.accounts"))
 
         if form_name == "log_prize":
-            month_key = request.form.get("month_key", "")
+            month_key = valid_month_key(request.form.get("month_key"))
             prize_amount = optional_float(request.form.get("prize_amount"), 0.0)
             if month_key and prize_amount is not None:
                 log_prize(account_id, uid, month_key, prize_amount)
                 flash(f"Prize of £{prize_amount:,.2f} logged for {month_key}.", "success")
+            elif not month_key:
+                flash("Please pick a valid month.", "error")
             return redirect(url_for("accounts.account_detail", account_id=account_id))
 
         if form_name == "delete_prize":

@@ -3,6 +3,7 @@ from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import current_user, login_required
 
+from app.utils import valid_date, valid_tax_year
 from app.calculations import (
     allowance_progress,
     calculate_isa_usage,
@@ -158,11 +159,16 @@ def add_contribution():
     uid = current_user.id
     account_id = request.form.get("account_id", type=int)
     amount = request.form.get("amount", type=float)
-    contribution_date = request.form.get("contribution_date") or datetime.now().date().isoformat()
+    raw_date = request.form.get("contribution_date")
+    contribution_date = valid_date(raw_date) or (None if raw_date else datetime.now().date().isoformat())
     note = request.form.get("note", "").strip() or None
 
     if not account_id or not amount or amount <= 0:
         flash("Please select an account and enter a valid amount.", "error")
+        return redirect(url_for("allowance.allowance_overview"))
+
+    if not contribution_date:
+        flash("Please enter a valid date.", "error")
         return redirect(url_for("allowance.allowance_overview"))
 
     if not fetch_account(account_id, uid):
@@ -189,11 +195,16 @@ def add_pension_topup():
     account_id = request.form.get("account_id", type=int)
     amount = request.form.get("amount", type=float)
     kind = (request.form.get("kind") or "personal").strip().lower()
-    contribution_date = request.form.get("contribution_date") or datetime.now().date().isoformat()
+    raw_date = request.form.get("contribution_date")
+    contribution_date = valid_date(raw_date) or (None if raw_date else datetime.now().date().isoformat())
     note = request.form.get("note", "").strip() or None
 
     if not account_id or not amount or amount <= 0:
         flash("Please select an account and enter a valid amount.", "error")
+        return redirect(url_for("allowance.allowance_overview"))
+
+    if not contribution_date:
+        flash("Please enter a valid date.", "error")
         return redirect(url_for("allowance.allowance_overview"))
 
     if kind not in ("personal", "employer"):
@@ -222,11 +233,16 @@ def add_dividend():
     uid = current_user.id
     account_id = request.form.get("account_id", type=int)
     amount = request.form.get("amount", type=float)
-    dividend_date = request.form.get("dividend_date") or datetime.now().date().isoformat()
+    raw_date = request.form.get("dividend_date")
+    dividend_date = valid_date(raw_date) or (None if raw_date else datetime.now().date().isoformat())
     note = request.form.get("note", "").strip() or None
 
     if not account_id or not amount or amount <= 0:
         flash("Please select an account and enter a valid amount.", "error")
+        return redirect(url_for("allowance.allowance_overview"))
+
+    if not dividend_date:
+        flash("Please enter a valid date.", "error")
         return redirect(url_for("allowance.allowance_overview"))
 
     if not fetch_account(account_id, uid):
@@ -253,12 +269,17 @@ def add_cgt():
     asset_name = request.form.get("asset_name", "").strip()
     proceeds = request.form.get("proceeds", type=float)
     cost_basis = request.form.get("cost_basis", type=float)
-    disposal_date = request.form.get("disposal_date") or datetime.now().date().isoformat()
+    raw_date = request.form.get("disposal_date")
+    disposal_date = valid_date(raw_date) or (None if raw_date else datetime.now().date().isoformat())
     note = request.form.get("note", "").strip() or None
     account_id = request.form.get("account_id", type=int) or None
 
     if not asset_name or proceeds is None or cost_basis is None or proceeds < 0 or cost_basis < 0:
         flash("Please fill in all required fields.", "error")
+        return redirect(url_for("allowance.allowance_overview") + "#cgt")
+
+    if not disposal_date:
+        flash("Please enter a valid date.", "error")
         return redirect(url_for("allowance.allowance_overview") + "#cgt")
 
     if account_id is not None and not fetch_account(account_id, uid):
@@ -282,10 +303,10 @@ def remove_cgt(disposal_id):
 @allowance_bp.route("/pension/carry-forward/add", methods=["POST"])
 @login_required
 def add_carry_forward():
-    tax_year = request.form.get("tax_year", "").strip()
+    tax_year = valid_tax_year(request.form.get("tax_year"))
     unused = request.form.get("unused_allowance", type=float)
     if not tax_year or unused is None or unused < 0:
-        flash("Please enter a valid tax year and unused amount.", "error")
+        flash("Please enter a valid tax year (e.g. 2023-24) and unused amount.", "error")
         return redirect(url_for("allowance.allowance_overview") + "#pension")
     upsert_pension_carry_forward(current_user.id, tax_year, unused)
     flash(f"Recorded £{unused:,.0f} carry-forward from {tax_year}.", "success")
