@@ -2589,22 +2589,24 @@ button.badge-like-button {
    strip and on the hero card. The custom property --month-color cascades
    down to pills, dots, active underlines, and the hero highlight. */
 
-.month-accent-1  { --month-color: #60a5fa; }   /* Jan — winter blue      */
-.month-accent-2  { --month-color: #818cf8; }   /* Feb — soft violet       */
-.month-accent-3  { --month-color: #a78bfa; }   /* Mar — spring violet     */
-.month-accent-4  { --month-color: #34d399; }   /* Apr — fresh green       */
-.month-accent-5  { --month-color: #22c55e; }   /* May — bright green      */
-.month-accent-6  { --month-color: #84cc16; }   /* Jun — lime              */
-.month-accent-7  { --month-color: #facc15; }   /* Jul — gold              */
-.month-accent-8  { --month-color: #f59e0b; }   /* Aug — amber             */
-.month-accent-9  { --month-color: #f97316; }   /* Sep — orange            */
-.month-accent-10 { --month-color: #e07850; }   /* Oct — warm terracotta   */
-.month-accent-11 { --month-color: #ec4899; }   /* Nov — pink              */
-.month-accent-12 { --month-color: #38bdf8; }   /* Dec — ice blue          */
+/* Adjacent months sit in different colour families so neighbouring pills
+   in the strip pop apart at a glance — calendar-as-clock-face. */
+.month-accent-1  { --month-color: #3b82f6; }   /* Jan — cobalt blue       */
+.month-accent-2  { --month-color: #ec4899; }   /* Feb — hot pink          */
+.month-accent-3  { --month-color: #facc15; }   /* Mar — gold              */
+.month-accent-4  { --month-color: #22c55e; }   /* Apr — fresh green       */
+.month-accent-5  { --month-color: #a855f7; }   /* May — lavender          */
+.month-accent-6  { --month-color: #f97316; }   /* Jun — orange            */
+.month-accent-7  { --month-color: #ef4444; }   /* Jul — bright red        */
+.month-accent-8  { --month-color: #14b8a6; }   /* Aug — teal              */
+.month-accent-9  { --month-color: #d97706; }   /* Sep — amber             */
+.month-accent-10 { --month-color: #7c3aed; }   /* Oct — deep violet       */
+.month-accent-11 { --month-color: #84cc16; }   /* Nov — lime              */
+.month-accent-12 { --month-color: #be123c; }   /* Dec — festive burgundy  */
 
-/* Hero card picks up the month accent as a subtle top border */
+/* Hero card picks up the month accent as a bold top stripe */
 .card.highlight[class*="month-accent-"] {
-  border-top: 3px solid var(--month-color, var(--accent));
+  border-top: 6px solid var(--month-color, var(--accent));
 }
 
 /* Hero strip stats use month colour for strong text */
