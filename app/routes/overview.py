@@ -11,6 +11,7 @@ from app.calculations import (
     calculate_isa_usage,
     calculate_pension_usage,
     effective_account_value,
+    effective_monthly_contribution,
     goal_current_value,
     is_review_due,
     is_salary_day,
@@ -49,6 +50,109 @@ from app.models import (
 )
 
 overview_bp = Blueprint("overview", __name__)
+
+
+def _build_daily_contributions_cumulative(uid, daily_labels, accounts, assumptions):
+    """Cumulative contributions credited on each daily snapshot date.
+
+    cumulative[i] = total contributions landed strictly after the first
+    snapshot date and on/before daily_labels[i]. The first snapshot's
+    value already includes any contributions made on or before that day,
+    so anything pre-period is excluded to avoid double-counting.
+
+    Per (account, month):
+      1. Skipped (override_amount=0) → £0
+      2. Has a monthly_review_item → expected_contribution (user-edited truth)
+      3. No review yet → effective_monthly_contribution default; the month
+         is added to pending_months so the UI can show "estimated".
+
+    Contributions land on the user's salary_day (clamped to 1-28 to avoid
+    short-month issues). Months strictly in the future are not counted.
+    """
+    if not daily_labels:
+        return [], []
+
+    salary_day = 28
+    try:
+        salary_day = max(1, min(28, int((assumptions or {}).get("salary_day") or 28)))
+    except (TypeError, ValueError):
+        pass
+
+    today = datetime.now().date()
+
+    try:
+        first_label_date = datetime.strptime(daily_labels[0], "%Y-%m-%d").date()
+        last_label_date = datetime.strptime(daily_labels[-1], "%Y-%m-%d").date()
+    except ValueError:
+        return [0.0] * len(daily_labels), []
+
+    # Walk months from first snapshot's month to today's month (inclusive).
+    pending_months = []
+    events = []  # (date, amount)
+
+    y, m = first_label_date.year, first_label_date.month
+    end_y, end_m = today.year, today.month
+    while (y, m) <= (end_y, end_m):
+        mk = f"{y:04d}-{m:02d}"
+        invest_date = date(y, m, salary_day)
+        # Only consider months whose investment date has actually arrived,
+        # otherwise we'd inject contributions that haven't happened yet.
+        if invest_date <= today and invest_date <= last_label_date:
+            review = fetch_monthly_review(mk, uid)
+            review_items_by_acc = {}
+            if review:
+                for item in fetch_monthly_review_items(review["id"]):
+                    review_items_by_acc[item["account_id"]] = item
+
+            active_overrides = fetch_all_active_overrides(mk, uid)
+            skipped_ids = {
+                aid for aid, ov in active_overrides.items()
+                if float(ov.get("override_amount") or 0) == 0
+            }
+
+            month_total = 0.0
+            month_has_estimate = False
+            for a in accounts:
+                aid = a["id"]
+                if aid in skipped_ids:
+                    continue
+                if aid in review_items_by_acc:
+                    month_total += float(review_items_by_acc[aid]["expected_contribution"] or 0)
+                else:
+                    default_amt = effective_monthly_contribution(a, assumptions)
+                    if default_amt > 0:
+                        month_total += default_amt
+                        month_has_estimate = True
+
+            if month_total > 0:
+                events.append((invest_date, month_total))
+            if month_has_estimate:
+                pending_months.append(mk)
+
+        if m == 12:
+            y, m = y + 1, 1
+        else:
+            m += 1
+
+    # Drop events on/before the first snapshot date — already in the start value.
+    events = [(d, a) for d, a in events if d > first_label_date]
+    events.sort(key=lambda e: e[0])
+
+    cumulative = []
+    running = 0.0
+    idx = 0
+    for label in daily_labels:
+        try:
+            d = datetime.strptime(label, "%Y-%m-%d").date()
+        except ValueError:
+            cumulative.append(round(running, 2))
+            continue
+        while idx < len(events) and events[idx][0] <= d:
+            running += events[idx][1]
+            idx += 1
+        cumulative.append(round(running, 2))
+
+    return cumulative, pending_months
 
 
 @overview_bp.route("/")
@@ -441,6 +545,10 @@ def overview():
 
     assumed_rate_pct = round(to_float((assumptions or {}).get("annual_growth_rate", 0.07)) * 100, 1)
 
+    daily_contributions, pending_review_months = _build_daily_contributions_cumulative(
+        uid, daily_labels, accounts, assumptions
+    )
+
     # Render the response and ensure it's not cached by the browser
     resp = make_response(render_template(
         "overview.html",
@@ -453,6 +561,8 @@ def overview():
         history_values=history_values,
         daily_labels=daily_labels,
         daily_values=daily_values,
+        daily_contributions=daily_contributions,
+        pending_review_months=pending_review_months,
         last_snapshot_date=last_snapshot_date,
         last_price_update=last_price_update,
         last_price_update_display=last_price_update_display,

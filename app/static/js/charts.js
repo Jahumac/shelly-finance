@@ -691,6 +691,7 @@
       if (!canvas) return;
       var allLabels = JSON.parse(canvas.dataset.labels || '[]');
       var allValues = JSON.parse(canvas.dataset.values || '[]');
+      var allContributions = JSON.parse(canvas.dataset.contributions || '[]');
       var fallbackValue = parseFloat(canvas.dataset.fallback || '0');
       var chart = null;
 
@@ -840,6 +841,7 @@
           var lEl = document.getElementById('latestValue');
           var cEl = document.getElementById('changeValue');
           var labelEl = document.getElementById('changeLabel');
+          var breakdownEl = document.getElementById('changeBreakdown');
           if (lEl) lEl.textContent = '£' + latest.toLocaleString('en-GB', { minimumFractionDigits: 2 });
           if (cEl) {
             cEl.textContent = (diff >= 0 ? '+' : '') + diff.toLocaleString('en-GB', { minimumFractionDigits: 2 }) +
@@ -851,6 +853,29 @@
             labelEl.textContent = firstDate
               ? 'Change since ' + firstDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
               : 'Change';
+          }
+          if (breakdownEl) {
+            var contribDelta = null;
+            if (allContributions.length === allLabels.length && data.labels.length) {
+              var startIdx = allLabels.indexOf(data.labels[0]);
+              var endIdx = allLabels.indexOf(data.labels[data.labels.length - 1]);
+              if (startIdx >= 0 && endIdx >= 0) {
+                contribDelta = (allContributions[endIdx] || 0) - (allContributions[startIdx] || 0);
+              }
+            }
+            if (contribDelta !== null) {
+              var marketGain = diff - contribDelta;
+              var marketPct = first ? (marketGain / first * 100) : null;
+              var fmt = function (n) {
+                return (n >= 0 ? '+£' : '−£') + Math.abs(n).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+              };
+              breakdownEl.innerHTML =
+                '<strong>' + fmt(contribDelta) + '</strong> from your contributions, ' +
+                '<strong>' + fmt(marketGain) + '</strong> from market growth' +
+                (marketPct !== null ? ' (' + (marketPct >= 0 ? '+' : '') + marketPct.toFixed(2) + '%)' : '') + '.';
+            } else {
+              breakdownEl.textContent = 'Includes market growth + any contributions you made during this period.';
+            }
           }
         }
       }
