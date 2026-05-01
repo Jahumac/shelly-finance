@@ -17,7 +17,6 @@ from app.models import (
     delete_debt,
     fetch_all_accounts,
     fetch_all_debts,
-    fetch_assumptions,
     fetch_budget_entries,
     fetch_budget_item,
     fetch_budget_items,
@@ -82,32 +81,6 @@ def _sync_linked_override(item_id, month_key, amount, user_id):
 
 def _month_label(month_key):
     return datetime.strptime(month_key, "%Y-%m").strftime("%B %Y")
-
-
-def _salary_cycle_label(month_key, salary_day):
-    """Return e.g. '28 Apr → 27 May' for the pay cycle funded by month_key's salary.
-
-    The cycle starts on salary_day of month_key and ends on salary_day-1 of the
-    following month — so 'April' always means the cycle your April salary funds.
-    Returns None when salary_day is not set.
-    """
-    if not salary_day:
-        return None
-    import calendar
-    y, m = int(month_key[:4]), int(month_key[5:7])
-    # Start: salary_day of this month (clamped to last valid day)
-    start_day = min(salary_day, calendar.monthrange(y, m)[1])
-    start_date = date(y, m, start_day)
-    # End: salary_day - 1 of next month (clamped)
-    ny = y if m < 12 else y + 1
-    nm = m + 1 if m < 12 else 1
-    if salary_day == 1:
-        end_day = calendar.monthrange(y, m)[1]
-        end_date = date(y, m, end_day)
-    else:
-        end_day = min(salary_day - 1, calendar.monthrange(ny, nm)[1])
-        end_date = date(ny, nm, end_day)
-    return f"{start_date.strftime('%-d %b')} → {end_date.strftime('%-d %b')}"
 
 
 def _build_monthly_data(month_key, user_id):
@@ -246,15 +219,10 @@ def budget():
 
     month_strip, is_inherited = _build_budget_month_strip(month_key, uid)
 
-    assumptions = fetch_assumptions(uid)
-    salary_day = int(assumptions["salary_day"] or 0) if assumptions and assumptions["salary_day"] else 0
-    cycle_label = _salary_cycle_label(month_key, salary_day)
-
     return render_template(
         "budget.html",
         month_key=month_key,
         month_label=_month_label(month_key),
-        salary_cycle_label=cycle_label,
         sections=sections,
         summary=summary,
         income_key=income_key,
@@ -924,9 +892,6 @@ def budget_items_view():
     sections_data, summary = _build_monthly_data(month_key, uid)
     month_strip, is_inherited = _build_budget_month_strip(month_key, uid)
 
-    assumptions = fetch_assumptions(uid)
-    salary_day = int(assumptions["salary_day"] or 0) if assumptions and assumptions["salary_day"] else 0
-
     return render_template(
         "budget_items.html",
         grouped=grouped,
@@ -937,7 +902,6 @@ def budget_items_view():
         active_page="budget",
         month_key=month_key,
         month_label=_month_label(month_key),
-        salary_cycle_label=_salary_cycle_label(month_key, salary_day),
         summary=summary,
         month_strip=month_strip,
         is_inherited=is_inherited,
