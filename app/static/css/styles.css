@@ -1232,11 +1232,6 @@ button.badge-like-button {
   border-color: rgba(248, 113, 113, 0.35);
 }
 
-.responsive-table-wrap {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
 /* ── Holdings: desktop table vs mobile cards ─────────────────────────── */
 /* ── Holdings list ─────────────────────────────────────────────────────
    Single responsive component (desktop tabular row at ≥640px, stacked
@@ -1408,10 +1403,6 @@ button.badge-like-button {
   .holdings-cell-actions { grid-area: actions; padding-top: 0.5rem; border-top: 1px solid rgba(51, 65, 85, 0.3); }
   .holdings-label        { display: block; }
   .holdings-cell-bucket:empty { display: none; }
-}
-
-.align-right {
-  text-align: right !important;
 }
 
 .muted-cell {

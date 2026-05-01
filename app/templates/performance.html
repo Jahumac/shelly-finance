@@ -96,8 +96,9 @@
 
 {# ── By Account ────────────────────────────────────────────────────── #}
 {% if account_perf %}
-<div class="panel" style="overflow-x:auto;">
+<div class="panel">
   <h3 class="section-title">By Account</h3>
+  <div class="table-scroll">
   <table class="data-table">
     <thead>
       <tr>
@@ -114,6 +115,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 {% endif %}
 
