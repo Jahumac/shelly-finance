@@ -339,9 +339,7 @@
       var labels  = JSON.parse(canvas.dataset.labels  || '[]');
       var actual  = JSON.parse(canvas.dataset.actual  || '[]');
       var plan    = JSON.parse(canvas.dataset.plan    || '[]');
-      var bench   = JSON.parse(canvas.dataset.bench   || '[]');
       var assumedRate = canvas.dataset.assumedRate || '';
-      var benchmarkRate = canvas.dataset.benchmarkRate || '';
 
       var datasets = [
         {
@@ -368,20 +366,6 @@
           borderWidth: 1.5,
         },
       ];
-
-      if (bench.length) {
-        datasets.push({
-          label: 'Benchmark (' + benchmarkRate + '%)',
-          data: bench,
-          borderColor: c.accent,
-          backgroundColor: 'transparent',
-          fill: false,
-          tension: 0.35,
-          pointRadius: 0,
-          pointHoverRadius: 4,
-          borderWidth: 1.5,
-        });
-      }
 
       new Chart(canvas, {
         type: 'line',

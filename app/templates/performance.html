@@ -17,16 +17,16 @@
 <section class="card highlight mb-1 month-accent-{{ current_month_num }}">
   <div class="hero-top">
     <div>
-      <p class="eyebrow">Performance</p>
+      <p class="eyebrow">On track vs. plan</p>
       {% if has_data %}
         <h2 class="hero-value">£{{ '{:,.0f}'.format(current_value) }}</h2>
         {% if plan_value is not none %}
           {% set vs_plan = current_value - plan_value %}
           <p class="hero-subtitle">
             {% if vs_plan >= 0 %}
-              <span class="perf-positive">£{{ '{:,.0f}'.format(vs_plan) }} ahead</span> of your {{ assumed_rate_pct }}% plan
+              <span class="perf-positive">£{{ '{:,.0f}'.format(vs_plan) }} ahead</span> of where you should be
             {% else %}
-              <span class="perf-negative">£{{ '{:,.0f}'.format(vs_plan | abs) }} behind</span> your {{ assumed_rate_pct }}% plan
+              <span class="perf-negative">£{{ '{:,.0f}'.format(vs_plan | abs) }} behind</span> where you should be
             {% endif %}
             · {{ daily_labels | length }} days tracked
           </p>
@@ -47,18 +47,10 @@
     {% call hero_stat('Portfolio now') %}<strong>£{{ '{:,.0f}'.format(current_value) }}</strong>{% endcall %}
     {% if plan_value is not none %}
     {% set vs_plan = current_value - plan_value %}
-    {% call hero_stat('Plan (' ~ assumed_rate_pct ~ '%)') %}<strong>£{{ '{:,.0f}'.format(plan_value) }}</strong>{% endcall %}
-    {% call hero_stat('vs Plan') %}
+    {% call hero_stat('Should be') %}<strong>£{{ '{:,.0f}'.format(plan_value) }}</strong>{% endcall %}
+    {% call hero_stat('Difference') %}
       <strong class="{% if vs_plan >= 0 %}perf-positive{% else %}perf-negative{% endif %}">
         {% if vs_plan >= 0 %}+{% endif %}£{{ '{:,.0f}'.format(vs_plan) }}
-      </strong>
-    {% endcall %}
-    {% endif %}
-    {% if benchmark_value is not none %}
-    {% set vs_bench = current_value - benchmark_value %}
-    {% call hero_stat('Benchmark (' ~ benchmark_rate_pct ~ '%)') %}
-      <strong class="{% if vs_bench >= 0 %}perf-positive{% else %}perf-negative{% endif %}">
-        {% if vs_bench >= 0 %}+{% endif %}£{{ '{:,.0f}'.format(vs_bench) }}
       </strong>
     {% endcall %}
     {% endif %}
@@ -82,16 +74,19 @@
     <div class="perf-legend">
       <span class="perf-legend-dot" style="background:var(--accent-2)"></span><span>Actual</span>
       <span class="perf-legend-dot" style="background:var(--muted);opacity:0.6"></span><span>Plan ({{ assumed_rate_pct }}%)</span>
-      {% if daily_bench %}<span class="perf-legend-dot" style="background:var(--accent)"></span><span>Benchmark ({{ benchmark_rate_pct }}%)</span>{% endif %}
     </div>
   </div>
   <canvas id="perfChart" height="90" role="img" aria-label="Portfolio performance chart showing actual vs plan"
     data-labels='{{ daily_labels | tojson | safe }}'
     data-actual='{{ daily_actual | tojson | safe }}'
     data-plan='{{ daily_plan | tojson | safe }}'
-    data-bench='{{ daily_bench | tojson | safe }}'
-    data-assumed-rate='{{ assumed_rate_pct }}'
-    data-benchmark-rate='{{ benchmark_rate_pct or "" }}'></canvas>
+    data-assumed-rate='{{ assumed_rate_pct }}'></canvas>
+  {% if monthly_contribution_total is not none and monthly_contribution_total > 0 %}
+  <p class="helper-text mt-05">
+    Plan assumes you contribute £{{ '{:,.0f}'.format(monthly_contribution_total) }}/mo (across all accounts) and earn {{ assumed_rate_pct }}% p.a.
+    Short-term dips are normal — review yearly to see if you're still on track.
+  </p>
+  {% endif %}
 </div>
 
 {# ── By Account ────────────────────────────────────────────────────── #}

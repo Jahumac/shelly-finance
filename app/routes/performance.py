@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import Blueprint, render_template
 from flask_login import current_user, login_required
 
-from app.calculations import to_float, uk_tax_year_start, uk_tax_year_end, uk_tax_year_label
+from app.calculations import effective_monthly_contribution, to_float, uk_tax_year_start, uk_tax_year_end, uk_tax_year_label
 from app.models import fetch_all_accounts, fetch_assumptions, fetch_daily_snapshots, fetch_holding_totals_by_account, fetch_tax_year_contributions
 
 performance_bp = Blueprint("performance", __name__)
@@ -17,8 +17,6 @@ def performance():
     accounts      = fetch_all_accounts(uid)
 
     assumed_rate   = to_float(assumptions["annual_growth_rate"]) if assumptions else 0.07
-    benchmark_rate = to_float(assumptions["benchmark_rate"]) if assumptions and assumptions["benchmark_rate"] is not None else None
-    benchmark_rate_pct = round(benchmark_rate * 100, 1) if benchmark_rate is not None else None
 
     # Daily snapshots for the chart (same as overview)
     daily_snapshots = fetch_daily_snapshots(uid, limit=730)
@@ -27,32 +25,65 @@ def performance():
     daily_labels = []
     daily_actual = []
     daily_plan   = []
-    daily_bench  = []
-    plan_value      = None
-    benchmark_value = None
-    current_value   = None
+    plan_value    = None
+    current_value = None
+    monthly_contribution_total = None
 
     if has_data:
-        start_val = daily_snapshots[0][1]
-        daily_rate_plan  = (1 + assumed_rate) ** (1 / 365) - 1
-        daily_rate_bench = (1 + benchmark_rate) ** (1 / 365) - 1 if benchmark_rate else None
+        # Plan = where you should be if you'd been contributing on schedule and
+        # earning `assumed_rate` (mirrors the Projections page logic, but walked
+        # forward from the oldest snapshot to today instead of forward to
+        # retirement). Sum current monthly contributions across accounts (incl.
+        # tax relief, employer match, LISA bonus, contribution fees) — same as
+        # `effective_monthly_contribution` used in projections.
+        monthly_contribution_total = sum(
+            effective_monthly_contribution(a, assumptions) for a in accounts
+        )
 
-        for i, (date_str, val) in enumerate(daily_snapshots):
-            # Format date label same style as overview
+        start_date_str, start_val = daily_snapshots[0]
+        try:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            start_date = None
+
+        end_date_str = daily_snapshots[-1][0]
+        try:
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            end_date = None
+
+        # Walk day-by-day from start to end, applying daily compound growth and
+        # adding the monthly contribution at each calendar-month boundary.
+        # Sample on snapshot days so the plan line aligns with the actual line.
+        plan_by_date = {}
+        if start_date and end_date:
+            daily_rate = (1 + assumed_rate) ** (1 / 365) - 1
+            value = start_val
+            plan_by_date[start_date] = value
+            cur = start_date
+            while cur < end_date:
+                nxt = cur + timedelta(days=1)
+                value *= (1 + daily_rate)
+                if (nxt.year, nxt.month) != (cur.year, cur.month):
+                    value += monthly_contribution_total
+                cur = nxt
+                plan_by_date[cur] = value
+
+        for date_str, val in daily_snapshots:
             try:
                 dt = datetime.strptime(date_str, "%Y-%m-%d")
                 label = dt.strftime("%-d %b %Y")
+                snap_date = dt.date()
             except ValueError:
                 label = date_str
+                snap_date = None
             daily_labels.append(label)
             daily_actual.append(round(val, 2))
-            daily_plan.append(round(start_val * ((1 + daily_rate_plan) ** i), 2))
-            if daily_rate_bench is not None:
-                daily_bench.append(round(start_val * ((1 + daily_rate_bench) ** i), 2))
+            plan_val = plan_by_date.get(snap_date) if snap_date else None
+            daily_plan.append(round(plan_val, 2) if plan_val is not None else None)
 
-        current_value   = daily_actual[-1]
-        plan_value      = daily_plan[-1]
-        benchmark_value = daily_bench[-1] if daily_bench else None
+        current_value = daily_actual[-1]
+        plan_value    = daily_plan[-1]
 
     # By Account — live values only, no monthly snapshot dependency
     holding_totals = fetch_holding_totals_by_account(uid)
@@ -72,12 +103,10 @@ def performance():
         daily_labels=daily_labels,
         daily_actual=daily_actual,
         daily_plan=daily_plan,
-        daily_bench=daily_bench,
         assumed_rate_pct=round(assumed_rate * 100, 1),
-        benchmark_rate_pct=benchmark_rate_pct,
+        monthly_contribution_total=monthly_contribution_total,
         account_perf=account_perf,
         plan_value=plan_value,
-        benchmark_value=benchmark_value,
         current_value=current_value,
         active_page="performance",
     )
