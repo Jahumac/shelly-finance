@@ -176,7 +176,7 @@
       <p id="changeValue" class="m-0 text-bold"></p>
     </div>
   </div>
-  <p id="changeBreakdown" class="helper-text mt-05"></p>
+  <div id="changeBreakdown" class="change-breakdown"></div>
   {% if pending_review_months %}
   <p class="helper-text mt-025" style="font-style: italic;">
     {{ pending_review_months | length }} month{{ 's' if pending_review_months | length != 1 else '' }} estimated from defaults — confirm in <a href="/monthly-review/" class="link-accent">Monthly Update</a> for accurate tracking.

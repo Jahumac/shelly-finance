@@ -869,12 +869,19 @@
               var fmt = function (n) {
                 return (n >= 0 ? '+£' : '−£') + Math.abs(n).toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
               };
+              var marketCls = marketGain >= 0 ? 'change-chip-market-pos' : 'change-chip-market-neg';
+              var pctText = (marketPct !== null)
+                ? ' (' + (marketPct >= 0 ? '+' : '') + marketPct.toFixed(2) + '%)'
+                : '';
               breakdownEl.innerHTML =
-                '<strong>' + fmt(contribDelta) + '</strong> from your contributions, ' +
-                '<strong>' + fmt(marketGain) + '</strong> from market growth' +
-                (marketPct !== null ? ' (' + (marketPct >= 0 ? '+' : '') + marketPct.toFixed(2) + '%)' : '') + '.';
+                '<span class="change-chip change-chip-contrib">' +
+                  fmt(contribDelta) + '<span class="change-chip-label">contributions</span>' +
+                '</span>' +
+                '<span class="change-chip ' + marketCls + '">' +
+                  fmt(marketGain) + '<span class="change-chip-label">market' + pctText + '</span>' +
+                '</span>';
             } else {
-              breakdownEl.textContent = 'Includes market growth + any contributions you made during this period.';
+              breakdownEl.innerHTML = '<span class="helper-text">Includes market growth + any contributions you made during this period.</span>';
             }
           }
         }

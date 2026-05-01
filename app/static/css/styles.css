@@ -2154,6 +2154,46 @@ button.badge-like-button {
   }
 }
 
+/* Change-breakdown chips on Overview — make the contribution vs. market split visually distinct from the surrounding helper text. */
+.change-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  margin: 0.6rem 0 0;
+  font-size: 0.95rem;
+}
+.change-breakdown .change-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+.change-breakdown .change-chip-contrib {
+  background: color-mix(in srgb, var(--accent-5) 18%, transparent);
+  color: var(--accent-5);
+  border: 1px solid color-mix(in srgb, var(--accent-5) 35%, transparent);
+}
+.change-breakdown .change-chip-market-pos {
+  background: color-mix(in srgb, var(--accent-2) 18%, transparent);
+  color: var(--accent-2);
+  border: 1px solid color-mix(in srgb, var(--accent-2) 35%, transparent);
+}
+.change-breakdown .change-chip-market-neg {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+}
+.change-breakdown .change-chip-label {
+  opacity: 0.85;
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
