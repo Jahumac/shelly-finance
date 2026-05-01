@@ -18,6 +18,7 @@
     return {
       accent:     readVar('--accent',          '#60a5fa'),
       accent2:    readVar('--accent-2',        '#34d399'),
+      accent5:    readVar('--accent-5',        '#a78bfa'),
       primary:    readVar('--primary',         '#60a5fa'),
       muted:      readVar('--muted',           '#94a3b8'),
       grid:       readVar('--chart-grid',      'rgba(148, 163, 184, 0.12)'),
@@ -695,6 +696,17 @@
       var fallbackValue = parseFloat(canvas.dataset.fallback || '0');
       var chart = null;
 
+      // Derive the dates on which contributions actually landed (cumulative
+      // jumps), so we can mark them on the chart when the user hovers the
+      // contributions chip.
+      var contribEventDates = {};
+      for (var ci = 0; ci < allContributions.length; ci++) {
+        var prevC = ci === 0 ? 0 : allContributions[ci - 1];
+        if ((allContributions[ci] - prevC) > 0.005) {
+          contribEventDates[allLabels[ci]] = true;
+        }
+      }
+
       var periods = { '1D': 1, '1M': 30, '6M': 180, '1Y': 365, 'ALL': 999999 };
 
       function parseYMD(dateStr) {
@@ -797,6 +809,13 @@
           grad.addColorStop(0, c.accent + '55');
           grad.addColorStop(1, c.accent + '00');
 
+          // Overlay dataset: dot at every contribution date in the current
+          // slice. Hidden by default (pointRadius 0); revealed when the
+          // contributions chip is hovered.
+          var contribOverlay = data.labels.map(function (lbl, idx) {
+            return contribEventDates[lbl] ? data.values[idx] : null;
+          });
+
           chart = new Chart(ctx, {
             type: 'line',
             plugins: [crosshairPlugin],
@@ -808,7 +827,18 @@
                 backgroundColor: grad,
                 pointCutoff: 30,
                 tension: 0.25
-              })]
+              }), {
+                data: contribOverlay,
+                showLine: false,
+                pointRadius: 0,
+                pointHoverRadius: 0,
+                pointBackgroundColor: c.accent5,
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointStyle: 'circle',
+                borderColor: 'transparent',
+                spanGaps: false
+              }]
             },
             options: lineOptions({
               tooltip: polishedTooltip({
@@ -880,6 +910,22 @@
                 '<span class="change-chip ' + marketCls + '">' +
                   fmt(marketGain) + '<span class="change-chip-label">market' + pctText + '</span>' +
                 '</span>';
+
+              // Hovering the contributions chip reveals dots on the chart at
+              // the dates contributions actually landed.
+              var contribChip = breakdownEl.querySelector('.change-chip-contrib');
+              if (contribChip && chart && chart.data.datasets[1]) {
+                contribChip.addEventListener('mouseenter', function () {
+                  if (!chart || !chart.data.datasets[1]) return;
+                  chart.data.datasets[1].pointRadius = 6;
+                  chart.update('none');
+                });
+                contribChip.addEventListener('mouseleave', function () {
+                  if (!chart || !chart.data.datasets[1]) return;
+                  chart.data.datasets[1].pointRadius = 0;
+                  chart.update('none');
+                });
+              }
             } else {
               breakdownEl.innerHTML = '<span class="helper-text">Includes market growth + any contributions you made during this period.</span>';
             }
