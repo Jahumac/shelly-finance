@@ -479,6 +479,20 @@ def fetch_history(ticker: str, period: str = "1y"):
             http_data = _fetch_history_http(symbol + ".L")
             if http_data:
                 return http_data
+        # Last-resort fallback: search Yahoo for the actual symbol when the
+        # stored ticker doesn't match exactly (e.g. "Nike" → "NKE"). Mirrors
+        # fetch_price()'s Phase 3 search fallback so a holding that has a
+        # working live price also gets a working history chart.
+        try:
+            found_symbol = _search_yahoo(ticker_clean)
+        except Exception:
+            found_symbol = None
+        if found_symbol and found_symbol != symbol and found_symbol != symbol + ".L":
+            search_data = _fetch_history_http(found_symbol)
+            if search_data:
+                logger.info("fetch_history search fallback: %r resolved to %r", ticker, found_symbol)
+                return search_data
+        logger.warning("fetch_history: no data for %r (symbol=%s, search=%s)", ticker, symbol, found_symbol)
         return None
     except Exception as e:
         logger.error(f"Error fetching history for {ticker}: {e}")
