@@ -11,8 +11,10 @@
   <a href="/budget/debts/">Debts</a>
 </nav>
 
+{% include '_month_strip.html' %}
+
 {# ── Hero ────────────────────────────────────────────────────────────────── #}
-<section class="card highlight mb-1">
+<section class="card highlight mb-1 month-accent-{{ current_month_num }}">
   <div class="hero-top">
     <div>
       <p class="eyebrow">Tax Year {{ tax_year }}</p>
