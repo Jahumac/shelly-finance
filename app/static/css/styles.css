@@ -83,6 +83,7 @@ body {
   font-family: Inter, system-ui, sans-serif;
   background: var(--bg);
   color: var(--text);
+  line-height: 1.5;
 }
 
 .site-header {
@@ -181,6 +182,13 @@ nav a.active {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem;
+}
+
+@media (min-width: 1280px) {
+  .page-shell {
+    padding-left: 3rem;
+    padding-right: 3rem;
+  }
 }
 
 /* ── Flash messages ──────────────────────────────────────────────── */
@@ -1273,7 +1281,8 @@ button.badge-like-button {
   border-bottom: 1px solid rgba(51, 65, 85, 0.6);
 }
 
-.holdings-row:not(.holdings-row-head):hover {
+.holdings-row:not(.holdings-row-head):hover,
+.holdings-row:not(.holdings-row-head):focus-within {
   background: rgba(56, 189, 248, 0.04);
 }
 
@@ -1813,6 +1822,7 @@ button.badge-like-button {
   color: var(--accent);
   cursor: pointer;
   font-size: 0.9rem;
+  font-weight: 600;
   font-family: inherit;
 }
 
@@ -2256,7 +2266,8 @@ button.badge-like-button {
   transition: background 0.15s, border-color 0.15s;
 }
 
-.budget-row:hover {
+.budget-row:hover,
+.budget-row:focus-within {
   background: rgba(255,255,255,0.06);
   border-color: rgba(56,189,248,0.28);
 }
@@ -5164,7 +5175,6 @@ a.link-accent:hover {
   content: '';
 }
 .contrib-totals td { border-top: 1px solid var(--border); padding-top: 0.75rem; }
-.mt-1 { margin-top: 1rem; }
 
 /* ── Asset allocation chart ─────────────────────────────────────────────── */
 .allocation-wrap {
