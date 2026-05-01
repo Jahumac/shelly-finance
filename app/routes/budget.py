@@ -887,10 +887,8 @@ def budget_items_view():
     page_mode = request.args.get("mode", "view" if selected_id else "list")
     section_options = [(s["key"], s["label"]) for s in db_sections]
 
-    # ── Month context (same hero + month strip as budget view) ────────────
+    # Track the month the user came from so "Back to Budget" returns there.
     month_key = valid_month_key(request.args.get("month")) or _default_month_key()
-    sections_data, summary = _build_monthly_data(month_key, uid)
-    month_strip, is_inherited = _build_budget_month_strip(month_key, uid)
 
     return render_template(
         "budget_items.html",
@@ -902,9 +900,6 @@ def budget_items_view():
         active_page="budget",
         month_key=month_key,
         month_label=_month_label(month_key),
-        summary=summary,
-        month_strip=month_strip,
-        is_inherited=is_inherited,
     )
 
 
