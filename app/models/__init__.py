@@ -130,6 +130,8 @@ from .planning import (
     add_dividend_record,
     add_isa_contribution,
     add_pension_contribution,
+    create_contribution_override,
+    delete_contribution_override,
     remove_contribution_override_for_month,
     upsert_single_month_contribution_override,
     delete_cgt_disposal,

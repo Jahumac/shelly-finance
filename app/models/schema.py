@@ -854,6 +854,19 @@ def _run_migrations(conn):
             # Always re-enable foreign keys
             conn.execute("PRAGMA foreign_keys=ON")
 
+    # ── Re-add columns lost by v7_cascading_deletes ─────────────────────
+    # v7's accounts_new CREATE TABLE omits these two columns, so any DB
+    # (including production) that ran v7 had them dropped. Add them back
+    # idempotently — a no-op once the column exists.
+    for col in [
+        "include_in_budget INTEGER DEFAULT 1",
+        "pre_salary INTEGER DEFAULT 0",
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE accounts ADD COLUMN {col}")
+        except Exception:
+            pass
+
 
 def _ensure_indexes(conn):
     """Create performance indexes. All statements are idempotent (IF NOT EXISTS)."""
