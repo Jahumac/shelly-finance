@@ -439,6 +439,8 @@ def overview():
     allocation_labels = [a[0] for a in allocation]
     allocation_values = [round(a[1], 2) for a in allocation]
 
+    assumed_rate_pct = round(to_float((assumptions or {}).get("annual_growth_rate", 0.07)) * 100, 1)
+
     # Render the response and ensure it's not cached by the browser
     resp = make_response(render_template(
         "overview.html",
@@ -446,6 +448,7 @@ def overview():
         accounts=accounts,
         goals_data=goals_data,
         assumptions=assumptions,
+        assumed_rate_pct=assumed_rate_pct,
         history_labels=history_labels,
         history_values=history_values,
         daily_labels=daily_labels,

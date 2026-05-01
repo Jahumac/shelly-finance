@@ -839,11 +839,18 @@
           var pct = first ? (diff / first * 100) : null;
           var lEl = document.getElementById('latestValue');
           var cEl = document.getElementById('changeValue');
+          var labelEl = document.getElementById('changeLabel');
           if (lEl) lEl.textContent = '£' + latest.toLocaleString('en-GB', { minimumFractionDigits: 2 });
           if (cEl) {
             cEl.textContent = (diff >= 0 ? '+' : '') + diff.toLocaleString('en-GB', { minimumFractionDigits: 2 }) +
               (pct !== null ? ' (' + (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%)' : '');
             cEl.style.color = diff >= 0 ? 'var(--success)' : 'var(--danger)';
+          }
+          if (labelEl) {
+            var firstDate = parseYMD(data.labels[0]);
+            labelEl.textContent = firstDate
+              ? 'Change since ' + firstDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+              : 'Change';
           }
         }
       }
