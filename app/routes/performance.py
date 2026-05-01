@@ -22,11 +22,11 @@ def performance():
     daily_snapshots = fetch_daily_snapshots(uid, limit=730)
     has_data = len(daily_snapshots) >= 2
 
-    daily_labels = []
-    daily_actual = []
-    daily_plan   = []
-    plan_value    = None
-    current_value = None
+    daily_labels   = []  # raw YYYY-MM-DD for client-side period filtering
+    daily_actual   = []
+    daily_plan     = []
+    plan_value     = None
+    current_value  = None
     monthly_contribution_total = None
 
     if has_data:
@@ -71,13 +71,10 @@ def performance():
 
         for date_str, val in daily_snapshots:
             try:
-                dt = datetime.strptime(date_str, "%Y-%m-%d")
-                label = dt.strftime("%-d %b %Y")
-                snap_date = dt.date()
+                snap_date = datetime.strptime(date_str, "%Y-%m-%d").date()
             except ValueError:
-                label = date_str
                 snap_date = None
-            daily_labels.append(label)
+            daily_labels.append(date_str)
             daily_actual.append(round(val, 2))
             plan_val = plan_by_date.get(snap_date) if snap_date else None
             daily_plan.append(round(plan_val, 2) if plan_val is not None else None)

@@ -100,12 +100,50 @@
     };
   }
 
-  global.ChartHelpers = {
-    colors: colors,
-    gbpTooltip: gbpTooltip,
-    lineOptions: lineOptions,
-    lineDataset: lineDataset,
+  // Vertical crosshair on hover — draws a thin dashed line through the active
+  // point so it's easier to read off the date/value on dense time series.
+  var crosshairPlugin = {
+    id: 'crosshair',
+    afterDraw: function (chart) {
+      var active = chart.tooltip && chart.tooltip.getActiveElements
+        ? chart.tooltip.getActiveElements()
+        : (chart.getActiveElements ? chart.getActiveElements() : []);
+      if (!active || !active.length) return;
+      var ctx = chart.ctx;
+      var ca = chart.chartArea;
+      var x = active[0].element.x;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(x, ca.top);
+      ctx.lineTo(x, ca.bottom);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = readVar('--muted', '#94a3b8') + '66';
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.restore();
+    }
   };
+
+  // Tooltip styling shared across the polished line charts.
+  function polishedTooltip(callbacks) {
+    var c = colors();
+    return {
+      enabled: true,
+      intersect: false,
+      mode: 'index',
+      backgroundColor: c.panel2,
+      borderColor: c.border,
+      borderWidth: 1,
+      padding: 10,
+      cornerRadius: 8,
+      titleColor: c.textWhite,
+      bodyColor: c.textWhite,
+      titleFont: { weight: '600', size: 12 },
+      bodyFont: { size: 12 },
+      boxPadding: 4,
+      callbacks: callbacks || {}
+    };
+  }
 
   /**
    * Automatic initialization of charts based on data- attributes.
@@ -336,58 +374,161 @@
     (function initPerfChart() {
       var canvas = document.getElementById('perfChart');
       if (!canvas || typeof window.Chart !== 'function') return;
-      var labels  = JSON.parse(canvas.dataset.labels  || '[]');
-      var actual  = JSON.parse(canvas.dataset.actual  || '[]');
-      var plan    = JSON.parse(canvas.dataset.plan    || '[]');
+      var allLabels = JSON.parse(canvas.dataset.labels || '[]');  // YYYY-MM-DD
+      var allActual = JSON.parse(canvas.dataset.actual || '[]');
+      var allPlan   = JSON.parse(canvas.dataset.plan   || '[]');
       var assumedRate = canvas.dataset.assumedRate || '';
+      if (!allLabels.length) return;
 
-      var datasets = [
-        {
-          label: 'Actual',
-          data: actual,
-          borderColor: c.accent2,
-          backgroundColor: c.accent2 + '14',
-          fill: true,
-          tension: 0.35,
-          pointRadius: actual.length <= 24 ? 4 : 2,
-          pointHoverRadius: 6,
-          borderWidth: 2,
-        },
-        {
-          label: 'Plan (' + assumedRate + '%)',
-          data: plan,
-          borderColor: c.muted + '80',
-          borderDash: [6, 4],
-          backgroundColor: 'transparent',
-          fill: false,
-          tension: 0.35,
-          pointRadius: 0,
-          pointHoverRadius: 4,
-          borderWidth: 1.5,
-        },
-      ];
+      var periods = { '1M': 30, '6M': 180, '1Y': 365, 'ALL': 999999 };
+      var chart = null;
 
-      new Chart(canvas, {
-        type: 'line',
-        data: { labels: labels, datasets: datasets },
-        options: lineOptions({
-          tooltip: {
-            backgroundColor: c.panel2,
-            borderColor: c.border,
-            borderWidth: 1,
-            callbacks: {
-              label: function(ctx) {
-                return ' ' + ctx.dataset.label + ': £' + Math.round(ctx.parsed.y).toLocaleString('en-GB');
+      function parseYMD(s) {
+        if (!s) return null;
+        var parts = s.split('-');
+        if (parts.length < 3) return null;
+        return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      }
+      function fmtDayMonth(d) {
+        return d ? d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '';
+      }
+      function fmtFull(d) {
+        return d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+      }
+
+      function sliceByPeriod(period) {
+        var days = periods[period] || 999999;
+        if (days >= allLabels.length) return { labels: allLabels, actual: allActual, plan: allPlan };
+        var start = Math.max(0, allLabels.length - days);
+        return {
+          labels: allLabels.slice(start),
+          actual: allActual.slice(start),
+          plan:   allPlan.slice(start),
+        };
+      }
+
+      function formatGBP(v, decimals) {
+        if (v == null || !isFinite(v)) return '—';
+        return '£' + Number(v).toLocaleString('en-GB', { minimumFractionDigits: decimals || 0, maximumFractionDigits: decimals || 0 });
+      }
+
+      function updateStats(slice) {
+        var lastActual = slice.actual.length ? slice.actual[slice.actual.length - 1] : null;
+        var lastPlan   = slice.plan.length   ? slice.plan[slice.plan.length - 1]     : null;
+        var firstActual = slice.actual.length ? slice.actual[0] : null;
+        var diff = (lastActual != null && lastPlan != null) ? lastActual - lastPlan : null;
+        var growth = (firstActual && firstActual !== 0 && lastActual != null) ? (lastActual - firstActual) / firstActual * 100 : null;
+
+        var elA = document.getElementById('perfStatActual');
+        var elP = document.getElementById('perfStatPlan');
+        var elD = document.getElementById('perfStatDiff');
+        var elG = document.getElementById('perfStatGrowth');
+        if (elA) elA.textContent = formatGBP(lastActual);
+        if (elP) elP.textContent = formatGBP(lastPlan);
+        if (elD) {
+          if (diff == null) { elD.textContent = '—'; elD.className = 'm-0 text-bold'; }
+          else {
+            elD.textContent = (diff >= 0 ? '+' : '') + formatGBP(diff).replace('£', '£');
+            elD.className = 'm-0 text-bold ' + (diff >= 0 ? 'perf-positive' : 'perf-negative');
+          }
+        }
+        if (elG) {
+          if (growth == null) { elG.textContent = '—'; elG.className = 'm-0 text-bold'; }
+          else {
+            elG.textContent = (growth >= 0 ? '+' : '') + growth.toFixed(2) + '%';
+            elG.className = 'm-0 text-bold ' + (growth >= 0 ? 'perf-positive' : 'perf-negative');
+          }
+        }
+      }
+
+      function render(period) {
+        var slice = sliceByPeriod(period);
+        var displayLabels = slice.labels.map(function (s) { return fmtDayMonth(parseYMD(s)); });
+        var ctx = canvas.getContext('2d');
+        var h = canvas.clientHeight || canvas.height || 280;
+        var grad = ctx.createLinearGradient(0, 0, 0, h);
+        grad.addColorStop(0, c.accent2 + '55');
+        grad.addColorStop(1, c.accent2 + '00');
+
+        var datasets = [
+          {
+            label: 'Actual',
+            data: slice.actual,
+            borderColor: c.accent2,
+            backgroundColor: grad,
+            fill: true,
+            tension: 0.3,
+            pointRadius: 0,
+            pointHoverRadius: 5,
+            pointHoverBackgroundColor: c.accent2,
+            pointHoverBorderColor: c.textWhite,
+            pointHoverBorderWidth: 2,
+            borderWidth: 2.5,
+          },
+          {
+            label: 'Plan (' + assumedRate + '%)',
+            data: slice.plan,
+            borderColor: c.muted + 'AA',
+            borderDash: [6, 5],
+            backgroundColor: 'transparent',
+            fill: false,
+            tension: 0.3,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            pointHoverBackgroundColor: c.muted,
+            pointHoverBorderColor: c.textWhite,
+            pointHoverBorderWidth: 2,
+            borderWidth: 1.5,
+          },
+        ];
+
+        if (chart) chart.destroy();
+        chart = new Chart(canvas, {
+          type: 'line',
+          plugins: [crosshairPlugin],
+          data: { labels: displayLabels, datasets: datasets },
+          options: lineOptions({
+            tooltip: polishedTooltip({
+              title: function (items) {
+                var idx = items && items[0] ? items[0].dataIndex : -1;
+                var raw = idx >= 0 ? slice.labels[idx] : '';
+                return fmtFull(parseYMD(raw)) || raw;
+              },
+              label: function(ctx2) {
+                return ' ' + ctx2.dataset.label + ': £' + Math.round(ctx2.parsed.y).toLocaleString('en-GB');
               }
-            }
-          },
-          extraScales: {
-            x: { grid: { color: c.gridAlt }, ticks: { color: c.muted, maxRotation: 0, maxTicksLimit: 6, callback: function(val, idx) { var lbl = labels[idx] || ''; var parts = lbl.split(' '); return parts.length >= 2 ? parts[0] + ' ' + parts[1] : lbl; } } },
-            y: { grid: { color: c.gridAlt }, ticks: { color: c.muted, callback: function(v) { return '£' + Math.round(v).toLocaleString('en-GB'); } } }
-          },
-          extra: { interaction: { mode: 'index', intersect: false } }
-        })
+            }),
+            extraScales: {
+              x: { grid: { color: c.gridAlt }, ticks: { color: c.muted, maxRotation: 0, maxTicksLimit: 6 } },
+              y: { grid: { color: c.gridAlt }, ticks: { color: c.muted, callback: function(v) { return v >= 1000 ? '£' + (v/1000).toFixed(0) + 'k' : '£' + Math.round(v); } } }
+            },
+            extra: { interaction: { mode: 'index', intersect: false } }
+          })
+        });
+
+        updateStats(slice);
+      }
+
+      // Scope period buttons to the card containing the perf chart so we don't
+      // collide with overview's identical button class.
+      var perfBtns = Array.prototype.filter.call(
+        document.querySelectorAll('.period-selector .period-btn'),
+        function (b) {
+          var card = b.closest('.card');
+          return card && card.querySelector('#perfChart');
+        }
+      );
+      perfBtns.forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          perfBtns.forEach(function (b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          render(btn.dataset.period);
+        });
       });
+
+      var initial = (Array.prototype.find.call(perfBtns, function (b) { return b.classList.contains('active'); }) || {}).dataset;
+      render((initial && initial.period) || 'ALL');
     })();
 
     // ── 5. Projections Chart ────────────────────────────────────────────────
@@ -652,11 +793,12 @@
           if (chart) chart.destroy();
           var ctx = canvas.getContext('2d');
           var grad = ctx.createLinearGradient(0, 0, 0, canvas.height || 220);
-          grad.addColorStop(0, c.accent + '33');
+          grad.addColorStop(0, c.accent + '55');
           grad.addColorStop(1, c.accent + '00');
 
           chart = new Chart(ctx, {
             type: 'line',
+            plugins: [crosshairPlugin],
             data: {
               labels: fmtLabels,
               datasets: [lineDataset({
@@ -668,10 +810,21 @@
               })]
             },
             options: lineOptions({
-              tooltip: gbpTooltip(2),
+              tooltip: polishedTooltip({
+                title: function (items) {
+                  var idx = items && items[0] ? items[0].dataIndex : -1;
+                  var raw = idx >= 0 ? data.labels[idx] : '';
+                  var d = parseYMD(raw);
+                  return d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : raw;
+                },
+                label: function (ctx2) {
+                  return ' £' + ctx2.parsed.y.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
+              }),
               extraScales: {
                 y: { min: yMin - yPad, max: yMax + yPad, ticks: { color: c.muted, font: { size: 11 }, callback: fmtTick } }
-              }
+              },
+              extra: { interaction: { mode: 'index', intersect: false } }
             })
           });
         } else {
@@ -782,5 +935,7 @@
     gbpTooltip: gbpTooltip,
     lineOptions: lineOptions,
     lineDataset: lineDataset,
+    crosshairPlugin: crosshairPlugin,
+    polishedTooltip: polishedTooltip,
   };
 })(window);

@@ -19,7 +19,7 @@
     <div>
       <p class="eyebrow">On track vs. plan</p>
       {% if has_data %}
-        <h2 class="hero-value">£{{ '{:,.0f}'.format(current_value) }}</h2>
+        <h2 class="hero-value hero-value-xl">£{{ '{:,.0f}'.format(current_value) }}</h2>
         {% if plan_value is not none %}
           {% set vs_plan = current_value - plan_value %}
           <p class="hero-subtitle">
@@ -68,31 +68,68 @@
 {% else %}
 
 {# ── Chart ─────────────────────────────────────────────────────── #}
-<div class="panel chart-wrap mb-1">
-  <div class="flex flex-between flex-center mb-1 perf-chart-header">
-    <h3 class="section-title-sm">Portfolio Value Over Time</h3>
-    <div class="perf-legend">
-      <span class="perf-legend-dot" style="background:var(--accent-2)"></span><span>Actual</span>
-      <span class="perf-legend-dot" style="background:var(--muted);opacity:0.6"></span><span>Plan ({{ assumed_rate_pct }}%)</span>
+<section class="card mb-1">
+  <div class="section-header mb-075 perf-chart-header">
+    <div>
+      <p class="chart-label m-0">Actual vs. Plan</p>
+      <div class="perf-legend mt-025">
+        <span class="perf-legend-dot" style="background:var(--accent-2)"></span><span>Actual</span>
+        <span class="perf-legend-dot" style="background:var(--muted);opacity:0.6"></span><span>Plan ({{ assumed_rate_pct }}%)</span>
+      </div>
+    </div>
+    <div class="period-selector flex gap-05">
+      <button class="period-btn" data-period="1M">1M</button>
+      <button class="period-btn" data-period="6M">6M</button>
+      <button class="period-btn" data-period="1Y">1Y</button>
+      <button class="period-btn active" data-period="ALL">ALL</button>
     </div>
   </div>
-  <canvas id="perfChart" height="90" role="img" aria-label="Portfolio performance chart showing actual vs plan"
-    data-labels='{{ daily_labels | tojson | safe }}'
-    data-actual='{{ daily_actual | tojson | safe }}'
-    data-plan='{{ daily_plan | tojson | safe }}'
-    data-assumed-rate='{{ assumed_rate_pct }}'></canvas>
+
+  <div class="chart-wrap chart-wrap-md">
+    <canvas id="perfChart" role="img" aria-label="Portfolio performance chart showing actual vs plan"
+      data-labels='{{ daily_labels | tojson | safe }}'
+      data-actual='{{ daily_actual | tojson | safe }}'
+      data-plan='{{ daily_plan | tojson | safe }}'
+      data-assumed-rate='{{ assumed_rate_pct }}'></canvas>
+  </div>
+
+  <div id="perfChartStats" class="perf-chart-stats mt-075">
+    <div class="perf-stat">
+      <p class="text-muted m-0 text-sm-2">Actual</p>
+      <p id="perfStatActual" class="m-0 text-bold">—</p>
+    </div>
+    <div class="perf-stat">
+      <p class="text-muted m-0 text-sm-2">Should be</p>
+      <p id="perfStatPlan" class="m-0 text-bold">—</p>
+    </div>
+    <div class="perf-stat">
+      <p class="text-muted m-0 text-sm-2">Difference</p>
+      <p id="perfStatDiff" class="m-0 text-bold">—</p>
+    </div>
+    <div class="perf-stat">
+      <p class="text-muted m-0 text-sm-2">Period growth</p>
+      <p id="perfStatGrowth" class="m-0 text-bold">—</p>
+    </div>
+  </div>
+
   {% if monthly_contribution_total is not none and monthly_contribution_total > 0 %}
-  <p class="helper-text mt-05">
+  <p class="helper-text mt-075">
     Plan assumes you contribute £{{ '{:,.0f}'.format(monthly_contribution_total) }}/mo (across all accounts) and earn {{ assumed_rate_pct }}% p.a.
     Short-term dips are normal — review yearly to see if you're still on track.
   </p>
   {% endif %}
-</div>
+</section>
 
 {# ── By Account ────────────────────────────────────────────────────── #}
 {% if account_perf %}
-<div class="panel">
-  <h3 class="section-title">By Account</h3>
+<section class="card">
+  <div class="section-header mb-075">
+    <div>
+      <p class="eyebrow">Breakdown</p>
+      <h3>By Account</h3>
+    </div>
+    <small class="text-muted">{{ account_perf | length }} active</small>
+  </div>
   <div class="table-scroll">
   <table class="data-table">
     <thead>
@@ -111,7 +148,7 @@
     </tbody>
   </table>
   </div>
-</div>
+</section>
 {% endif %}
 
 {% endif %}
