@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, render_template
 from flask_login import current_user, login_required
 
-from app.calculations import effective_monthly_contribution, to_float, uk_tax_year_start, uk_tax_year_end, uk_tax_year_label
+from app.calculations import contribution_breakdown, effective_monthly_contribution, to_float, uk_tax_year_start, uk_tax_year_end, uk_tax_year_label
 from app.models import fetch_all_accounts, fetch_assumptions, fetch_daily_snapshots, fetch_holding_totals_by_account, fetch_tax_year_contributions
 
 performance_bp = Blueprint("performance", __name__)
@@ -28,6 +28,7 @@ def performance():
     plan_value     = None
     current_value  = None
     monthly_contribution_total = None
+    contribution_breakdown_rows = []
 
     if has_data:
         # Plan = where you should be if you'd been contributing on schedule and
@@ -39,6 +40,25 @@ def performance():
         monthly_contribution_total = sum(
             effective_monthly_contribution(a, assumptions) for a in accounts
         )
+
+        # Per-account breakdown so the user can see exactly which accounts feed
+        # into the plan total — and spot stale `monthly_contribution` values on
+        # accounts they no longer pay into at that level.
+        for a in accounts:
+            br = contribution_breakdown(a, assumptions)
+            if br["total_into_pot"] <= 0:
+                continue
+            contribution_breakdown_rows.append({
+                "name": a["name"],
+                "personal": br["personal"],
+                "tax_relief": br["tax_relief"],
+                "government_bonus": br["government_bonus"],
+                "employer": br["employer"],
+                "contribution_fee": br["contribution_fee"],
+                "total_into_pot": br["total_into_pot"],
+                "method_label": br["method_label"],
+            })
+        contribution_breakdown_rows.sort(key=lambda r: -r["total_into_pot"])
 
         start_date_str, start_val = daily_snapshots[0]
         try:
@@ -102,6 +122,7 @@ def performance():
         daily_plan=daily_plan,
         assumed_rate_pct=round(assumed_rate * 100, 1),
         monthly_contribution_total=monthly_contribution_total,
+        contribution_breakdown_rows=contribution_breakdown_rows,
         account_perf=account_perf,
         plan_value=plan_value,
         current_value=current_value,

@@ -115,8 +115,50 @@
   {% if monthly_contribution_total is not none and monthly_contribution_total > 0 %}
   <p class="helper-text mt-075">
     Plan assumes you contribute £{{ '{:,.0f}'.format(monthly_contribution_total) }}/mo (across all accounts) and earn {{ assumed_rate_pct }}% p.a.
+    The figure above includes tax relief, LISA bonus, employer match — the *full* amount landing in each pot, not what comes out of your bank.
     Short-term dips are normal — review yearly to see if you're still on track.
   </p>
+  {% if contribution_breakdown_rows %}
+  <details class="mt-075">
+    <summary class="text-muted text-sm-2" style="cursor: pointer;">Where does the £{{ '{:,.0f}'.format(monthly_contribution_total) }} come from?</summary>
+    <div class="table-scroll mt-05">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Account</th>
+          <th class="num">You pay</th>
+          <th class="num">Tax relief</th>
+          <th class="num">Bonus</th>
+          <th class="num">Employer</th>
+          <th class="num">Fee</th>
+          <th class="num">Into pot</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in contribution_breakdown_rows %}
+        <tr>
+          <td>{{ r.name }}{% if r.method_label %} <small class="text-muted">· {{ r.method_label }}</small>{% endif %}</td>
+          <td class="num">£{{ '{:,.2f}'.format(r.personal) }}</td>
+          <td class="num">{% if r.tax_relief %}+£{{ '{:,.2f}'.format(r.tax_relief) }}{% else %}—{% endif %}</td>
+          <td class="num">{% if r.government_bonus %}+£{{ '{:,.2f}'.format(r.government_bonus) }}{% else %}—{% endif %}</td>
+          <td class="num">{% if r.employer %}+£{{ '{:,.2f}'.format(r.employer) }}{% else %}—{% endif %}</td>
+          <td class="num">{% if r.contribution_fee %}−£{{ '{:,.2f}'.format(r.contribution_fee) }}{% else %}—{% endif %}</td>
+          <td class="num text-bold">£{{ '{:,.2f}'.format(r.total_into_pot) }}</td>
+        </tr>
+        {% endfor %}
+        <tr>
+          <td class="text-bold">Total</td>
+          <td class="num"></td><td class="num"></td><td class="num"></td><td class="num"></td><td class="num"></td>
+          <td class="num text-bold">£{{ '{:,.2f}'.format(monthly_contribution_total) }}</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="helper-text mt-05">
+      If a row looks wrong — say, an old monthly contribution that no longer matches reality — edit that account on the <a href="/accounts/" class="link-accent">Accounts page</a> to bring the plan in line.
+    </p>
+  </details>
+  {% endif %}
   {% endif %}
 </section>
 
