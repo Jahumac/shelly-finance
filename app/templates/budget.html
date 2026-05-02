@@ -146,6 +146,7 @@
                class="budget-amount-input"
                data-item-id="{{ item.id }}"
                data-section="{{ section.key }}"
+               {% if item.pre_salary %}data-pre-salary="1"{% endif %}
                value="{{ '{:.2f}'.format(item.amount) }}">
         <span class="budget-save-indicator" id="ind-{{ item.id }}"></span>
       </div>

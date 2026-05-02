@@ -372,9 +372,12 @@
 
       function recalcSummary() {
         var sectionTotals = {};
+        var preSalaryTotal = 0;
         document.querySelectorAll('.budget-amount-input').forEach(function(inp) {
           var k = inp.dataset.section;
-          sectionTotals[k] = (sectionTotals[k] || 0) + (parseFloat(inp.value) || 0);
+          var v = parseFloat(inp.value) || 0;
+          sectionTotals[k] = (sectionTotals[k] || 0) + v;
+          if (inp.dataset.preSalary === '1') preSalaryTotal += v;
         });
 
         var income   = sectionTotals[INCOME_KEY] || 0;
@@ -385,7 +388,9 @@
           expenses += sectionTotals[k];
           SAVE_KEYS.forEach(function(s) { if (k.indexOf(s) !== -1) savings += sectionTotals[k]; });
         });
-        var surplus      = income - expenses;
+        // Outside-take-home items (cashback, salary sacrifice, etc.) appear in
+        // section totals but never reduce take-home, so add them back.
+        var surplus      = income - (expenses - preSalaryTotal);
         var savingsRate  = income > 0 ? (savings / income * 100) : 0;
 
         var si = document.getElementById('stat-income');
