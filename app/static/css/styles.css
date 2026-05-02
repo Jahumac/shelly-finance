@@ -2608,13 +2608,9 @@ button.badge-like-button {
 }
 
 .budget-row-pre-salary {
-  opacity: 0.6;
-}
-
-.budget-amount-readonly {
-  cursor: default;
-  pointer-events: none;
-  opacity: 0.7;
+  /* Marker class — kept in case we want to style outside-take-home rows
+     differently in future. No dimming: these rows are fully editable now
+     (cashback, gifts, etc. need monthly edits just like normal rows). */
 }
 
 .budget-row-right {
