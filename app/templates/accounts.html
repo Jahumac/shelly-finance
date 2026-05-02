@@ -234,20 +234,21 @@
             </label>
             {% endif %}
             <div class="form-full-col acct-budget-flags">
-              <label class="toggle-row">
+              <p class="acct-flag-heading">Budget behaviour</p>
+              <label class="acct-flag-row">
                 <input type="hidden" name="include_in_budget" value="0">
                 <input type="checkbox" name="include_in_budget" value="1" {% if selected.include_in_budget is none or selected.include_in_budget %}checked{% endif %}>
-                <div>
-                  <span>Include in budget</span>
-                  <small>Show this account's contribution in the Investments &amp; Savings section of your budget.</small>
+                <div class="acct-flag-text">
+                  <span class="acct-flag-title">Include in budget</span>
+                  <small class="acct-flag-desc">Show this account's contribution in the Investments &amp; Savings section of your budget.</small>
                 </div>
               </label>
-              <label class="toggle-row">
+              <label class="acct-flag-row acct-flag-nested">
                 <input type="hidden" name="pre_salary" value="0">
                 <input type="checkbox" name="pre_salary" value="1" {% if selected.pre_salary %}checked{% endif %}>
-                <div>
-                  <span>Pre-salary deduction</span>
-                  <small>Tick if this contribution leaves before your salary arrives (e.g. salary sacrifice). Shown in budget for visibility but not counted against your take-home.</small>
+                <div class="acct-flag-text">
+                  <span class="acct-flag-title">Pre-salary deduction</span>
+                  <small class="acct-flag-desc">Tick if this contribution leaves before your salary arrives (e.g. salary sacrifice / workplace pension). Shown in budget for visibility but not counted against take-home. Tick alongside <em>Include in budget</em>.</small>
                 </div>
               </label>
             </div>
@@ -547,10 +548,11 @@
           </div>
           <a class="badge badge-meta" href="/budget/?month={{ current_month_key }}">Edit in Budget</a>
         </div>
-        <p class="helper-text">Shelly always shows the <strong>currently active</strong> contribution at the top. Short-term changes are managed from Budget; if you've set an adjustment, it replaces the standard amount for its date range.</p>
+        <p class="helper-text">Shelly always shows the <strong>currently active</strong> contribution at the top. Below it are any <em>life-happens</em> adjustments you've set (e.g. holidays, bonuses). Routine month-to-month edits made in Budget are not listed here.</p>
 
+        {% set life_overrides = overrides | rejectattr('reason', 'equalto', 'from budget') | list %}
         {% set active_override = namespace(ov=none) %}
-        {% for ov in overrides %}
+        {% for ov in life_overrides %}
           {% if ov.from_month <= current_month_key and ov.to_month >= current_month_key and not active_override.ov %}
             {% set active_override.ov = ov %}
           {% endif %}
@@ -584,7 +586,7 @@
           <p class="helper-text">No active contribution. Set a monthly amount in Budget to start tracking.</p>
           {% endif %}
 
-          {% for ov in overrides %}
+          {% for ov in life_overrides %}
             {% if not (ov.from_month <= current_month_key and ov.to_month >= current_month_key) %}
             <div class="override-item">
               <div class="override-item-info">

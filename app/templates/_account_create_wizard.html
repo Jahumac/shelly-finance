@@ -269,20 +269,21 @@
         </div>
 
         <div class="acct-budget-flags" style="margin-top:0.75rem;">
-          <label class="toggle-row">
+          <p class="acct-flag-heading">Budget behaviour</p>
+          <label class="acct-flag-row">
             <input type="hidden" name="include_in_budget" value="0">
             <input type="checkbox" name="include_in_budget" value="1" checked>
-            <div>
-              <span>Include in budget</span>
-              <small>Show this account's contribution in the Investments &amp; Savings section of your budget.</small>
+            <div class="acct-flag-text">
+              <span class="acct-flag-title">Include in budget</span>
+              <small class="acct-flag-desc">Show this account's contribution in the Investments &amp; Savings section of your budget.</small>
             </div>
           </label>
-          <label class="toggle-row">
+          <label class="acct-flag-row acct-flag-nested">
             <input type="hidden" name="pre_salary" value="0">
             <input type="checkbox" name="pre_salary" value="1">
-            <div>
-              <span>Pre-salary deduction</span>
-              <small>Tick if this leaves before your salary hits (e.g. salary sacrifice). Shown in budget for visibility but not counted against your take-home.</small>
+            <div class="acct-flag-text">
+              <span class="acct-flag-title">Pre-salary deduction</span>
+              <small class="acct-flag-desc">Tick if this leaves before your salary hits (e.g. salary sacrifice / workplace pension). Shown in budget for visibility but not counted against take-home. Tick alongside <em>Include in budget</em>.</small>
             </div>
           </label>
         </div>
