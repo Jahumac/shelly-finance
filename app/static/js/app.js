@@ -2262,6 +2262,103 @@
       });
     });
 
+    /* ── Provider combobox — dark-theme replacement for native datalist ── */
+    (function () {
+      var datalist = document.getElementById('provider-list');
+      if (!datalist) return;
+      var providerOptions = Array.prototype.slice.call(datalist.querySelectorAll('option'))
+        .map(function (o) { return o.value; })
+        .filter(function (v) { return !!v; });
+      if (!providerOptions.length) return;
+
+      document.querySelectorAll('input[list="provider-list"]').forEach(function (input) {
+        input.removeAttribute('list');
+        input.setAttribute('autocomplete', 'off');
+
+        var wrap = document.createElement('div');
+        wrap.className = 'provider-combo';
+        input.parentNode.insertBefore(wrap, input);
+        wrap.appendChild(input);
+
+        var list = document.createElement('ul');
+        list.className = 'provider-combo-list';
+        list.setAttribute('role', 'listbox');
+        wrap.appendChild(list);
+
+        var activeIndex = -1;
+
+        function render(filter) {
+          list.innerHTML = '';
+          activeIndex = -1;
+          var q = (filter || '').trim().toLowerCase();
+          var matches = q
+            ? providerOptions.filter(function (p) { return p.toLowerCase().indexOf(q) !== -1; })
+            : providerOptions.slice();
+          if (!matches.length) {
+            var empty = document.createElement('li');
+            empty.className = 'provider-combo-empty';
+            empty.textContent = 'No matches — type any name to add it';
+            list.appendChild(empty);
+            return;
+          }
+          matches.forEach(function (name) {
+            var li = document.createElement('li');
+            li.className = 'provider-combo-item';
+            li.setAttribute('role', 'option');
+            li.textContent = name;
+            li.addEventListener('mousedown', function (e) {
+              e.preventDefault();
+              input.value = name;
+              close();
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+            list.appendChild(li);
+          });
+        }
+
+        function open() {
+          render(input.value);
+          list.classList.add('is-open');
+        }
+        function close() {
+          list.classList.remove('is-open');
+          activeIndex = -1;
+        }
+        function setActive(i) {
+          var items = list.querySelectorAll('.provider-combo-item');
+          items.forEach(function (el, idx) {
+            el.classList.toggle('is-active', idx === i);
+            if (idx === i) el.scrollIntoView({ block: 'nearest' });
+          });
+          activeIndex = i;
+        }
+
+        input.addEventListener('focus', open);
+        input.addEventListener('input', open);
+        input.addEventListener('blur', function () { setTimeout(close, 150); });
+        input.addEventListener('keydown', function (e) {
+          var items = list.querySelectorAll('.provider-combo-item');
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (!list.classList.contains('is-open')) open();
+            if (items.length) setActive((activeIndex + 1) % items.length);
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (items.length) setActive(activeIndex <= 0 ? items.length - 1 : activeIndex - 1);
+          } else if (e.key === 'Enter') {
+            if (activeIndex >= 0 && items[activeIndex]) {
+              e.preventDefault();
+              input.value = items[activeIndex].textContent;
+              close();
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          } else if (e.key === 'Escape') {
+            close();
+          }
+        });
+      });
+    })();
+
   }); // End DOMContentLoaded
 
   /* ── Online/Offline status ───────────────────────────────────────── */
