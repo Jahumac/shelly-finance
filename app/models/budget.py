@@ -45,7 +45,7 @@ def _ensure_account_contribution_items(conn, user_id):
 
     accounts = conn.execute(
         """
-        SELECT id, name
+        SELECT id, name, monthly_contribution
         FROM accounts
         WHERE user_id = ?
           AND is_active = 1
@@ -71,6 +71,7 @@ def _ensure_account_contribution_items(conn, user_id):
         )
 
     for account in accounts:
+        amount = float(account["monthly_contribution"] or 0)
         existing = conn.execute(
             """
             SELECT id FROM budget_items
@@ -92,16 +93,28 @@ def _ensure_account_contribution_items(conn, user_id):
                     user_id, name, section, default_amount, linked_account_id,
                     notes, sort_order, is_active
                 )
-                VALUES (?, ?, ?, 0, ?, ?, ?, 1)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 1)
                 """,
                 (
                     user_id,
                     account["name"],
                     section_key,
+                    amount,
                     account["id"],
                     "Auto-created from account contribution.",
                     (sort_row["max_sort"] or -1) + 1,
                 ),
+            )
+        else:
+            # Mirror the account's monthly_contribution onto the linked
+            # budget_item's default_amount the same way debts sync
+            # monthly_payment. Per-month tweaks live in budget_entries /
+            # contribution_overrides; the base default should always reflect
+            # the account. The name is left alone so a user-friendly rename
+            # in Budget Setup survives.
+            conn.execute(
+                "UPDATE budget_items SET default_amount = ? WHERE id = ?",
+                (amount, existing["id"]),
             )
         # Retire any old unlinked items in the investment section with the same name —
         # they were created manually before auto-linking existed and are now duplicates.
