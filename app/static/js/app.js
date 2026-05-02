@@ -2207,6 +2207,20 @@
       });
     })();
 
+    /* ── Persist <details data-persist-open="key"> open state ──────── */
+    document.querySelectorAll('details[data-persist-open]').forEach(function (el) {
+      var key = el.getAttribute('data-persist-open');
+      if (!key) return;
+      try {
+        if (localStorage.getItem(key) === '1') el.open = true;
+      } catch (e) { /* localStorage may be unavailable */ }
+      el.addEventListener('toggle', function () {
+        try {
+          localStorage.setItem(key, el.open ? '1' : '0');
+        } catch (e) { /* ignore */ }
+      });
+    });
+
   }); // End DOMContentLoaded
 
   /* ── Online/Offline status ───────────────────────────────────────── */

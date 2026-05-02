@@ -819,8 +819,9 @@ body.is-back-online .site-header {
 }
 
 .acct-flag-row:hover {
-  background: rgba(255,255,255,0.04);
-  border-color: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.14);
+  box-shadow: 0 4px 14px -8px rgba(0,0,0,0.4);
 }
 
 .acct-flag-row input[type="checkbox"] {
@@ -856,10 +857,12 @@ body.is-back-online .site-header {
   font-weight: 600;
 }
 
+/* Pre-salary deduction sits beside Include in budget; visually identical
+   so the pair reads as a unified group rather than parent/child. */
 .acct-flag-nested {
-  margin-left: 1.1rem;
-  border-left: 2px solid rgba(255,255,255,0.08);
-  border-radius: 0 8px 8px 0;
+  margin-left: 0;
+  border-left: none;
+  border-radius: 8px;
 }
 
 /* Flush variant: when acct-budget-flags lives inside an .edit-card,
@@ -2487,6 +2490,12 @@ button.badge-like-button {
   border-radius: 16px;
   padding: 1.25rem 1.5rem;
   box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.panel:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
 }
 
 /* Give focus-panel targets breathing room so scrollIntoView clears the sticky header */

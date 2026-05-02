@@ -314,7 +314,7 @@
           </div>
 
           {# ── Advanced: fees ───────────────────────────────────── #}
-          <details class="edit-card edit-card-fees" {% if selected.platform_fee_pct or selected.platform_fee_flat or selected.fund_fee_pct or selected.contribution_fee_pct %}open{% endif %}>
+          <details class="edit-card edit-card-fees" data-persist-open="shelly:acct-fees-open">
             <summary class="edit-card-fees-summary">
               <div class="edit-card-header">
                 <p class="edit-card-eyebrow">Advanced</p>
