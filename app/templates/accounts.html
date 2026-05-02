@@ -23,9 +23,25 @@
   </div>
   <div class="hero-strip">
     {% call hero_stat('Total value') %}<strong>£{{ '{:,.0f}'.format(total_value) }}</strong>{% endcall %}
-    {% call hero_stat('Monthly in') %}<strong>£{{ '{:,.0f}'.format(total_monthly) }}</strong>{% endcall %}
+    {% call hero_stat('Monthly in', stat_id='accounts-monthly-in') %}
+      <strong title="Total landing in your accounts each month — your contributions plus any tax relief, gov't bonus and employer top-ups">£{{ '{:,.0f}'.format(total_into_pot_monthly) }}</strong>
+    {% endcall %}
     {% call hero_stat('Holdings tracked') %}<strong>{{ accounts | selectattr('valuation_mode', 'equalto', 'holdings') | list | length }}</strong>{% endcall %}
   </div>
+  {% set _uplift_monthly = total_into_pot_monthly - total_personal_monthly %}
+  {% if _uplift_monthly > 0 %}
+  <div class="change-breakdown">
+    <span class="change-chip change-chip-contrib">
+      £{{ '{:,.0f}'.format(total_personal_monthly) }}<span class="change-chip-label">from you</span>
+    </span>
+    <span class="change-chip change-chip-market-pos">
+      +£{{ '{:,.0f}'.format(_uplift_monthly) }}<span class="change-chip-label">tax + employer</span>
+    </span>
+    <span class="change-chip change-chip-into-pot">
+      £{{ '{:,.0f}'.format(total_into_pot_monthly) }}<span class="change-chip-label">into pots</span>
+    </span>
+  </div>
+  {% endif %}
 </section>
 
 {% if accounts | length > 0 %}
