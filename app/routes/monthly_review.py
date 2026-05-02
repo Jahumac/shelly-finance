@@ -5,6 +5,7 @@ from flask import Blueprint, current_app, flash, jsonify, redirect, render_templ
 from flask_login import current_user, login_required
 
 from app.calculations import (
+    contribution_breakdown,
     effective_account_value,
     goal_current_value,
     progress_to_goal,
@@ -261,6 +262,27 @@ def monthly_review():
                     "diff": expected - budgeted,
                 }
 
+    # Per-row into-pot breakdown — feeds chips next to each contribution amount
+    # (and the overall hero strip totals) so the user can see how much of the
+    # number is theirs vs. tax relief / employer / LISA bonus.
+    contribution_breakdowns = {}
+    total_personal = 0.0
+    total_into_pot = 0.0
+    if contribution_items:
+        accounts_by_id = {a["id"]: a for a in fetch_all_accounts(uid)}
+        for item in contribution_items:
+            acc = accounts_by_id.get(item["account_id"])
+            if not acc:
+                continue
+            personal = float(item["expected_contribution"] or 0)
+            adjusted = dict(acc)
+            adjusted["monthly_contribution"] = personal
+            br = contribution_breakdown(adjusted, assumptions)
+            contribution_breakdowns[item["account_id"]] = br
+            total_personal += personal
+            total_into_pot += br["total_into_pot"]
+    total_uplift = total_into_pot - total_personal
+
     return render_template(
         "monthly_review.html",
         review=review,
@@ -284,6 +306,10 @@ def monthly_review():
         unupdated_manual_names=unupdated_manual_names,
         goal_data=goal_data,
         budget_comparison_map=budget_comparison_map,
+        contribution_breakdowns=contribution_breakdowns,
+        total_personal=total_personal,
+        total_into_pot=total_into_pot,
+        total_uplift=total_uplift,
         active_page="monthly_review",
     )
 

@@ -2195,10 +2195,31 @@ button.badge-like-button {
   color: var(--danger);
   border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
 }
+.change-breakdown .change-chip-into-pot {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
 .change-breakdown .change-chip-label {
   opacity: 0.85;
   font-weight: 500;
   font-size: 0.85rem;
+}
+
+/* Per-row "+£X into pot" chip on the Monthly Update Expected Contributions list. */
+.contrib-pot-chip {
+  display: inline-block;
+  margin-top: 0.25rem;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--accent-2) 16%, transparent);
+  color: var(--accent-2);
+  border: 1px solid color-mix(in srgb, var(--accent-2) 32%, transparent);
+  cursor: help;
 }
 
 .data-table {

@@ -85,9 +85,22 @@
     </div>
     <div class="hero-strip-stat">
       <span>Expected contributions</span>
-      <strong>£{{ '{:,.0f}'.format(contribution_items | sum(attribute='expected_contribution')) }}</strong>
+      <strong>£{{ '{:,.0f}'.format(total_personal) }}</strong>
     </div>
   </div>
+  {% if contribution_items and total_uplift > 0 %}
+  <div class="change-breakdown">
+    <span class="change-chip change-chip-contrib">
+      £{{ '{:,.0f}'.format(total_personal) }}<span class="change-chip-label">from you</span>
+    </span>
+    <span class="change-chip change-chip-market-pos">
+      +£{{ '{:,.0f}'.format(total_uplift) }}<span class="change-chip-label">tax + employer</span>
+    </span>
+    <span class="change-chip change-chip-into-pot">
+      £{{ '{:,.0f}'.format(total_into_pot) }}<span class="change-chip-label">into pots</span>
+    </span>
+  </div>
+  {% endif %}
 </section>
 
 {% if review.status != 'complete' %}
@@ -170,6 +183,14 @@
           <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0;">
             <div style="text-align:right;">
               <strong>£{{ '{:,.2f}'.format(item.expected_contribution) }}</strong>
+              {% set br = contribution_breakdowns.get(item.account_id) %}
+              {% if br and br.total_into_pot > item.expected_contribution + 0.005 %}
+                {% set uplift = br.total_into_pot - item.expected_contribution %}
+                <span class="contrib-pot-chip"
+                      title="£{{ '{:,.2f}'.format(item.expected_contribution) }} from you{% if br.tax_relief %} · +£{{ '{:,.2f}'.format(br.tax_relief) }} tax relief{% endif %}{% if br.government_bonus %} · +£{{ '{:,.2f}'.format(br.government_bonus) }} bonus{% endif %}{% if br.employer %} · +£{{ '{:,.2f}'.format(br.employer) }} employer{% endif %}{% if br.contribution_fee %} · −£{{ '{:,.2f}'.format(br.contribution_fee) }} fee{% endif %} → £{{ '{:,.2f}'.format(br.total_into_pot) }} into pot">
+                  +£{{ '{:,.0f}'.format(uplift) }} into pot
+                </span>
+              {% endif %}
               {% set bc = budget_comparison_map.get(item.account_id) %}
               {% if bc %}
                 {% if bc.diff|round(2) == 0 %}
