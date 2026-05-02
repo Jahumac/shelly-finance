@@ -554,6 +554,25 @@ def fetch_fx_rates():
     return rates or _FX_RATE_CACHE["rates"]
 
 
+def _fetch_via_http_sources(symbol: str):
+    """Try Twelve Data → Yahoo Quote → Yahoo Chart for a single symbol.
+
+    Returns the first hit (with yf_symbol + source attached) or None.
+    """
+    for fn, source_name in (
+        (_try_twelve_data, "twelve_data"),
+        (_try_yahoo_quote, "yahoo_quote"),
+        (_try_yahoo_http, "yahoo_chart"),
+    ):
+        res = fn(symbol)
+        if res:
+            res["yf_symbol"] = symbol
+            res["source"] = source_name
+            logger.info(f"Fetched {symbol} via {source_name}: {res['price']} {res['currency']}")
+            return res
+    return None
+
+
 def fetch_price(ticker: str):
     """Fetch the current price for a ticker.
 
@@ -566,6 +585,11 @@ def fetch_price(ticker: str):
     4. If both fail and it doesn't end with .L, also try ticker + ".L" (London Stock Exchange).
     5. Last resort: search Yahoo Finance by name and try the best match.
 
+    Sanity check: when both the bare ticker and a `.L` variant return
+    prices, we compare GBP-equivalents and discard a `.L` result that
+    differs by more than ~3× — this guards against defunct/unrelated
+    LSE listings like a 4-pence ghost of a US share.
+
     Returns a dict with keys: price, currency, change_pct, yf_symbol
     or None if the price cannot be fetched.
     """
@@ -573,55 +597,43 @@ def fetch_price(ticker: str):
         return None
     ticker = ticker.strip().upper()
 
-    # ── Phase 0: prefer known alias up-front ────
     alias = TICKER_ALIASES.get(ticker)
-    _seen = set()
-    symbols_to_try = []
-    for s in ([alias] if alias else []) + [ticker] + ([] if ticker.endswith(".L") else [ticker + ".L"]):
-        if s and s not in _seen:
-            _seen.add(s)
-            symbols_to_try.append(s)
+    primary = alias or ticker
+    # Only try a .L fallback if we don't already have an LSE/aliased symbol
+    secondary = None if (primary.endswith(".L") or alias) else primary + ".L"
 
-    # ── Phase 1: Direct HTTP APIs (Reliable & Live) ────────────────────────
-    _chart_fallback = None  # best non-LSE Source A result seen so far
+    primary_res = _fetch_via_http_sources(primary)
 
-    for sym in symbols_to_try:
-        # Try Twelve Data (Source C) first if API key is configured
-        res = _try_twelve_data(sym)
-        if res:
-            res["yf_symbol"] = sym
-            res["source"] = "twelve_data"
-            logger.info(f"Fetched {sym} via Source C (Twelve Data): {res['price']} {res['currency']}")
-            return res
+    # If we have an LSE/GBP result already, accept it without consulting .L
+    if primary_res and (primary.endswith(".L") or primary_res.get("currency") in ("GBP", "GBp")):
+        return primary_res
 
-        # Try Yahoo Quote API (Source B) as the secondary live source
-        res = _try_yahoo_quote(sym)
-        if res:
-            res["yf_symbol"] = sym
-            res["source"] = "yahoo_quote"
-            logger.info(f"Fetched {sym} via Source B (quote): {res['price']} {res['currency']}")
-            return res
+    # Try the .L variant and sanity-check it against the bare-ticker price
+    if secondary:
+        secondary_res = _fetch_via_http_sources(secondary)
+        if secondary_res:
+            if primary_res:
+                try:
+                    p_gbp = to_gbp(primary_res["price"], primary_res["currency"])
+                    s_gbp = to_gbp(secondary_res["price"], secondary_res["currency"])
+                    if p_gbp and s_gbp and p_gbp > 0:
+                        ratio = s_gbp / p_gbp
+                        if ratio < 0.3 or ratio > 3.0:
+                            logger.warning(
+                                "Discarding %s (%s %s ≈ £%.4f) — wildly off from %s (£%.4f); using bare ticker",
+                                secondary, secondary_res["price"], secondary_res["currency"], s_gbp,
+                                primary, p_gbp,
+                            )
+                            return primary_res
+                except Exception:
+                    pass
+            return secondary_res
 
-        # Fallback to Yahoo Chart API (Source A)
-        res = _try_yahoo_http(sym)
-        if res:
-            res["yf_symbol"] = sym
-            res["source"] = "yahoo_chart"
-            logger.info(f"Fetched {sym} via Source A (chart): {res['price']} {res['currency']}")
-            # Prefer LSE / GBP-priced result; return immediately
-            if sym.endswith(".L") or res.get("currency") in ("GBP", "GBp"):
-                return res
-            # Non-LSE result — save as fallback and keep looking for a .L version
-            if _chart_fallback is None:
-                _chart_fallback = res
-
-    # If Phase 1 found a non-LSE chart result but no .L version, use it
-    if _chart_fallback:
-        logger.info(f"Using Source A non-LSE fallback: {_chart_fallback['yf_symbol']} {_chart_fallback['price']} {_chart_fallback['currency']}")
-        return _chart_fallback
+    if primary_res:
+        return primary_res
 
     # ── Phase 2: yfinance (Fallback) ─────────────────────────────────────
-    for sym in symbols_to_try:
+    for sym in filter(None, [primary, secondary]):
         yf_result = _try_ticker(sym)
         if yf_result:
             yf_result["yf_symbol"] = sym

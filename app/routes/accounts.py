@@ -148,6 +148,11 @@ def _render_accounts_page(user_id, selected=None, detail_mode="view", position_e
     else:
         prices_stale = any(r["valuation_mode"] == "holdings" for r in rows)
     positions = fetch_holdings_for_account(selected["id"]) if selected else []
+    if positions:
+        positions = sorted(
+            positions,
+            key=lambda p: (-(float(p["value"] or 0)), (p["holding_name"] or "").lower()),
+        )
     catalogue_rows = fetch_catalogue_with_prices(user_id)
     catalogue_prices = {row["id"]: {"price": row["last_price"], "currency": row["price_currency"]} for row in catalogue_rows if row["last_price"]}
     overrides = fetch_contribution_overrides(selected["id"]) if selected else []
