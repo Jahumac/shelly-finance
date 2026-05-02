@@ -1543,11 +1543,20 @@
           growthMode: 'default',
           rate: ''
         },
-        workplace_pension: {
-          name: 'Workplace Pension',
+        cash_isa: {
+          name: 'My Cash ISA',
           provider: '',
-          wrapper: 'Workplace Pension',
-          category: 'Pension',
+          wrapper: 'Cash ISA',
+          category: 'ISA',
+          valuation: 'manual',
+          growthMode: 'custom',
+          rate: ''
+        },
+        lifetime_isa: {
+          name: 'My Lifetime ISA',
+          provider: '',
+          wrapper: 'Lifetime ISA',
+          category: 'ISA',
           valuation: 'manual',
           growthMode: 'default',
           rate: ''
@@ -1561,6 +1570,24 @@
           growthMode: 'custom',
           rate: ''
         },
+        workplace_pension: {
+          name: 'Workplace Pension',
+          provider: '',
+          wrapper: 'Workplace Pension',
+          category: 'Pension',
+          valuation: 'manual',
+          growthMode: 'default',
+          rate: ''
+        },
+        sipp: {
+          name: 'My SIPP',
+          provider: '',
+          wrapper: 'SIPP',
+          category: 'Pension',
+          valuation: 'holdings',
+          growthMode: 'default',
+          rate: ''
+        },
         premium_bonds: {
           name: 'Premium Bonds',
           provider: 'NS&I',
@@ -1569,6 +1596,15 @@
           valuation: 'premium_bonds',
           growthMode: 'custom',
           rate: '3.3'
+        },
+        gia: {
+          name: 'General Investment Account',
+          provider: '',
+          wrapper: 'General Investment Account',
+          category: 'Taxable',
+          valuation: 'holdings',
+          growthMode: 'default',
+          rate: ''
         }
       };
       var currentWrapper = '';

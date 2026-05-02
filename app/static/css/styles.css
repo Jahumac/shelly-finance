@@ -5148,6 +5148,10 @@ a.link-accent:hover {
   font: inherit;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, transform 0.12s;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 5rem;
 }
 
 .cw-template:hover,
