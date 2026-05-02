@@ -109,132 +109,171 @@
     </div>
 
     {% if detail_mode == 'edit' %}
-      <form method="post" class="settings-form mt-1">
+      {% set _wt_edit = (selected.wrapper_type or '') | lower %}
+      {% set _wt_lower = _wt_edit %}
+      {% set _cat_lower = (selected.category or '') | lower %}
+      {% set _is_pension = 'workplace' in _wt_edit or 'pension' in _wt_edit %}
+      <form method="post" class="settings-form acct-edit-form mt-1">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="form_name" value="account">
         <section class="panel panel-sm">
           <h3 class="section-title">Edit Account</h3>
-          <div class="form-grid">
-            <label><span>Name</span><input type="text" name="name" value="{{ selected.name }}"></label>
-            <label>
-              <span>Provider</span>
-              <input type="text" name="provider" value="{{ selected.provider }}" list="provider-list" autocomplete="off">
-            </label>
-            <label>
-              <span>Wrapper Type</span>
-              <select name="wrapper_type">
-                {% for option in wrapper_type_options %}
-                  <option value="{{ option }}" {% if selected.wrapper_type == option %}selected{% endif %}>{{ option }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label>
-              <span>Category</span>
-              <select name="category">
-                {% for option in category_options %}
-                  <option value="{{ option }}" {% if selected.category == option %}selected{% endif %}>{{ option }}</option>
-                {% endfor %}
-              </select>
-            </label>
-            <label class="form-full-col">
-              <span>Tags</span>
-              <div class="tag-picker" data-tag-picker>
-                {% for tag in tag_options %}
-                <label class="tag-chip">
-                  <input type="checkbox" name="tags" value="{{ tag }}" {% if tag in selected_tags %}checked{% endif %}>
-                  <span class="tag-label">{{ tag }}</span>
-                  <span class="tag-delete" role="button" tabindex="0" data-delete-tag="{{ tag }}" aria-label="Remove tag {{ tag }}">✕</span>
-                </label>
-                {% endfor %}
-              </div>
-              <div class="tag-add-row" style="margin-top:0.4rem; display:flex; gap:0.4rem; align-items:center;">
-                <input type="text" data-new-tag-input aria-label="New custom tag name"
-                       placeholder="Add custom tag…"
-                       style="flex:1; padding:0.3rem 0.5rem; font-size:0.85rem;">
-                <button type="button" class="badge badge-outline text-nowrap" data-add-tag-btn
-                        aria-label="Add custom tag">+ Add</button>
-              </div>
-            </label>
-            <label>
-              <span>Balance Method</span>
-              <select name="valuation_mode" data-valuation-mode>
-                <option value="manual" {% if selected.valuation_mode == 'manual' or not selected.valuation_mode %}selected{% endif %}>Manual</option>
-                <option value="holdings" {% if selected.valuation_mode == 'holdings' %}selected{% endif %}>Built from holdings</option>
-                <option value="premium_bonds" {% if selected.valuation_mode == 'premium_bonds' %}selected{% endif %}>Premium Bonds</option>
-              </select>
-            </label>
-            <div data-manual-fields class="form-contents" {% if selected.valuation_mode == 'holdings' %}hidden{% endif %}>
-              <label><span>Current Balance</span><input type="number" step="any" name="current_value" value="{{ selected.current_value if selected.current_value is not none else '' }}"></label>
+
+          {# ── Identity ─────────────────────────────────────────── #}
+          <div class="edit-card">
+            <div class="edit-card-header">
+              <p class="edit-card-eyebrow">Identity</p>
+              <h4 class="edit-card-title">What this account is</h4>
             </div>
-            {% if selected.valuation_mode == 'premium_bonds' %}
-            {# Premium Bonds: lock to custom mode, show prize fund rate directly #}
-            <input type="hidden" name="growth_mode" value="custom">
-            <label>
-              <span>Prize fund rate (%)</span>
-              <input type="number" step="0.1" name="growth_rate_override" value="{{ '{:.1f}'.format(selected.growth_rate_override * 100) if selected.growth_rate_override else '3.3' }}" placeholder="e.g. 3.3">
-              <small class="form-hint">NS&amp;I's annual prize fund rate — currently <strong>3.3%</strong> (as of 2025). Shelly uses this as a rough estimate for projections only. It doesn't mean you earn 3.3% — it's the total pot divided by all bonds, so your actual prizes depend on luck. Your real wins are tracked separately in the Prize Draw section of Monthly Update.</small>
-            </label>
-            {% else %}
-            <label data-growth-mode-row>
-              <span>Growth Mode</span>
-              <select name="growth_mode" data-growth-mode>
-                <option value="default" {% if selected.growth_mode == 'default' %}selected{% endif %}>Default investment growth</option>
-                <option value="custom" {% if selected.growth_mode == 'custom' %}selected{% endif %}>Custom rate / interest</option>
-              </select>
-            </label>
-            <label data-custom-rate-field {% if selected.growth_mode != 'custom' %}class="hidden"{% endif %}>
-              <span>Custom Growth / Interest Rate (%)</span>
-              <input type="number" step="0.1" name="growth_rate_override" value="{{ '{:.1f}'.format(selected.growth_rate_override * 100) if selected.growth_rate_override else '' }}" placeholder="e.g. 4.5">
-              <small class="form-hint">Enter as a percentage — e.g. 4.5 for 4.5%, 3.6 for 3.6%</small>
-            </label>
-            {% set _wt_lower = (selected.wrapper_type or '') | lower %}
-            {% set _cat_lower = (selected.category or '') | lower %}
-            {% if selected.growth_mode == 'custom' and ('cash isa' in _wt_lower or 'cash' in _cat_lower or 'savings' in _cat_lower) %}
-            <label data-custom-rate-field {% if selected.growth_mode != 'custom' %}class="hidden"{% endif %}>
-              <span>Interest paid on day of month</span>
-              <input type="number" name="interest_payment_day" min="0" max="31" value="{{ selected.interest_payment_day or 0 }}">
-              <small class="form-hint">Day of the month when interest is credited to your account (e.g. 3 for the 3rd). Set 0 if unknown or not applicable.</small>
-            </label>
-            {% endif %}
-            {% endif %}
-            <label>
-              <span>Your Monthly Contribution</span>
-              <input type="number" step="0.01" name="monthly_contribution" value="{{ selected.monthly_contribution or 0 }}">
-              {% set _wt_edit = (selected.wrapper_type or '') | lower %}
-              {% if 'sipp' in _wt_edit %}
-              <small class="form-hint">What you pay from your bank each month. Shelly adds 25% basic-rate tax relief on top — your provider claims it from HMRC automatically.</small>
-              {% elif 'workplace' in _wt_edit or 'pension' in _wt_edit %}
-              <small class="form-hint">Your share of the pension contribution — either from your net pay or salary sacrifice, depending on your scheme.</small>
-              {% elif 'lifetime' in _wt_edit %}
-              <small class="form-hint">What you pay in. The government adds a 25% bonus (up to £4,000/year contributions).</small>
+            <div class="form-grid">
+              <label><span>Name</span><input type="text" name="name" value="{{ selected.name }}"></label>
+              <label>
+                <span>Provider</span>
+                <input type="text" name="provider" value="{{ selected.provider }}" list="provider-list" autocomplete="off">
+              </label>
+              <label>
+                <span>Wrapper Type</span>
+                <select name="wrapper_type">
+                  {% for option in wrapper_type_options %}
+                    <option value="{{ option }}" {% if selected.wrapper_type == option %}selected{% endif %}>{{ option }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label>
+                <span>Category</span>
+                <select name="category">
+                  {% for option in category_options %}
+                    <option value="{{ option }}" {% if selected.category == option %}selected{% endif %}>{{ option }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+            </div>
+          </div>
+
+          {# ── Tags ─────────────────────────────────────────────── #}
+          <div class="edit-card">
+            <div class="edit-card-header">
+              <p class="edit-card-eyebrow">Tags</p>
+              <h4 class="edit-card-title">Categorise &amp; group</h4>
+            </div>
+            <div class="tag-picker" data-tag-picker>
+              {% for tag in tag_options %}
+              <label class="tag-chip">
+                <input type="checkbox" name="tags" value="{{ tag }}" {% if tag in selected_tags %}checked{% endif %}>
+                <span class="tag-label">{{ tag }}</span>
+                <span class="tag-delete" role="button" tabindex="0" data-delete-tag="{{ tag }}" aria-label="Remove tag {{ tag }}">✕</span>
+              </label>
+              {% endfor %}
+            </div>
+            <div class="tag-add-row" style="margin-top:0.5rem; display:flex; gap:0.4rem; align-items:center;">
+              <input type="text" data-new-tag-input aria-label="New custom tag name"
+                     placeholder="Add custom tag…"
+                     style="flex:1; padding:0.4rem 0.55rem; font-size:0.85rem;">
+              <button type="button" class="badge badge-outline text-nowrap" data-add-tag-btn
+                      aria-label="Add custom tag">+ Add</button>
+            </div>
+          </div>
+
+          {# ── Valuation & growth ───────────────────────────────── #}
+          <div class="edit-card">
+            <div class="edit-card-header">
+              <p class="edit-card-eyebrow">Valuation</p>
+              <h4 class="edit-card-title">How Shelly values &amp; grows this account</h4>
+            </div>
+            <div class="form-grid">
+              <label>
+                <span>Balance Method</span>
+                <select name="valuation_mode" data-valuation-mode>
+                  <option value="manual" {% if selected.valuation_mode == 'manual' or not selected.valuation_mode %}selected{% endif %}>Manual</option>
+                  <option value="holdings" {% if selected.valuation_mode == 'holdings' %}selected{% endif %}>Built from holdings</option>
+                  <option value="premium_bonds" {% if selected.valuation_mode == 'premium_bonds' %}selected{% endif %}>Premium Bonds</option>
+                </select>
+              </label>
+              <div data-manual-fields class="form-contents" {% if selected.valuation_mode == 'holdings' %}hidden{% endif %}>
+                <label><span>Current Balance</span><input type="number" step="any" name="current_value" value="{{ selected.current_value if selected.current_value is not none else '' }}"></label>
+              </div>
+              {% if selected.valuation_mode == 'premium_bonds' %}
+              <input type="hidden" name="growth_mode" value="custom">
+              <label class="form-full-col">
+                <span>Prize fund rate (%)</span>
+                <input type="number" step="0.1" name="growth_rate_override" value="{{ '{:.1f}'.format(selected.growth_rate_override * 100) if selected.growth_rate_override else '3.3' }}" placeholder="e.g. 3.3">
+                <small class="form-hint">NS&amp;I's annual prize fund rate — currently <strong>3.3%</strong> (as of 2025). Shelly uses this as a rough estimate for projections only. It doesn't mean you earn 3.3% — it's the total pot divided by all bonds, so your actual prizes depend on luck. Your real wins are tracked separately in the Prize Draw section of Monthly Update.</small>
+              </label>
               {% else %}
-              <small class="form-hint">How much you put in each month. If you link a budget item to this account, Shelly uses this in your budget automatically.</small>
+              <label data-growth-mode-row>
+                <span>Growth Mode</span>
+                <select name="growth_mode" data-growth-mode>
+                  <option value="default" {% if selected.growth_mode == 'default' %}selected{% endif %}>Default investment growth</option>
+                  <option value="custom" {% if selected.growth_mode == 'custom' %}selected{% endif %}>Custom rate / interest</option>
+                </select>
+              </label>
+              <label data-custom-rate-field {% if selected.growth_mode != 'custom' %}class="hidden"{% endif %}>
+                <span>Custom Growth / Interest Rate (%)</span>
+                <input type="number" step="0.1" name="growth_rate_override" value="{{ '{:.1f}'.format(selected.growth_rate_override * 100) if selected.growth_rate_override else '' }}" placeholder="e.g. 4.5">
+                <small class="form-hint">Enter as a percentage — e.g. 4.5 for 4.5%, 3.6 for 3.6%</small>
+              </label>
+              {% if selected.growth_mode == 'custom' and ('cash isa' in _wt_lower or 'cash' in _cat_lower or 'savings' in _cat_lower) %}
+              <label data-custom-rate-field {% if selected.growth_mode != 'custom' %}class="hidden"{% endif %}>
+                <span>Interest paid on day of month</span>
+                <input type="number" name="interest_payment_day" min="0" max="31" value="{{ selected.interest_payment_day or 0 }}">
+                <small class="form-hint">Day of the month when interest is credited to your account (e.g. 3 for the 3rd). Set 0 if unknown or not applicable.</small>
+              </label>
               {% endif %}
-            </label>
-            {# ── Pension-specific fields ── #}
-            {% if 'workplace' in _wt_edit or 'pension' in _wt_edit %}
-            <label>
-              <span>Employer Contribution</span>
-              <input type="number" step="0.01" name="employer_contribution" value="{{ selected.employer_contribution or 0 }}">
-              <small class="form-hint">What your employer puts in each month on top of yours</small>
-            </label>
-            <label>
-              <span>Contribution Method</span>
-              {% set cm = selected.contribution_method if selected.contribution_method else 'standard' %}
-              <select name="contribution_method">
-                <option value="salary_sacrifice" {{ 'selected' if cm == 'salary_sacrifice' }}>Salary sacrifice</option>
-                <option value="relief_at_source" {{ 'selected' if cm == 'relief_at_source' or cm == 'standard' }}>Relief at source (e.g. NEST)</option>
-              </select>
-              <small class="form-hint">Salary sacrifice = pre-tax, no relief to claim. Relief at source = your provider claims 20% back from HMRC for you.</small>
-            </label>
-            <label>
-              <span>Pension contribution posting day</span>
-              <input type="number" name="pension_contribution_day" min="0" max="28" value="{{ selected.pension_contribution_day or 0 }}">
-              <small class="form-hint">Optional. Use if workplace pension invests later than salary day (e.g. paid on the 28th, invested on the 7th). Set 0 to use salary day from Settings.</small>
-            </label>
-            {% endif %}
-            <div class="form-full-col acct-budget-flags">
-              <p class="acct-flag-heading">Budget behaviour</p>
+              {% endif %}
+            </div>
+          </div>
+
+          {# ── Contributions ────────────────────────────────────── #}
+          <div class="edit-card edit-card-contrib">
+            <div class="edit-card-header">
+              <p class="edit-card-eyebrow">Contributions</p>
+              <h4 class="edit-card-title">What goes in each month</h4>
+            </div>
+            <div class="form-grid">
+              <label>
+                <span>Your Monthly Contribution</span>
+                <input type="number" step="0.01" name="monthly_contribution" value="{{ selected.monthly_contribution or 0 }}">
+                {% if 'sipp' in _wt_edit %}
+                <small class="form-hint">What you pay from your bank each month. Shelly adds 25% basic-rate tax relief on top — your provider claims it from HMRC automatically.</small>
+                {% elif _is_pension %}
+                <small class="form-hint">Your share of the pension contribution — either from your net pay or salary sacrifice, depending on your scheme.</small>
+                {% elif 'lifetime' in _wt_edit %}
+                <small class="form-hint">What you pay in. The government adds a 25% bonus (up to £4,000/year contributions).</small>
+                {% else %}
+                <small class="form-hint">How much you put in each month. If you link a budget item to this account, Shelly uses this in your budget automatically.</small>
+                {% endif %}
+              </label>
+              {% if _is_pension %}
+              <label>
+                <span>Employer Contribution</span>
+                <input type="number" step="0.01" name="employer_contribution" value="{{ selected.employer_contribution or 0 }}">
+                <small class="form-hint">What your employer puts in each month on top of yours</small>
+              </label>
+              <label>
+                <span>Contribution Method</span>
+                {% set cm = selected.contribution_method if selected.contribution_method else 'standard' %}
+                <select name="contribution_method">
+                  <option value="salary_sacrifice" {{ 'selected' if cm == 'salary_sacrifice' }}>Salary sacrifice</option>
+                  <option value="relief_at_source" {{ 'selected' if cm == 'relief_at_source' or cm == 'standard' }}>Relief at source (e.g. NEST)</option>
+                </select>
+                <small class="form-hint">Salary sacrifice = pre-tax, no relief to claim. Relief at source = your provider claims 20% back from HMRC for you.</small>
+              </label>
+              <label>
+                <span>Pension contribution posting day</span>
+                <input type="number" name="pension_contribution_day" min="0" max="28" value="{{ selected.pension_contribution_day or 0 }}">
+                <small class="form-hint">Optional. Use if workplace pension invests later than salary day (e.g. paid on the 28th, invested on the 7th). Set 0 to use salary day from Settings.</small>
+              </label>
+              {% endif %}
+            </div>
+          </div>
+
+          {# ── Budget behaviour ─────────────────────────────────── #}
+          <div class="edit-card">
+            <div class="edit-card-header">
+              <p class="edit-card-eyebrow">Budget</p>
+              <h4 class="edit-card-title">How this contribution shows in Budget</h4>
+            </div>
+            <div class="acct-budget-flags acct-budget-flags-flush">
               <label class="acct-flag-row">
                 <input type="hidden" name="include_in_budget" value="0">
                 <input type="checkbox" name="include_in_budget" value="1" {% if selected.include_in_budget is none or selected.include_in_budget %}checked{% endif %}>
@@ -252,16 +291,38 @@
                 </div>
               </label>
             </div>
-            <label><span>Account Goal</span><input type="number" step="0.01" name="goal_value" value="{{ selected.goal_value or '' }}"></label>
-            <label><span>Account holder</span><input type="text" name="owner" value="{{ selected.owner or '' }}" placeholder="e.g. Samuel, Me, Joint">
-              <small class="form-hint">Optional — useful for household accounts to show whose account this is.</small>
-            </label>
-            <label class="form-full-col"><span>Notes</span><input type="text" name="notes" value="{{ selected.notes or '' }}"></label>
           </div>
-          {# ── Advanced: Fees (below the main form grid) ─────────── #}
-          <details class="fee-details mt-1" {% if selected.platform_fee_pct or selected.platform_fee_flat or selected.fund_fee_pct or selected.contribution_fee_pct %}open{% endif %}>
-            <summary class="badge badge-outline cursor-pointer">Advanced: Fees</summary>
-            <div class="fee-fields">
+
+          {# ── Goal & notes ─────────────────────────────────────── #}
+          <div class="edit-card">
+            <div class="edit-card-header">
+              <p class="edit-card-eyebrow">Goal &amp; notes</p>
+              <h4 class="edit-card-title">Target, holder, and free-form notes</h4>
+            </div>
+            <div class="form-grid">
+              <label><span>Account Goal</span><input type="number" step="0.01" name="goal_value" value="{{ selected.goal_value or '' }}"></label>
+              <label>
+                <span>Account holder</span>
+                <input type="text" name="owner" value="{{ selected.owner or '' }}" placeholder="e.g. Samuel, Me, Joint">
+                <small class="form-hint">Optional — useful for household accounts to show whose account this is.</small>
+              </label>
+              <label class="form-full-col">
+                <span>Notes</span>
+                <textarea name="notes" rows="3" class="acct-notes-textarea" placeholder="Anything you want to remember about this account…">{{ selected.notes or '' }}</textarea>
+              </label>
+            </div>
+          </div>
+
+          {# ── Advanced: fees ───────────────────────────────────── #}
+          <details class="edit-card edit-card-fees" {% if selected.platform_fee_pct or selected.platform_fee_flat or selected.fund_fee_pct or selected.contribution_fee_pct %}open{% endif %}>
+            <summary class="edit-card-fees-summary">
+              <div class="edit-card-header">
+                <p class="edit-card-eyebrow">Advanced</p>
+                <h4 class="edit-card-title">Fees</h4>
+              </div>
+              <span class="edit-card-fees-toggle" aria-hidden="true">▾</span>
+            </summary>
+            <div class="form-grid mt-075">
               <label>
                 <span>Platform fee (%)</span>
                 <input type="number" step="0.001" name="platform_fee_pct" value="{{ selected.platform_fee_pct or '' }}" placeholder="e.g. 0.15" min="0" max="5">
@@ -291,9 +352,11 @@
             <input type="hidden" name="annual_fee_pct" value="0">
             <small class="form-hint text-muted block mt-05">All optional — Shelly combines annual fees into one effective rate and subtracts from your growth rate. Contribution fee reduces each payment before it's invested.</small>
           </details>
-          <div class="badge-row mt-1">
-            <button type="submit">Save account</button>
-            <a class="badge" href="/accounts/{{ selected.id }}">Cancel</a>
+
+          {# ── Action bar ───────────────────────────────────────── #}
+          <div class="edit-card-actions">
+            <a class="badge edit-cancel-btn" href="/accounts/{{ selected.id }}">Cancel</a>
+            <button type="submit" class="edit-save-btn">Save account</button>
           </div>
         </section>
       </form>
