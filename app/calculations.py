@@ -780,7 +780,7 @@ def _contribution_month_keys(today, salary_day):
     return keys
 
 
-def calculate_isa_usage(accounts, ad_hoc_contributions, today=None, salary_day=0, isa_overrides=None):
+def calculate_isa_usage(accounts, ad_hoc_contributions, today=None, salary_day=0, isa_overrides=None, review_contributions=None):
     """Auto-calculate ISA and LISA usage for the current tax year.
 
     accounts: list of account dicts (need wrapper_type, monthly_contribution)
@@ -788,6 +788,10 @@ def calculate_isa_usage(accounts, ad_hoc_contributions, today=None, salary_day=0
     salary_day: day of month when contributions go in (affects April handling)
     isa_overrides: list of override rows (account_id, from_month, to_month, override_amount)
                    — used to apply skips/adjustments to per-month contribution amounts
+    review_contributions: list of rows from fetch_tax_year_contributions (each row
+                   has account_id, month_key, expected_contribution, is_skipped).
+                   When present, a finalised review item replaces the per-account
+                   default for that month — the review is the user's confirmed truth.
 
     Returns dict with keys: isa_used, lisa_used, monthly_isa, monthly_lisa,
     adhoc_isa, adhoc_lisa, projected_isa, projected_lisa, breakdown.
@@ -805,10 +809,26 @@ def calculate_isa_usage(accounts, ad_hoc_contributions, today=None, salary_day=0
             (ov["from_month"], ov["to_month"], float(ov["override_amount"]))
         )
 
+    # Build review lookup: (account_id, month_key) → expected personal amount.
+    # is_skipped rows force £0 regardless of the stored expected_contribution.
+    review_amount_map = {}
+    for rc in (review_contributions or []):
+        key = (rc["account_id"], rc["month_key"])
+        if rc["is_skipped"]:
+            review_amount_map[key] = 0.0
+        else:
+            review_amount_map[key] = float(rc["expected_contribution"] or 0)
+
     def _effective_monthly(account_id, monthly, month_key):
+        # 1. Finalised review wins — that's the user's confirmed truth.
+        rkey = (account_id, month_key)
+        if rkey in review_amount_map:
+            return review_amount_map[rkey]
+        # 2. Active override (skip / adjusted amount).
         for from_m, to_m, amount in override_map.get(account_id, []):
             if from_m <= month_key <= to_m:
                 return amount
+        # 3. Per-account default.
         return monthly
 
     monthly_isa = 0.0

@@ -39,6 +39,7 @@ from app.models import (
     fetch_contribution_overrides,
     fetch_holding_totals_by_account,
     fetch_isa_contributions,
+    fetch_isa_overrides_for_tax_year,
     fetch_monthly_review,
     fetch_monthly_review_items,
     fetch_pension_contributions,
@@ -47,6 +48,7 @@ from app.models import (
     fetch_or_create_monthly_review,
     fetch_primary_goal,
     fetch_daily_snapshots,
+    fetch_tax_year_contributions,
 )
 
 overview_bp = Blueprint("overview", __name__)
@@ -117,7 +119,16 @@ def _build_daily_contributions_cumulative(uid, daily_labels, accounts, assumptio
                 if aid in skipped_ids:
                     continue
                 if aid in review_items_by_acc:
-                    month_total += float(review_items_by_acc[aid]["expected_contribution"] or 0)
+                    # The review stores the *personal* contribution. To match
+                    # what's actually landing in the pot (and Performance's
+                    # numbers), run it through the full into-pot helper so
+                    # SIPP picks up tax relief, Workplace Pension picks up
+                    # employer + relief, LISA picks up the bonus, etc.
+                    personal = float(review_items_by_acc[aid]["expected_contribution"] or 0)
+                    if personal > 0:
+                        adjusted = dict(a)
+                        adjusted["monthly_contribution"] = personal
+                        month_total += effective_monthly_contribution(adjusted, assumptions)
                 else:
                     default_amt = effective_monthly_contribution(a, assumptions)
                     if default_amt > 0:
@@ -230,10 +241,22 @@ def overview():
         salary_day = int(assumptions["salary_day"]) if assumptions and assumptions["salary_day"] else 0
     except (KeyError, TypeError):
         salary_day = 0
-    ty_start = uk_tax_year_start(now_date).isoformat()
-    ty_end = uk_tax_year_end(now_date).isoformat()
+    ty_start_date = uk_tax_year_start(now_date)
+    ty_end_date = uk_tax_year_end(now_date)
+    ty_start = ty_start_date.isoformat()
+    ty_end = ty_end_date.isoformat()
     ad_hoc = fetch_isa_contributions(uid, ty_start, ty_end)
-    isa_usage = calculate_isa_usage(raw_accounts, ad_hoc, now_date, salary_day)
+    isa_overrides = fetch_isa_overrides_for_tax_year(uid, ty_start, ty_end)
+    review_contribs = fetch_tax_year_contributions(
+        uid,
+        ty_start_date.strftime("%Y-%m"),
+        ty_end_date.strftime("%Y-%m"),
+    )
+    isa_usage = calculate_isa_usage(
+        raw_accounts, ad_hoc, now_date, salary_day,
+        isa_overrides=isa_overrides,
+        review_contributions=review_contribs,
+    )
     isa_used = isa_usage["isa_used"]
     lisa_used = isa_usage["lisa_used"]
 

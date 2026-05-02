@@ -35,6 +35,7 @@ from app.models import (
     fetch_pension_carry_forward,
     fetch_pension_contributions,
     fetch_dividend_records,
+    fetch_tax_year_contributions,
     upsert_pension_carry_forward,
 )
 
@@ -55,11 +56,22 @@ def allowance_overview():
         salary_day = int(assumptions["salary_day"]) if assumptions and assumptions["salary_day"] else 0
     except (KeyError, TypeError):
         salary_day = 0
-    ty_start = uk_tax_year_start(now_date).isoformat()
-    ty_end = uk_tax_year_end(now_date).isoformat()
+    ty_start_date = uk_tax_year_start(now_date)
+    ty_end_date = uk_tax_year_end(now_date)
+    ty_start = ty_start_date.isoformat()
+    ty_end = ty_end_date.isoformat()
     ad_hoc = fetch_isa_contributions(uid, ty_start, ty_end)
     isa_overrides = fetch_isa_overrides_for_tax_year(uid, ty_start, ty_end)
-    usage = calculate_isa_usage(accounts, ad_hoc, now_date, salary_day, isa_overrides)
+    review_contribs = fetch_tax_year_contributions(
+        uid,
+        ty_start_date.strftime("%Y-%m"),
+        ty_end_date.strftime("%Y-%m"),
+    )
+    usage = calculate_isa_usage(
+        accounts, ad_hoc, now_date, salary_day,
+        isa_overrides=isa_overrides,
+        review_contributions=review_contribs,
+    )
 
     isa_allowance = float(assumptions["isa_allowance"]) if assumptions else 20000
     lisa_allowance = float(assumptions["lisa_allowance"]) if assumptions else 4000
