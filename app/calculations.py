@@ -299,8 +299,14 @@ def goal_current_value(selected_tags, accounts, holdings_totals=None):
     return total
 
 
-def total_monthly_contributions(accounts):
-    return sum(to_float(a["monthly_contribution"]) for a in accounts)
+def total_monthly_contributions(accounts, assumptions=None):
+    """Sum of monthly contributions across accounts, full into-pot.
+
+    Includes tax relief, LISA bonus, employer match, and contribution fees so
+    the figure matches what's actually landing in pots each month — same
+    convention used by the Performance page and Overview chip.
+    """
+    return sum(effective_monthly_contribution(a, assumptions) for a in accounts)
 
 
 

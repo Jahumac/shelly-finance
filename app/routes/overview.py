@@ -184,7 +184,7 @@ def overview():
         accounts.append(row)
 
     invested_total = total_invested(accounts, holdings_totals)
-    monthly_total = total_monthly_contributions(accounts)
+    monthly_total = total_monthly_contributions(accounts, assumptions)
     tag_totals_map = tag_totals(accounts, holdings_totals)
     projected_total = projected_total_retirement_value(accounts, assumptions)
 
