@@ -44,13 +44,14 @@
   {% endif %}
 </section>
 
-{% if accounts | length > 0 %}
+{% if accounts | length > 0 and page_mode != 'create' %}
 <div class="row-end">
   <a class="badge badge-primary-action" href="/accounts/?mode=create">+ Add account</a>
 </div>
 {% endif %}
 
 {# ── Account cards ────────────────────────────────────────────────────────── #}
+{% if page_mode != 'create' %}
 <div class="acct-grid">
   {% for account in accounts %}
   {% set val = effective_values[account.id] %}
@@ -98,6 +99,7 @@
   </div>
   {% endfor %}
 </div>
+{% endif %}
 
 {% if selected %}
   {# ── Account detail view ──────────────────────────────────────────── #}

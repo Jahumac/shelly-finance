@@ -5138,6 +5138,12 @@ a.link-accent:hover {
   margin: 0 0 1rem;
 }
 
+@media (min-width: 720px) {
+  .cw-template-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
 .cw-template {
   text-align: left;
   padding: 0.75rem 0.85rem;
