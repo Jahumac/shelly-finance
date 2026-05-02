@@ -547,28 +547,55 @@
           </div>
           <a class="badge badge-meta" href="/budget/?month={{ current_month_key }}">Edit in Budget</a>
         </div>
-        <p class="helper-text">Short-term contribution changes are managed from Budget. This account view simply shows the active monthly adjustments Shelly is using.</p>
+        <p class="helper-text">Shelly always shows the <strong>currently active</strong> contribution at the top. Short-term changes are managed from Budget; if you've set an adjustment, it replaces the standard amount for its date range.</p>
 
-        {% if overrides %}
+        {% set active_override = namespace(ov=none) %}
+        {% for ov in overrides %}
+          {% if ov.from_month <= current_month_key and ov.to_month >= current_month_key and not active_override.ov %}
+            {% set active_override.ov = ov %}
+          {% endif %}
+        {% endfor %}
+        {% set standard_amount = selected.monthly_contribution|float if selected.monthly_contribution else 0 %}
+
         <div class="override-list mt-075">
-          {% for ov in overrides %}
-          <div class="override-item {% if ov.from_month <= current_month_key and ov.to_month >= current_month_key %}override-active{% endif %}">
+          {% if active_override.ov %}
+          <div class="override-item override-active override-active-prominent">
             <div class="override-item-info">
-              <strong>£{{ '{:,.2f}'.format(ov.override_amount) }}/mo</strong>
-              <small>{{ ov.from_month }} → {{ ov.to_month }}{% if ov.reason %} · {{ ov.reason }}{% endif %}</small>
+              <strong>£{{ '{:,.2f}'.format(active_override.ov.override_amount) }}/mo</strong>
+              <small>Adjustment · {{ active_override.ov.from_month }} → {{ active_override.ov.to_month }}{% if active_override.ov.reason %} · {{ active_override.ov.reason }}{% endif %}</small>
             </div>
             <div class="flex flex-center gap-05">
-              {% if ov.from_month <= current_month_key and ov.to_month >= current_month_key %}
-                <span class="override-badge">Active</span>
-              {% endif %}
-              <a class="badge badge-meta" href="/budget/?month={{ ov.from_month }}">Budget</a>
+              <span class="override-badge">Active</span>
+              <a class="badge badge-meta" href="/budget/?month={{ active_override.ov.from_month }}">Budget</a>
             </div>
           </div>
+          {% elif standard_amount > 0 %}
+          <div class="override-item override-active override-active-prominent">
+            <div class="override-item-info">
+              <strong>£{{ '{:,.2f}'.format(standard_amount) }}/mo</strong>
+              <small>Standard contribution from Budget</small>
+            </div>
+            <div class="flex flex-center gap-05">
+              <span class="override-badge">Active</span>
+              <a class="badge badge-meta" href="/budget/?month={{ current_month_key }}">Budget</a>
+            </div>
+          </div>
+          {% else %}
+          <p class="helper-text">No active contribution. Set a monthly amount in Budget to start tracking.</p>
+          {% endif %}
+
+          {% for ov in overrides %}
+            {% if not (ov.from_month <= current_month_key and ov.to_month >= current_month_key) %}
+            <div class="override-item">
+              <div class="override-item-info">
+                <strong>£{{ '{:,.2f}'.format(ov.override_amount) }}/mo</strong>
+                <small>Adjustment · {{ ov.from_month }} → {{ ov.to_month }}{% if ov.reason %} · {{ ov.reason }}{% endif %}</small>
+              </div>
+              <a class="badge badge-meta" href="/budget/?month={{ ov.from_month }}">Budget</a>
+            </div>
+            {% endif %}
           {% endfor %}
         </div>
-        {% else %}
-        <p class="helper-text">No adjustments yet — Shelly's using your standard account contribution.</p>
-        {% endif %}
       </section>
 
       {% if selected.valuation_mode == 'premium_bonds' %}

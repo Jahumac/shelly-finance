@@ -1888,6 +1888,26 @@ button.badge-like-button {
   background: rgba(251, 191, 36, 0.05);
 }
 
+.override-active-prominent {
+  position: relative;
+  border-color: rgba(251, 191, 36, 0.55);
+  border-left: 4px solid rgba(251, 191, 36, 0.9);
+  background: linear-gradient(90deg, rgba(251, 191, 36, 0.12), rgba(251, 191, 36, 0.04));
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.18), 0 6px 16px -10px rgba(251, 191, 36, 0.35);
+  transition: box-shadow 0.25s ease, background 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+}
+
+.override-active-prominent:hover {
+  border-color: rgba(251, 191, 36, 0.95);
+  background: linear-gradient(90deg, rgba(251, 191, 36, 0.22), rgba(251, 191, 36, 0.08));
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.45), 0 10px 24px -8px rgba(251, 191, 36, 0.55);
+  transform: translateY(-1px);
+}
+
+.override-active-prominent .override-item-info strong {
+  color: #fde68a;
+}
+
 .override-badge {
   font-size: 0.75rem;
   padding: 0.2rem 0.55rem;
