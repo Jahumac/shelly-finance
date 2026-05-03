@@ -578,6 +578,19 @@ body.is-back-online .site-header {
   color: #fee2e2;
 }
 
+.badge.badge-outline {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+.badge.badge-outline:hover,
+.badge.badge-outline:focus {
+  background: rgba(56, 189, 248, 0.06);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: var(--text);
+}
+
 .badge.badge-meta {
   font-size: 0.82rem;
   padding: 0.45rem 0.8rem;
